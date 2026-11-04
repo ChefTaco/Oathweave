@@ -14,6 +14,7 @@ export const AuthorizeQuerySchema = z.object({
 
 /** POST /oauth/authorize — user consent approval */
 export const AuthorizeConsentSchema = z.object({
+  consent: z.enum(['approve', 'deny']).optional(),
   clientId: z.string().min(1),
   redirectUri: z.url(),
   responseType: z.string().min(1),
@@ -26,7 +27,11 @@ export const AuthorizeConsentSchema = z.object({
 
 /** POST /oauth/token */
 export const TokenExchangeSchema = z.object({
-  grant_type: z.enum(['authorization_code', 'refresh_token', 'client_credentials']),
+  grant_type: z.enum([
+    'authorization_code',
+    'refresh_token',
+    'client_credentials',
+  ]),
   code: z.string().optional(),
   redirect_uri: z.string().optional(),
   client_id: z.string().optional(),

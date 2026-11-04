@@ -1,6 +1,7 @@
-import { CeremonyStore } from "./ceremony-store.js";
-import { Redis } from "ioredis";
-import { env } from "../config/env.js";
+import { CeremonyStore } from './ceremony-store.js'
+import { credentialOptionIds } from './webauthn-credentials.js'
+import { Redis } from 'ioredis'
+import { env } from '../config/env.js'
 /**
  * WebAuthn/FIDO2 service — registration & authentication ceremonies.
  *
@@ -15,28 +16,41 @@ import {
   verifyAuthenticationResponse,
   type VerifiedRegistrationResponse,
   type VerifiedAuthenticationResponse,
-} from '@simplewebauthn/server';
+} from '@simplewebauthn/server'
 
-type AuthenticatorTransportFuture = 'ble' | 'hybrid' | 'internal' | 'nfc' | 'usb';
+type AuthenticatorTransportFuture =
+  | 'ble'
+  | 'hybrid'
+  | 'internal'
+  | 'nfc'
+  | 'usb'
 
-const RP_NAME = process.env['WEBAUTHN_RP_NAME'] ?? 'Hive IAM';
-const RP_ID = process.env['WEBAUTHN_RP_ID'] ?? 'localhost';
-const RP_ORIGIN = process.env['WEBAUTHN_RP_ORIGIN'] ?? 'https://localhost';
+const RP_NAME = env.WEBAUTHN_RP_NAME
+const RP_ID = env.WEBAUTHN_RP_ID
+const RP_ORIGIN = env.WEBAUTHN_RP_ORIGIN
 
 // Single-use, purpose- and session-bound challenge store (5-min TTL).
 
-const ceremonyRedis = new Redis(env.REDIS_URL, { lazyConnect: true, enableOfflineQueue: false, maxRetriesPerRequest: 1, connectTimeout: 3000, commandTimeout: 5000 });
-ceremonyRedis.on('error', () => { /* Readiness and bounded ceremony errors report the dependency failure. */ });
-void ceremonyRedis.connect().catch(() => undefined);
-const ceremonies = new CeremonyStore(ceremonyRedis, env.REDIS_PREFIX);
+const ceremonyRedis = new Redis(env.REDIS_URL, {
+  lazyConnect: true,
+  enableOfflineQueue: false,
+  maxRetriesPerRequest: 1,
+  connectTimeout: 3000,
+  commandTimeout: 5000,
+})
+ceremonyRedis.on('error', () => {
+  /* Readiness and bounded ceremony errors report the dependency failure. */
+})
+void ceremonyRedis.connect().catch(() => undefined)
+const ceremonies = new CeremonyStore(ceremonyRedis, env.REDIS_PREFIX)
 
 // ── Types ──
 
 interface StoredCredential {
-  credentialId: string;   // Base64url
-  publicKey: string;      // Base64url
-  counter: number;
-  transports?: string[];
+  credentialId: string // Base64url
+  publicKey: string // Base64url
+  counter: number
+  transports?: string[]
 }
 
 // ── Registration ──
@@ -46,7 +60,7 @@ export async function getRegistrationOptions(
   userEmail: string,
   userName: string,
   existingCredentials: StoredCredential[],
-  binding = "",
+  binding = '',
 ): Promise<ReturnType<typeof generateRegistrationOptions>> {
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
@@ -54,29 +68,36 @@ export async function getRegistrationOptions(
     userName,
     userDisplayName: userEmail,
     attestationType: 'none',
-    excludeCredentials: existingCredentials.map((c) => ({
-      id: c.credentialId,
-      transports: (c.transports ?? []) as AuthenticatorTransportFuture[],
-    })),
+    excludeCredentials: existingCredentials.flatMap((c) =>
+      credentialOptionIds(c.credentialId).map((id) => ({
+        id,
+        transports: (c.transports ?? []) as AuthenticatorTransportFuture[],
+      })),
+    ),
     authenticatorSelection: {
       residentKey: 'preferred',
       userVerification: 'required',
     },
-  });
+  })
 
-  await ceremonies.save(userId, "register", binding, options.challenge);
-  return options;
+  await ceremonies.save(userId, 'register', binding, options.challenge)
+  return options
 }
 
 export async function verifyRegistration(
   userId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   response: any,
-  binding = "",
+  binding = '',
 ): Promise<VerifiedRegistrationResponse> {
-  const expectedChallenge = await ceremonies.consume(userId, "register", binding, response);
+  const expectedChallenge = await ceremonies.consume(
+    userId,
+    'register',
+    binding,
+    response,
+  )
   if (!expectedChallenge) {
-    throw new Error('Registration challenge expired or not found');
+    throw new Error('Registration challenge expired or not found')
   }
 
   return verifyRegistrationResponse({
@@ -85,7 +106,7 @@ export async function verifyRegistration(
     expectedOrigin: RP_ORIGIN,
     expectedRPID: RP_ID,
     requireUserVerification: true,
-  });
+  })
 }
 
 // ── Authentication ──
@@ -93,19 +114,21 @@ export async function verifyRegistration(
 export async function getAuthenticationOptions(
   userId: string,
   existingCredentials: StoredCredential[],
-  binding = "",
+  binding = '',
 ): Promise<ReturnType<typeof generateAuthenticationOptions>> {
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: existingCredentials.map((c) => ({
-      id: c.credentialId,
-      transports: (c.transports ?? []) as AuthenticatorTransportFuture[],
-    })),
+    allowCredentials: existingCredentials.flatMap((c) =>
+      credentialOptionIds(c.credentialId).map((id) => ({
+        id,
+        transports: (c.transports ?? []) as AuthenticatorTransportFuture[],
+      })),
+    ),
     userVerification: 'required',
-  });
+  })
 
-  await ceremonies.save(userId, "authenticate", binding, options.challenge);
-  return options;
+  await ceremonies.save(userId, 'authenticate', binding, options.challenge)
+  return options
 }
 
 export async function verifyAuthentication(
@@ -113,14 +136,19 @@ export async function verifyAuthentication(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   response: any,
   credential: StoredCredential,
-  binding = "",
+  binding = '',
 ): Promise<VerifiedAuthenticationResponse> {
-  const expectedChallenge = await ceremonies.consume(userId, "authenticate", binding, response);
+  const expectedChallenge = await ceremonies.consume(
+    userId,
+    'authenticate',
+    binding,
+    response,
+  )
   if (!expectedChallenge) {
-    throw new Error('Authentication challenge expired or not found');
+    throw new Error('Authentication challenge expired or not found')
   }
 
-  const uint8Key = Buffer.from(credential.publicKey, 'base64url');
+  const uint8Key = Buffer.from(credential.publicKey, 'base64url')
 
   return verifyAuthenticationResponse({
     response,
@@ -132,7 +160,8 @@ export async function verifyAuthentication(
       id: credential.credentialId,
       publicKey: uint8Key,
       counter: credential.counter,
-      transports: (credential.transports ?? []) as AuthenticatorTransportFuture[],
+      transports: (credential.transports ??
+        []) as AuthenticatorTransportFuture[],
     },
-  });
+  })
 }

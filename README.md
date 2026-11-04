@@ -164,3 +164,6 @@ the selected deployment. When the service certificate uses a DNS name, set
 bundle when needed. Probes retain certificate verification. Runtime state belongs
 in `/data`; mount only product-owned protected configuration in `/config`.
 Images are local candidates until registry publication and release acceptance.
+
+Browser clients, passkeys, step-up and private recovery delivery are documented in
+[the browser authentication guide](docs/BROWSER_AUTH.md). Existing production migration gates remain required.

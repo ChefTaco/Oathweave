@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto'
-import { issuerForClient, browserClientPolicies } from '../services/browser-policies.js'
-import { browserAuthorization, requireBrowserOrigin } from '../middleware/browser-session.js'
+import {
+  issuerForClient,
+  browserClientPolicies,
+} from '../services/browser-policies.js'
+import {
+  browserAuthorization,
+  requireBrowserOrigin,
+} from '../middleware/browser-session.js'
 /**
  * oauth.ts — OAuth2 Authorization Code Flow + PKCE routes.
  *
@@ -20,7 +26,11 @@ import { clientAuthMiddleware } from '../middleware/client-auth.js'
 import { parseBody } from '../utils/validate.js'
 import { getClientIp } from '../utils/ip.js'
 import { ApiError } from '../types/index.js'
-import { AuthorizeQuerySchema, AuthorizeConsentSchema, TokenExchangeSchema } from '../schemas/oauth.js'
+import {
+  AuthorizeQuerySchema,
+  AuthorizeConsentSchema,
+  TokenExchangeSchema,
+} from '../schemas/oauth.js'
 import {
   validateAuthorizeRequest,
   createAuthorizationCode,
@@ -58,7 +68,7 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
     codeChallengeMethod: params.code_challenge_method,
     scope: params.scope,
     state: params.state,
-        nonce: params.nonce,
+    nonce: params.nonce,
   })
 
   // If first-party client, auto-approve and redirect immediately
@@ -74,15 +84,18 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
         codeChallengeMethod: params.code_challenge_method,
         scope: params.scope,
         state: params.state,
-        browserSessionId: browserClientPolicies[params.client_id] ? principal.sessionId : undefined,
-      nonce: params.nonce,
+        browserSessionId: browserClientPolicies[params.client_id]
+          ? principal.sessionId
+          : undefined,
+        nonce: params.nonce,
       },
       getClientIp(c),
     )
 
     const redirectUrl = new URL(codeResult.redirectUri)
     redirectUrl.searchParams.set('code', codeResult.code)
-    if (codeResult.state) redirectUrl.searchParams.set('state', codeResult.state)
+    if (codeResult.state)
+      redirectUrl.searchParams.set('state', codeResult.state)
 
     return c.redirect(redirectUrl.toString(), 302)
   }
@@ -101,7 +114,7 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
       codeChallengeMethod: params.code_challenge_method,
       scope: params.scope,
       state: params.state,
-    nonce: params.nonce,
+      nonce: params.nonce,
     },
   })
 })
@@ -111,6 +124,40 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
   const body = await parseBody(c, AuthorizeConsentSchema)
   const principal = c.get('principal')
   const ip = getClientIp(c)
+
+  // A browser preflight must not allocate a usable code before consent. Native
+  // clients retain their existing explicit POST approval flow.
+  const browser =
+    c.req.header('x-oathweave-browser') === 'true' &&
+    browserClientPolicies[body.clientId]
+  if (browser) {
+    requireBrowserOrigin(c)
+    const request = await validateAuthorizeRequest(body)
+    c.header('Cache-Control', 'no-store')
+    if (body.consent === 'deny')
+      return c.json(
+        { error: 'ACCESS_DENIED', message: 'Authorization declined' },
+        403,
+      )
+    if (!request.skipConsent && body.consent !== 'approve') {
+      return c.json(
+        {
+          error: 'CONSENT_REQUIRED',
+          message: 'Review access before continuing',
+          clientName: request.clientName,
+          clientDescription: request.clientDescription,
+          scope: request.scope ?? '',
+          audience: browserClientPolicies[body.clientId]!.audience,
+          permissions: browserClientPolicies[body.clientId]!.permissions.filter(
+            (permission) =>
+              principal.permissions.includes(permission) ||
+              principal.permissions.includes('*'),
+          ),
+        },
+        403,
+      )
+    }
+  }
 
   const codeResult = await createAuthorizationCode(
     principal.sub,
@@ -123,18 +170,26 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
       scope: body.scope,
       state: body.state,
       nonce: body.nonce,
-      browserSessionId: browserClientPolicies[body.clientId] ? principal.sessionId : undefined,
+      browserSessionId: browserClientPolicies[body.clientId]
+        ? principal.sessionId
+        : undefined,
     },
     ip,
   )
 
   // Same-origin first-party SPA clients receive the authorization response
   // directly. The code still requires its registered redirect URI and PKCE.
-  if (c.req.header('x-oathweave-browser') === 'true' && browserClientPolicies[body.clientId]) {
+  if (
+    c.req.header('x-oathweave-browser') === 'true' &&
+    browserClientPolicies[body.clientId]
+  ) {
     requireBrowserOrigin(c)
-    if (!codeResult.skipConsent) throw new ApiError(403, 'CONSENT_REQUIRED', 'Explicit consent is required')
     c.header('Cache-Control', 'no-store')
-    return c.json({code:codeResult.code,state:codeResult.state,iss:issuerForClient(body.clientId,env.JWT_ISSUER)})
+    return c.json({
+      code: codeResult.code,
+      state: codeResult.state,
+      iss: issuerForClient(body.clientId, env.JWT_ISSUER),
+    })
   }
 
   const redirectUrl = new URL(codeResult.redirectUri)
@@ -150,8 +205,8 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
 
 // ── POST /token — Exchange code for tokens (or refresh) ──
 oauthRouter.post('/token', async (c) => {
-  c.header('Cache-Control','no-store')
-  c.header('Pragma','no-cache')
+  c.header('Cache-Control', 'no-store')
+  c.header('Pragma', 'no-cache')
   // Parse as form-urlencoded (OAuth2 spec) or JSON
   let body: Record<string, string>
   const contentType = c.req.header('content-type') ?? ''
@@ -170,7 +225,10 @@ oauthRouter.post('/token', async (c) => {
     const messages = parsed.error.issues
       .map((i) => `${i.path.join('.')}: ${i.message}`)
       .join('; ')
-    return c.json({ error: 'invalid_request', error_description: messages }, 400)
+    return c.json(
+      { error: 'invalid_request', error_description: messages },
+      400,
+    )
   }
 
   const params = parsed.data
@@ -179,11 +237,22 @@ oauthRouter.post('/token', async (c) => {
   // ── Handle refresh_token grant ──
   if (params.grant_type === 'refresh_token') {
     if (!params.refresh_token) {
-      return c.json({ error: 'invalid_request', error_description: 'refresh_token required' }, 400)
+      return c.json(
+        {
+          error: 'invalid_request',
+          error_description: 'refresh_token required',
+        },
+        400,
+      )
     }
 
     try {
-      const tokenPair = await rotateRefreshToken(params.refresh_token, ip, params.client_id, c.req.header('user-agent'))
+      const tokenPair = await rotateRefreshToken(
+        params.refresh_token,
+        ip,
+        params.client_id,
+        c.req.header('user-agent'),
+      )
       return c.json({
         access_token: tokenPair.accessToken,
         refresh_token: tokenPair.refreshToken,
@@ -191,36 +260,67 @@ oauthRouter.post('/token', async (c) => {
         token_type: 'Bearer',
       })
     } catch (err) {
-      return c.json({
-        error: 'invalid_grant',
-        error_description: err instanceof Error ? err.message : 'Invalid refresh token',
-      }, 400)
+      return c.json(
+        {
+          error: 'invalid_grant',
+          error_description:
+            err instanceof Error ? err.message : 'Invalid refresh token',
+        },
+        400,
+      )
     }
   }
 
   // ── Handle client_credentials grant ──
   if (params.grant_type === 'client_credentials') {
     if (!params.client_id) {
-      return c.json({ error: 'invalid_request', error_description: 'client_id is required' }, 400)
+      return c.json(
+        {
+          error: 'invalid_request',
+          error_description: 'client_id is required',
+        },
+        400,
+      )
     }
 
     // Authenticate the client (required for client_credentials)
     const clientSecret = params.client_secret ?? extractBasicAuthSecret(c)
     if (!clientSecret) {
-      return c.json({ error: 'invalid_client', error_description: 'Client authentication required' }, 401)
+      return c.json(
+        {
+          error: 'invalid_client',
+          error_description: 'Client authentication required',
+        },
+        401,
+      )
     }
 
-    const client = await prisma.client.findUnique({ where: { id: params.client_id } })
+    const client = await prisma.client.findUnique({
+      where: { id: params.client_id },
+    })
     if (!client || !client.active || !client.secretHash) {
-      return c.json({ error: 'invalid_client', error_description: 'Unknown or inactive client' }, 401)
+      return c.json(
+        {
+          error: 'invalid_client',
+          error_description: 'Unknown or inactive client',
+        },
+        401,
+      )
     }
     const validSecret = await argon2.verify(client.secretHash, clientSecret)
     if (!validSecret) {
-      return c.json({ error: 'invalid_client', error_description: 'Invalid client secret' }, 401)
+      return c.json(
+        { error: 'invalid_client', error_description: 'Invalid client secret' },
+        401,
+      )
     }
 
     try {
-      const result = await exchangeClientCredentials(params.client_id, params.scope, ip)
+      const result = await exchangeClientCredentials(
+        params.client_id,
+        params.scope,
+        ip,
+      )
       return c.json({
         access_token: result.accessToken,
         expires_in: result.expiresIn,
@@ -229,33 +329,62 @@ oauthRouter.post('/token', async (c) => {
       })
     } catch (err) {
       if (err instanceof ApiError) {
-        return c.json({ error: err.code.toLowerCase(), error_description: err.message }, err.status as 400)
+        return c.json(
+          { error: err.code.toLowerCase(), error_description: err.message },
+          err.status as 400,
+        )
       }
-      return c.json({ error: 'server_error', error_description: 'An unexpected error occurred' }, 500)
+      return c.json(
+        {
+          error: 'server_error',
+          error_description: 'An unexpected error occurred',
+        },
+        500,
+      )
     }
   }
 
   // ── Handle authorization_code grant ──
   if (!params.code || !params.redirect_uri || !params.client_id) {
-    return c.json({
-      error: 'invalid_request',
-      error_description: 'code, redirect_uri, and client_id are required',
-    }, 400)
+    return c.json(
+      {
+        error: 'invalid_request',
+        error_description: 'code, redirect_uri, and client_id are required',
+      },
+      400,
+    )
   }
 
   // Authenticate the client (client_secret in body or Basic auth)
   const clientSecret = params.client_secret ?? extractBasicAuthSecret(c)
   if (clientSecret) {
-    const client = await prisma.client.findUnique({ where: { id: params.client_id } })
+    const client = await prisma.client.findUnique({
+      where: { id: params.client_id },
+    })
     if (!client || !client.active) {
-      return c.json({ error: 'invalid_client', error_description: 'Unknown or inactive client' }, 401)
+      return c.json(
+        {
+          error: 'invalid_client',
+          error_description: 'Unknown or inactive client',
+        },
+        401,
+      )
     }
     if (!client.secretHash) {
-      return c.json({ error: 'invalid_client', error_description: 'Public clients cannot authenticate with a secret' }, 401)
+      return c.json(
+        {
+          error: 'invalid_client',
+          error_description: 'Public clients cannot authenticate with a secret',
+        },
+        401,
+      )
     }
     const validSecret = await argon2.verify(client.secretHash, clientSecret)
     if (!validSecret) {
-      return c.json({ error: 'invalid_client', error_description: 'Invalid client secret' }, 401)
+      return c.json(
+        { error: 'invalid_client', error_description: 'Invalid client secret' },
+        401,
+      )
     }
   }
   // Note: Public clients (PKCE-only, no secret) are allowed — PKCE provides the proof
@@ -295,21 +424,33 @@ oauthRouter.post('/token', async (c) => {
     }
 
     if (browserClientPolicies[params.client_id]) {
-      await prisma.refreshToken.deleteMany({where:{tokenHash:createHash('sha256').update(result.refreshToken).digest('hex')}})
+      await prisma.refreshToken.deleteMany({
+        where: {
+          tokenHash: createHash('sha256')
+            .update(result.refreshToken)
+            .digest('hex'),
+        },
+      })
       delete response.refresh_token
     }
     return c.json(response)
   } catch (err) {
     if (err instanceof ApiError) {
-      return c.json({
-        error: err.code.toLowerCase(),
-        error_description: err.message,
-      }, err.status as 400)
+      return c.json(
+        {
+          error: err.code.toLowerCase(),
+          error_description: err.message,
+        },
+        err.status as 400,
+      )
     }
-    return c.json({
-      error: 'server_error',
-      error_description: 'An unexpected error occurred',
-    }, 500)
+    return c.json(
+      {
+        error: 'server_error',
+        error_description: 'An unexpected error occurred',
+      },
+      500,
+    )
   }
 })
 
@@ -344,7 +485,8 @@ oauthRouter.get('/userinfo', authMiddleware, async (c) => {
 // ── GET /.well-known/openid-configuration — OIDC Discovery ──
 oauthRouter.get('/.well-known/openid-configuration', (c) => {
   const proto = c.req.header('x-forwarded-proto') ?? 'https'
-  const host = c.req.header('x-forwarded-host') ?? c.req.header('host') ?? 'localhost:4200'
+  const host =
+    c.req.header('x-forwarded-host') ?? c.req.header('host') ?? 'localhost:4200'
   const issuerUrl = `${proto}://${host}`
 
   c.header('Cache-Control', 'public, max-age=86400')
@@ -359,12 +501,16 @@ oauthRouter.get('/jwks', async (c) => {
 })
 
 // ── Helper: extract client secret from Basic auth header ──
-function extractBasicAuthSecret(c: { req: { header: (name: string) => string | undefined } }): string | undefined {
+function extractBasicAuthSecret(c: {
+  req: { header: (name: string) => string | undefined }
+}): string | undefined {
   const authorization = c.req.header('authorization')
   if (!authorization?.startsWith('Basic ')) return undefined
 
   try {
-    const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf-8')
+    const decoded = Buffer.from(authorization.slice(6), 'base64').toString(
+      'utf-8',
+    )
     const colonIndex = decoded.indexOf(':')
     if (colonIndex === -1) return undefined
     return decoded.slice(colonIndex + 1)

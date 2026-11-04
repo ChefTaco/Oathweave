@@ -14,6 +14,17 @@ export const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8).max(256),
 })
 
+export const StepUpSchema = z
+  .object({
+    password: z.string().min(1).max(256),
+    totpCode: z
+      .string()
+      .regex(/^[0-9]{6}$/)
+      .optional(),
+    assertion: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
+
 export const MfaVerifySchema = z.object({
   code: z.string().min(6).max(6),
 })

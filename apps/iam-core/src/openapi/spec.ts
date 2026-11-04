@@ -1,5 +1,9 @@
 import { z, type ZodType } from 'zod'
-import { AuthorizeQuerySchema, AuthorizeConsentSchema, TokenExchangeSchema } from '../schemas/oauth.js'
+import {
+  AuthorizeQuerySchema,
+  AuthorizeConsentSchema,
+  TokenExchangeSchema,
+} from '../schemas/oauth.js'
 import { IAM_VERSION } from '../config/version.js'
 import {
   LoginSchema,
@@ -8,12 +12,40 @@ import {
   MfaVerifySchema,
   MfaChallengeSchema,
   MfaDisableSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+  StepUpSchema,
 } from '../schemas/auth.js'
-import { CreateUserSchema, UpdateUserSchema, AssignRolesSchema, RotatePasswordSchema } from '../schemas/users.js'
+import {
+  CreateUserSchema,
+  UpdateUserSchema,
+  AssignRolesSchema,
+  RotatePasswordSchema,
+} from '../schemas/users.js'
 import { CreateRoleSchema, UpdateRoleSchema } from '../schemas/roles.js'
-import { CreateClientSchema, RotateClientSecretSchema, UpdateClientSchema } from '../schemas/clients.js'
-import { CreateServiceAccountSchema, UpdateServiceAccountSchema } from '../schemas/service-accounts.js'
-import { CreateSystemUserSchema, UpdateSystemUserSchema } from '../schemas/system-users.js'
+import {
+  CreateClientSchema,
+  RotateClientSecretSchema,
+  UpdateClientSchema,
+} from '../schemas/clients.js'
+import {
+  CreateServiceAccountSchema,
+  UpdateServiceAccountSchema,
+} from '../schemas/service-accounts.js'
+import {
+  CreateSystemUserSchema,
+  UpdateSystemUserSchema,
+} from '../schemas/system-users.js'
+
+import {
+  PasskeyRegisterSchema,
+  PasskeyAuthenticationSchema,
+  PasskeyAuthenticationOptionsSchema,
+  PasskeyOptionsResponseSchema,
+  PasskeyCredentialSchema,
+  MfaStatusSchema,
+  RecoveryCodesSchema,
+} from '../schemas/webauthn.js'
 
 // ── Helpers ──
 
@@ -26,10 +58,16 @@ function zod(schema: ZodType) {
       // Keep the published contract stable with the previous zod-to-json-schema
       // output: objects are documented as closed, and string formats are
       // described by `format` alone rather than zod's internal regexes.
-      if (zodSchema._zod.def.type === 'object' && jsonSchema.additionalProperties === undefined) {
+      if (
+        zodSchema._zod.def.type === 'object' &&
+        jsonSchema.additionalProperties === undefined
+      ) {
         jsonSchema.additionalProperties = false
       }
-      if (typeof jsonSchema.format === 'string' && typeof jsonSchema.pattern === 'string') {
+      if (
+        typeof jsonSchema.format === 'string' &&
+        typeof jsonSchema.pattern === 'string'
+      ) {
         delete jsonSchema.pattern
       }
     },
@@ -56,18 +94,44 @@ function created(schema: Record<string, unknown>, description = 'Created') {
   return { [201]: { description, content: { 'application/json': { schema } } } }
 }
 
-const err400 = { description: 'Validation error', content: { 'application/json': { schema: ref('ApiError') } } }
-const err401 = { description: 'Unauthorized', content: { 'application/json': { schema: ref('ApiError') } } }
-const err403 = { description: 'Forbidden', content: { 'application/json': { schema: ref('ApiError') } } }
-const err404 = { description: 'Not found', content: { 'application/json': { schema: ref('ApiError') } } }
-const err409 = { description: 'Conflict', content: { 'application/json': { schema: ref('ApiError') } } }
+const err400 = {
+  description: 'Validation error',
+  content: { 'application/json': { schema: ref('ApiError') } },
+}
+const err401 = {
+  description: 'Unauthorized',
+  content: { 'application/json': { schema: ref('ApiError') } },
+}
+const err403 = {
+  description: 'Forbidden',
+  content: { 'application/json': { schema: ref('ApiError') } },
+}
+const err404 = {
+  description: 'Not found',
+  content: { 'application/json': { schema: ref('ApiError') } },
+}
+const err409 = {
+  description: 'Conflict',
+  content: { 'application/json': { schema: ref('ApiError') } },
+}
 
-function qp(name: string, description: string, required = false, schema: Record<string, unknown> = { type: 'string' }) {
+function qp(
+  name: string,
+  description: string,
+  required = false,
+  schema: Record<string, unknown> = { type: 'string' },
+) {
   return { name, in: 'query' as const, required, description, schema }
 }
 
 function pp(name: string, description: string) {
-  return { name, in: 'path' as const, required: true, description, schema: { type: 'string' } }
+  return {
+    name,
+    in: 'path' as const,
+    required: true,
+    description,
+    schema: { type: 'string' },
+  }
 }
 
 // ── Build Spec ──
@@ -75,7 +139,10 @@ function pp(name: string, description: string) {
 export function buildOpenApiSpec() {
   const tags = [
     { name: 'Health', description: 'Service health check' },
-    { name: 'Auth', description: 'Authentication — login, MFA, token management' },
+    {
+      name: 'Auth',
+      description: 'Authentication — login, MFA, token management',
+    },
     { name: 'Users', description: 'User CRUD and role assignment' },
     { name: 'Roles', description: 'Role and permission management' },
     { name: 'Service Accounts', description: 'Service account management' },
@@ -90,6 +157,20 @@ export function buildOpenApiSpec() {
   const componentSchemas: Record<string, unknown> = {
     // Request schemas from Zod
     LoginRequest: zod(LoginSchema),
+    ForgotPasswordRequest: zod(ForgotPasswordSchema),
+    ResetPasswordRequest: zod(ResetPasswordSchema),
+    StepUpRequest: zod(StepUpSchema),
+    PasskeyRegisterRequest: zod(PasskeyRegisterSchema),
+    PasskeyAuthenticationRequest: zod(PasskeyAuthenticationSchema),
+    PasskeyAuthenticationOptionsRequest: zod(
+      PasskeyAuthenticationOptionsSchema,
+    ),
+    PasskeyOptionsResponse: zod(PasskeyOptionsResponseSchema),
+    PasskeyCredential: zod(PasskeyCredentialSchema),
+    MfaStatus: zod(MfaStatusSchema),
+    RecoveryCodes: zod(RecoveryCodesSchema),
+    AuthorizeConsentRequest: zod(AuthorizeConsentSchema),
+    TokenExchangeRequest: zod(TokenExchangeSchema),
     RefreshRequest: zod(RefreshSchema),
     ChangePasswordRequest: zod(ChangePasswordSchema),
     MfaVerifyRequest: zod(MfaVerifySchema),
@@ -228,17 +309,83 @@ export function buildOpenApiSpec() {
 
   const paths: Record<string, unknown> = {
     '/api/v1/browser/session': {
-      get: {tags:['Auth'],operationId:'browserSession',summary:'Read the revocable browser SSO principal',security:[{BrowserSession:[]}],responses:{200:{description:'Current principal'},401:err401}},
+      get: {
+        tags: ['Auth'],
+        operationId: 'browserSession',
+        summary: 'Read the revocable browser SSO principal',
+        security: [{ BrowserSession: [] }],
+        responses: { 200: { description: 'Current principal' }, 401: err401 },
+      },
     },
     '/api/v1/browser/logout': {
-      post: {tags:['Auth'],operationId:'browserLogout',summary:'Revoke the browser session and its bound product access',security:[{BrowserSession:[]}],responses:{200:{description:'Session revoked'},403:err403}},
+      post: {
+        tags: ['Auth'],
+        operationId: 'browserLogout',
+        summary: 'Revoke the browser session and its bound product access',
+        security: [{ BrowserSession: [] }],
+        responses: { 200: { description: 'Session revoked' }, 403: err403 },
+      },
     },
     '/api/v1/oauth/authorize': {
-      get: {tags:['Auth'],operationId:'oauthAuthorize',summary:'Authorize an exact registered redirect and S256 PKCE challenge',parameters:Object.entries(AuthorizeQuerySchema.shape).map(([name,schema])=>({name,in:'query',schema:zod(schema)})),responses:{200:{description:'Consent request'},302:{description:'Authorization response'},400:err400,401:err401}},
-      post: {tags:['Auth'],operationId:'oauthConsent',summary:'Approve authorization; registered first-party browser clients receive a session-bound code, state and issuer',requestBody:{required:true,content:{'application/json':{schema:zod(AuthorizeConsentSchema)}}},responses:{200:{description:'Authorization response'},400:err400,401:err401,403:err403}},
+      get: {
+        tags: ['Auth'],
+        operationId: 'oauthAuthorize',
+        summary:
+          'Authorize an exact registered redirect and S256 PKCE challenge',
+        parameters: Object.entries(AuthorizeQuerySchema.shape).map(
+          ([name, schema]) => ({ name, in: 'query', schema: zod(schema) }),
+        ),
+        responses: {
+          200: { description: 'Consent request' },
+          302: { description: 'Authorization response' },
+          400: err400,
+          401: err401,
+        },
+      },
+      post: {
+        tags: ['Auth'],
+        operationId: 'oauthConsent',
+        summary:
+          'Approve authorization; registered first-party browser clients receive a session-bound code, state and issuer',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: zod(AuthorizeConsentSchema) },
+          },
+        },
+        responses: {
+          200: { description: 'Authorization response' },
+          400: err400,
+          401: err401,
+          403: err403,
+        },
+      },
     },
     '/api/v1/oauth/token': {
-      post: {tags:['Auth'],operationId:'oauthToken',summary:'Exchange a one-use authorization code with PKCE. Suite browser clients receive no refresh token.',security:[],requestBody:{required:true,content:{'application/json':{schema:zod(TokenExchangeSchema)},'application/x-www-form-urlencoded':{schema:zod(TokenExchangeSchema)}}},responses:{200:{description:'Audience-restricted access token and optional ID token'},400:err400,401:err401}},
+      post: {
+        tags: ['Auth'],
+        operationId: 'oauthToken',
+        summary:
+          'Exchange a one-use authorization code with PKCE. Suite browser clients receive no refresh token.',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: zod(TokenExchangeSchema) },
+            'application/x-www-form-urlencoded': {
+              schema: zod(TokenExchangeSchema),
+            },
+          },
+        },
+        responses: {
+          200: {
+            description:
+              'Audience-restricted access token and optional ID token',
+          },
+          400: err400,
+          401: err401,
+        },
+      },
     },
     // ── Health ──
     '/api/v1/health': {
@@ -246,7 +393,14 @@ export function buildOpenApiSpec() {
         tags: ['Health'],
         summary: 'Compatibility dependency health check',
         operationId: 'getHealth',
-        responses: success({ type: 'object', properties: { status: { type: 'string' }, timestamp: { type: 'string' }, checks: { type: 'array', items: { type: 'object' } } } }),
+        responses: success({
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            timestamp: { type: 'string' },
+            checks: { type: 'array', items: { type: 'object' } },
+          },
+        }),
       },
     },
     '/api/v1/health/live': {
@@ -254,7 +408,14 @@ export function buildOpenApiSpec() {
         tags: ['Health'],
         summary: 'Dependency-free liveness check',
         operationId: 'getHealthLive',
-        responses: success({ type: 'object', properties: { status: { type: 'string' }, timestamp: { type: 'string' }, checks: { type: 'array', items: { type: 'object' } } } }),
+        responses: success({
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            timestamp: { type: 'string' },
+            checks: { type: 'array', items: { type: 'object' } },
+          },
+        }),
       },
     },
     '/api/v1/health/ready': {
@@ -262,7 +423,14 @@ export function buildOpenApiSpec() {
         tags: ['Health'],
         summary: 'Readiness check for SQLite and Redis',
         operationId: 'getHealthReady',
-        responses: success({ type: 'object', properties: { status: { type: 'string' }, timestamp: { type: 'string' }, checks: { type: 'array', items: { type: 'object' } } } }),
+        responses: success({
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            timestamp: { type: 'string' },
+            checks: { type: 'array', items: { type: 'object' } },
+          },
+        }),
       },
     },
     '/api/v1/health/dependencies': {
@@ -270,7 +438,14 @@ export function buildOpenApiSpec() {
         tags: ['Health'],
         summary: 'Dependency health check for SQLite and Redis',
         operationId: 'getHealthDependencies',
-        responses: success({ type: 'object', properties: { status: { type: 'string' }, timestamp: { type: 'string' }, checks: { type: 'array', items: { type: 'object' } } } }),
+        responses: success({
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            timestamp: { type: 'string' },
+            checks: { type: 'array', items: { type: 'object' } },
+          },
+        }),
       },
     },
 
@@ -280,11 +455,31 @@ export function buildOpenApiSpec() {
         tags: ['Auth'],
         summary: 'Login with username and password',
         operationId: 'login',
-        parameters:[{name:'X-Oathweave-Browser',in:'header',required:false,schema:{type:'string',enum:['true']},description:'Opt into the approved-origin server-owned SSO session. Native access and refresh credentials are omitted from this response.'}],
+        parameters: [
+          {
+            name: 'X-Oathweave-Browser',
+            in: 'header',
+            required: false,
+            schema: { type: 'string', enum: ['true'] },
+            description:
+              'Opt into the approved-origin server-owned SSO session. Native access and refresh credentials are omitted from this response.',
+          },
+        ],
         requestBody: jsonBody(ref('LoginRequest')),
         responses: {
-          ...success({ type: 'object', properties: { accessToken: { type: 'string' }, refreshToken: { type: 'string' }, expiresIn: { type: 'number' } } }, 'Native login returns credentials. Browser SSO mode returns a server-owned cookie and public profile without native access/refresh tokens.'),
-          400: err400, 401: err401,
+          ...success(
+            {
+              type: 'object',
+              properties: {
+                accessToken: { type: 'string' },
+                refreshToken: { type: 'string' },
+                expiresIn: { type: 'number' },
+              },
+            },
+            'Native login returns credentials. Browser SSO mode returns a server-owned cookie and public profile without native access/refresh tokens.',
+          ),
+          400: err400,
+          401: err401,
         },
       },
     },
@@ -295,7 +490,14 @@ export function buildOpenApiSpec() {
         operationId: 'refreshToken',
         requestBody: jsonBody(ref('RefreshRequest')),
         responses: {
-          ...success({ type: 'object', properties: { accessToken: { type: 'string' }, refreshToken: { type: 'string' }, expiresIn: { type: 'number' } } }),
+          ...success({
+            type: 'object',
+            properties: {
+              accessToken: { type: 'string' },
+              refreshToken: { type: 'string' },
+              expiresIn: { type: 'number' },
+            },
+          }),
           401: err401,
         },
       },
@@ -306,7 +508,10 @@ export function buildOpenApiSpec() {
         summary: 'Logout and revoke session',
         operationId: 'logout',
         security: [{ BearerAuth: [] }],
-        responses: success({ type: 'object', properties: { message: { type: 'string' } } }),
+        responses: success({
+          type: 'object',
+          properties: { message: { type: 'string' } },
+        }),
       },
     },
     '/api/v1/auth/me': {
@@ -325,7 +530,14 @@ export function buildOpenApiSpec() {
         operationId: 'changePassword',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('ChangePasswordRequest')),
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 400: err400, 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          400: err400,
+          401: err401,
+        },
       },
     },
     '/api/v1/auth/public-key': {
@@ -333,7 +545,10 @@ export function buildOpenApiSpec() {
         tags: ['Auth'],
         summary: 'Get JWT RS256 public key (PEM)',
         operationId: 'getPublicKey',
-        responses: success({ type: 'object', properties: { publicKey: { type: 'string' } } }),
+        responses: success({
+          type: 'object',
+          properties: { publicKey: { type: 'string' } },
+        }),
       },
     },
     '/api/v1/auth/mfa/setup': {
@@ -342,7 +557,18 @@ export function buildOpenApiSpec() {
         summary: 'Initialize TOTP MFA setup',
         operationId: 'mfaSetup',
         security: [{ BearerAuth: [] }],
-        responses: { ...success({ type: 'object', properties: { secret: { type: 'string' }, qrCode: { type: 'string' }, backupCodes: { type: 'array', items: { type: 'string' } } } }), 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            required: ['secret', 'qrUri', 'qrDataUrl'],
+            properties: {
+              secret: { type: 'string' },
+              qrUri: { type: 'string' },
+              qrDataUrl: { type: 'string' },
+            },
+          }),
+          401: err401,
+        },
       },
     },
     '/api/v1/auth/mfa/verify': {
@@ -352,7 +578,18 @@ export function buildOpenApiSpec() {
         operationId: 'mfaVerify',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('MfaVerifyRequest')),
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 400: err400, 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            required: ['message', 'backupCodes'],
+            properties: {
+              message: { type: 'string' },
+              backupCodes: { type: 'array', items: { type: 'string' } },
+            },
+          }),
+          400: err400,
+          401: err401,
+        },
       },
     },
     '/api/v1/auth/mfa/challenge': {
@@ -362,8 +599,16 @@ export function buildOpenApiSpec() {
         operationId: 'mfaChallenge',
         requestBody: jsonBody(ref('MfaChallengeRequest')),
         responses: {
-          ...success({ type: 'object', properties: { accessToken: { type: 'string' }, refreshToken: { type: 'string' }, expiresIn: { type: 'number' } } }),
-          400: err400, 401: err401,
+          ...success({
+            type: 'object',
+            properties: {
+              accessToken: { type: 'string' },
+              refreshToken: { type: 'string' },
+              expiresIn: { type: 'number' },
+            },
+          }),
+          400: err400,
+          401: err401,
         },
       },
     },
@@ -374,7 +619,14 @@ export function buildOpenApiSpec() {
         operationId: 'mfaDisable',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('MfaDisableRequest')),
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 400: err400, 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          400: err400,
+          401: err401,
+        },
       },
     },
 
@@ -387,13 +639,23 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [
           qp('page', 'Page number', false, { type: 'integer', default: 1 }),
-          qp('limit', 'Items per page', false, { type: 'integer', default: 50 }),
+          qp('limit', 'Items per page', false, {
+            type: 'integer',
+            default: 50,
+          }),
           qp('search', 'Search by username or email'),
           qp('status', 'Filter by status'),
         ],
         responses: {
-          ...success({ type: 'object', properties: { users: { type: 'array', items: ref('User') }, total: { type: 'integer' } } }),
-          401: err401, 403: err403,
+          ...success({
+            type: 'object',
+            properties: {
+              users: { type: 'array', items: ref('User') },
+              total: { type: 'integer' },
+            },
+          }),
+          401: err401,
+          403: err403,
         },
       },
       post: {
@@ -402,7 +664,13 @@ export function buildOpenApiSpec() {
         operationId: 'createUser',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('CreateUserRequest')),
-        responses: { ...created(ref('User')), 400: err400, 401: err401, 403: err403, 409: err409 },
+        responses: {
+          ...created(ref('User')),
+          400: err400,
+          401: err401,
+          403: err403,
+          409: err409,
+        },
       },
     },
     '/api/v1/users/{id}': {
@@ -421,7 +689,13 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'User ID')],
         requestBody: jsonBody(ref('UpdateUserRequest')),
-        responses: { ...success(ref('User')), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success(ref('User')),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
       delete: {
         tags: ['Users'],
@@ -429,7 +703,15 @@ export function buildOpenApiSpec() {
         operationId: 'deleteUser',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'User ID')],
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
     '/api/v1/users/{id}/roles': {
@@ -440,7 +722,13 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'User ID')],
         requestBody: jsonBody(ref('AssignRolesRequest')),
-        responses: { ...success(ref('User')), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success(ref('User')),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
     '/api/v1/users/{id}/rotate-password': {
@@ -451,7 +739,16 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'User ID')],
         requestBody: jsonBody(ref('RotatePasswordRequest')),
-        responses: { ...success({ type: 'object', properties: { success: { type: 'boolean' } } }), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { success: { type: 'boolean' } },
+          }),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
 
@@ -462,7 +759,13 @@ export function buildOpenApiSpec() {
         summary: 'List roles',
         operationId: 'listRoles',
         security: [{ BearerAuth: [] }],
-        responses: { ...success({ type: 'object', properties: { roles: { type: 'array', items: ref('Role') } } }), 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { roles: { type: 'array', items: ref('Role') } },
+          }),
+          401: err401,
+        },
       },
       post: {
         tags: ['Roles'],
@@ -470,7 +773,13 @@ export function buildOpenApiSpec() {
         operationId: 'createRole',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('CreateRoleRequest')),
-        responses: { ...created(ref('Role')), 400: err400, 401: err401, 403: err403, 409: err409 },
+        responses: {
+          ...created(ref('Role')),
+          400: err400,
+          401: err401,
+          403: err403,
+          409: err409,
+        },
       },
     },
     '/api/v1/roles/{id}': {
@@ -489,7 +798,13 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Role ID')],
         requestBody: jsonBody(ref('UpdateRoleRequest')),
-        responses: { ...success(ref('Role')), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success(ref('Role')),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
       delete: {
         tags: ['Roles'],
@@ -497,7 +812,15 @@ export function buildOpenApiSpec() {
         operationId: 'deleteRole',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Role ID')],
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
 
@@ -508,7 +831,15 @@ export function buildOpenApiSpec() {
         summary: 'List service accounts',
         operationId: 'listServiceAccounts',
         security: [{ BearerAuth: [] }],
-        responses: { ...success({ type: 'object', properties: { serviceAccounts: { type: 'array', items: ref('ServiceAccount') } } }), 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              serviceAccounts: { type: 'array', items: ref('ServiceAccount') },
+            },
+          }),
+          401: err401,
+        },
       },
       post: {
         tags: ['Service Accounts'],
@@ -516,7 +847,12 @@ export function buildOpenApiSpec() {
         operationId: 'createServiceAccount',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('CreateServiceAccountRequest')),
-        responses: { ...created(ref('ServiceAccount')), 400: err400, 401: err401, 403: err403 },
+        responses: {
+          ...created(ref('ServiceAccount')),
+          400: err400,
+          401: err401,
+          403: err403,
+        },
       },
     },
     '/api/v1/service-accounts/{id}': {
@@ -527,7 +863,13 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Service account ID')],
         requestBody: jsonBody(ref('UpdateServiceAccountRequest')),
-        responses: { ...success(ref('ServiceAccount')), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success(ref('ServiceAccount')),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
       delete: {
         tags: ['Service Accounts'],
@@ -535,7 +877,15 @@ export function buildOpenApiSpec() {
         operationId: 'deleteServiceAccount',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Service account ID')],
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
     '/api/v1/service-accounts/{id}/rotate': {
@@ -545,7 +895,18 @@ export function buildOpenApiSpec() {
         operationId: 'rotateServiceAccountKey',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Service account ID')],
-        responses: { ...success({ type: 'object', properties: { apiKey: { type: 'string' }, message: { type: 'string' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              apiKey: { type: 'string' },
+              message: { type: 'string' },
+            },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
 
@@ -556,7 +917,13 @@ export function buildOpenApiSpec() {
         summary: 'List clients',
         operationId: 'listClients',
         security: [{ BearerAuth: [] }],
-        responses: { ...success({ type: 'object', properties: { clients: { type: 'array', items: ref('Client') } } }), 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { clients: { type: 'array', items: ref('Client') } },
+          }),
+          401: err401,
+        },
       },
       post: {
         tags: ['Clients'],
@@ -564,7 +931,12 @@ export function buildOpenApiSpec() {
         operationId: 'createClient',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('CreateClientRequest')),
-        responses: { ...created(ref('Client')), 400: err400, 401: err401, 403: err403 },
+        responses: {
+          ...created(ref('Client')),
+          400: err400,
+          401: err401,
+          403: err403,
+        },
       },
     },
     '/api/v1/clients/{id}': {
@@ -575,7 +947,13 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Client ID')],
         requestBody: jsonBody(ref('UpdateClientRequest')),
-        responses: { ...success(ref('Client')), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success(ref('Client')),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
       delete: {
         tags: ['Clients'],
@@ -583,7 +961,15 @@ export function buildOpenApiSpec() {
         operationId: 'deleteClient',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Client ID')],
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
     '/api/v1/clients/{id}/rotate-secret': {
@@ -594,7 +980,17 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Client ID')],
         requestBody: jsonBody(ref('RotateClientSecretRequest')),
-        responses: { ...success({ type: 'object', properties: { success: { type: 'boolean' } } }), 400: err400, 401: err401, 403: err403, 404: err404, 409: err409 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { success: { type: 'boolean' } },
+          }),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+          409: err409,
+        },
       },
     },
 
@@ -619,9 +1015,22 @@ export function buildOpenApiSpec() {
         parameters: [
           qp('userId', 'Filter by user ID'),
           qp('page', 'Page number', false, { type: 'integer', default: 1 }),
-          qp('limit', 'Items per page', false, { type: 'integer', default: 50 }),
+          qp('limit', 'Items per page', false, {
+            type: 'integer',
+            default: 50,
+          }),
         ],
-        responses: { ...success({ type: 'object', properties: { sessions: { type: 'array', items: ref('Session') }, total: { type: 'integer' } } }), 401: err401, 403: err403 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              sessions: { type: 'array', items: ref('Session') },
+              total: { type: 'integer' },
+            },
+          }),
+          401: err401,
+          403: err403,
+        },
       },
     },
     '/api/v1/sessions/{id}': {
@@ -631,7 +1040,15 @@ export function buildOpenApiSpec() {
         operationId: 'revokeSession',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Session ID')],
-        responses: { ...success({ type: 'object', properties: { message: { type: 'string' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
 
@@ -642,7 +1059,15 @@ export function buildOpenApiSpec() {
         summary: 'List system user mappings',
         operationId: 'listSystemUsers',
         security: [{ BearerAuth: [] }],
-        responses: { ...success({ type: 'object', properties: { systemUsers: { type: 'array', items: { type: 'object' } } } }), 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              systemUsers: { type: 'array', items: { type: 'object' } },
+            },
+          }),
+          401: err401,
+        },
       },
       post: {
         tags: ['System Users'],
@@ -650,7 +1075,12 @@ export function buildOpenApiSpec() {
         operationId: 'createSystemUser',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('CreateSystemUserRequest')),
-        responses: { ...created({ type: 'object' }), 400: err400, 401: err401, 403: err403 },
+        responses: {
+          ...created({ type: 'object' }),
+          400: err400,
+          401: err401,
+          403: err403,
+        },
       },
     },
     '/api/v1/system-users/{id}': {
@@ -661,7 +1091,13 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'System user mapping ID')],
         requestBody: jsonBody(ref('UpdateSystemUserRequest')),
-        responses: { ...success({ type: 'object' }), 400: err400, 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({ type: 'object' }),
+          400: err400,
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
       delete: {
         tags: ['System Users'],
@@ -669,7 +1105,15 @@ export function buildOpenApiSpec() {
         operationId: 'deleteSystemUser',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'System user mapping ID')],
-        responses: { ...success({ type: 'object', properties: { success: { type: 'boolean' } } }), 401: err401, 403: err403, 404: err404 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { success: { type: 'boolean' } },
+          }),
+          401: err401,
+          403: err403,
+          404: err404,
+        },
       },
     },
 
@@ -682,7 +1126,10 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         parameters: [
           qp('page', 'Page number', false, { type: 'integer', default: 1 }),
-          qp('limit', 'Items per page', false, { type: 'integer', default: 50 }),
+          qp('limit', 'Items per page', false, {
+            type: 'integer',
+            default: 50,
+          }),
           qp('category', 'Filter by category'),
           qp('actorId', 'Filter by actor ID'),
           qp('outcome', 'Filter by outcome'),
@@ -690,7 +1137,17 @@ export function buildOpenApiSpec() {
           qp('from', 'Start date (ISO 8601)'),
           qp('to', 'End date (ISO 8601)'),
         ],
-        responses: { ...success({ type: 'object', properties: { events: { type: 'array', items: ref('AuditEvent') }, total: { type: 'integer' } } }), 401: err401, 403: err403 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              events: { type: 'array', items: ref('AuditEvent') },
+              total: { type: 'integer' },
+            },
+          }),
+          401: err401,
+          403: err403,
+        },
       },
     },
     '/api/v1/audit/stats': {
@@ -707,10 +1164,14 @@ export function buildOpenApiSpec() {
               successCount: { type: 'integer' },
               failureCount: { type: 'integer' },
               deniedCount: { type: 'integer' },
-              byCategory: { type: 'object', additionalProperties: { type: 'integer' } },
+              byCategory: {
+                type: 'object',
+                additionalProperties: { type: 'integer' },
+              },
             },
           }),
-          401: err401, 403: err403,
+          401: err401,
+          403: err403,
         },
       },
     },
@@ -721,7 +1182,11 @@ export function buildOpenApiSpec() {
         operationId: 'exportAuditEvents',
         security: [{ BearerAuth: [] }],
         parameters: [
-          qp('format', 'Export format', false, { type: 'string', enum: ['csv', 'json', 'syslog'], default: 'csv' }),
+          qp('format', 'Export format', false, {
+            type: 'string',
+            enum: ['csv', 'json', 'syslog'],
+            default: 'csv',
+          }),
           qp('from', 'Start date (ISO 8601)'),
           qp('to', 'End date (ISO 8601)'),
           qp('category', 'Filter by category'),
@@ -736,7 +1201,8 @@ export function buildOpenApiSpec() {
               'text/plain': { schema: { type: 'string' } },
             },
           },
-          401: err401, 403: err403,
+          401: err401,
+          403: err403,
         },
       },
     },
@@ -751,7 +1217,8 @@ export function buildOpenApiSpec() {
             description: 'Server-Sent Events stream',
             content: { 'text/event-stream': { schema: { type: 'string' } } },
           },
-          401: err401, 403: err403,
+          401: err401,
+          403: err403,
         },
       },
     },
@@ -763,9 +1230,19 @@ export function buildOpenApiSpec() {
         security: [{ AgentToken: [] }],
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { type: 'array', items: { type: 'object' } } } },
+          content: {
+            'application/json': {
+              schema: { type: 'array', items: { type: 'object' } },
+            },
+          },
         },
-        responses: { ...success({ type: 'object', properties: { ingested: { type: 'integer' } } }), 401: err401 },
+        responses: {
+          ...success({
+            type: 'object',
+            properties: { ingested: { type: 'integer' } },
+          }),
+          401: err401,
+        },
       },
     },
 
@@ -783,8 +1260,21 @@ export function buildOpenApiSpec() {
         summary: 'Update password policy (admin only)',
         operationId: 'updatePasswordPolicy',
         security: [{ BearerAuth: [] }],
-        requestBody: jsonBody({ type: 'object', properties: { minLength: { type: 'integer' }, requireUppercase: { type: 'boolean' }, maxAgeDays: { type: 'integer' }, historyCount: { type: 'integer' } } } as unknown as ReturnType<typeof ref>),
-        responses: { ...success(ref('PasswordPolicy')), 400: err400, 401: err401, 403: err403 },
+        requestBody: jsonBody({
+          type: 'object',
+          properties: {
+            minLength: { type: 'integer' },
+            requireUppercase: { type: 'boolean' },
+            maxAgeDays: { type: 'integer' },
+            historyCount: { type: 'integer' },
+          },
+        } as unknown as ReturnType<typeof ref>),
+        responses: {
+          ...success(ref('PasswordPolicy')),
+          400: err400,
+          401: err401,
+          403: err403,
+        },
       },
     },
     '/api/v1/password-policy/strength': {
@@ -792,18 +1282,205 @@ export function buildOpenApiSpec() {
         tags: ['Password Policy'],
         summary: 'Check password strength score',
         operationId: 'checkPasswordStrength',
-        requestBody: jsonBody({ type: 'object', properties: { password: { type: 'string' } }, required: ['password'] } as unknown as ReturnType<typeof ref>),
-        responses: { ...success({ type: 'object', properties: { score: { type: 'integer' }, label: { type: 'string' } } }) },
+        requestBody: jsonBody({
+          type: 'object',
+          properties: { password: { type: 'string' } },
+          required: ['password'],
+        } as unknown as ReturnType<typeof ref>),
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              score: { type: 'integer' },
+              label: { type: 'string' },
+            },
+          }),
+        },
       },
     },
   }
+
+  Object.assign(paths, {
+    '/api/v1/auth/forgot-password': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'requestPasswordRecovery',
+        summary:
+          'Queue private out-of-band recovery; identical public responses for existing and unknown accounts',
+        requestBody: jsonBody(ref('ForgotPasswordRequest')),
+        responses: {
+          200: { description: 'Recovery request queued' },
+          503: { description: 'Recovery delivery is unavailable' },
+        },
+      },
+    },
+    '/api/v1/auth/reset-password': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'resetPassword',
+        summary:
+          'Consume an expiring one-use reset token and revoke prior sessions, refresh tokens and authorization codes',
+        requestBody: jsonBody(ref('ResetPasswordRequest')),
+        responses: {
+          200: { description: 'Password replaced; sign in again' },
+          400: err400,
+        },
+      },
+    },
+    '/api/v1/auth/mfa/status': {
+      get: {
+        tags: ['Auth'],
+        operationId: 'getOwnMfaStatus',
+        security: [{ BearerAuth: [] }],
+        responses: { ...success(ref('MfaStatus')), 401: err401 },
+      },
+    },
+    '/api/v1/auth/mfa/recovery-codes': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'replaceRecoveryCodes',
+        summary:
+          'Replace recovery codes after recent interactive authentication; plaintext is shown once',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          ...success(ref('RecoveryCodes')),
+          401: err401,
+          403: err403,
+        },
+      },
+    },
+    '/api/v1/auth/step-up/options': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'stepUpPasskeyOptions',
+        security: [{ BrowserSession: [] }, { BearerAuth: [] }],
+        responses: {
+          ...success(ref('PasskeyOptionsResponse')),
+          401: err401,
+          403: err403,
+        },
+      },
+    },
+    '/api/v1/auth/step-up': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'completeStepUp',
+        summary:
+          'Verify the password and an enabled MFA method for the current session',
+        security: [{ BrowserSession: [] }, { BearerAuth: [] }],
+        requestBody: jsonBody(ref('StepUpRequest')),
+        responses: {
+          200: { description: 'Session re-authenticated' },
+          401: err401,
+          403: err403,
+        },
+      },
+    },
+    '/api/v1/mfa/webauthn/options': {
+      get: {
+        tags: ['Auth'],
+        operationId: 'registerPasskeyOptions',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          ...success(ref('PasskeyOptionsResponse')),
+          401: err401,
+          403: err403,
+        },
+      },
+    },
+    '/api/v1/mfa/webauthn/register': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'registerPasskey',
+        security: [{ BearerAuth: [] }],
+        requestBody: jsonBody(ref('PasskeyRegisterRequest')),
+        responses: {
+          200: { description: 'Passkey registered' },
+          400: err400,
+          403: err403,
+        },
+      },
+    },
+    '/api/v1/mfa/webauthn/authenticate-options': {
+      get: {
+        tags: ['Auth'],
+        operationId: 'nativePasskeyAuthenticationOptions',
+        summary:
+          'Native compatibility; browsers use POST to keep challenge credentials out of URLs',
+        parameters: [
+          {
+            name: 'mfaToken',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: { ...success(ref('PasskeyOptionsResponse')), 401: err401 },
+      },
+      post: {
+        tags: ['Auth'],
+        operationId: 'passkeyAuthenticationOptions',
+        requestBody: jsonBody(ref('PasskeyAuthenticationOptionsRequest')),
+        responses: { ...success(ref('PasskeyOptionsResponse')), 401: err401 },
+      },
+    },
+    '/api/v1/mfa/webauthn/authenticate': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'authenticatePasskey',
+        summary:
+          'Verify a single-use MFA ceremony; browser opt-in returns only an HttpOnly SSO session',
+        requestBody: jsonBody(ref('PasskeyAuthenticationRequest')),
+        responses: {
+          200: {
+            description:
+              'Authenticated; native token response or browser session',
+          },
+          400: err400,
+          401: err401,
+        },
+      },
+    },
+    '/api/v1/mfa/webauthn/credentials': {
+      get: {
+        tags: ['Auth'],
+        operationId: 'listOwnPasskeys',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          ...success({
+            type: 'object',
+            properties: {
+              data: { type: 'array', items: ref('PasskeyCredential') },
+            },
+            required: ['data'],
+          }),
+          401: err401,
+        },
+      },
+    },
+    '/api/v1/mfa/webauthn/credentials/{id}': {
+      delete: {
+        tags: ['Auth'],
+        operationId: 'deleteOwnPasskey',
+        security: [{ BearerAuth: [] }],
+        parameters: [pp('id', 'Passkey record identifier')],
+        responses: {
+          200: { description: 'Passkey removed' },
+          401: err401,
+          403: err403,
+          404: err404,
+        },
+      },
+    },
+  })
 
   return {
     openapi: '3.1.0',
     info: {
       title: 'Hive IAM Core API',
       version: IAM_VERSION,
-      description: 'Centralized Identity & Access Management API for the Hive platform. Handles authentication (RS256 JWT), authorization (RBAC), user management, service accounts, audit logging, MFA, and password policies.',
+      description:
+        'Centralized Identity & Access Management API for the Hive platform. Handles authentication (RS256 JWT), authorization (RBAC), user management, service accounts, audit logging, MFA, and password policies.',
     },
     servers: [
       { url: 'http://localhost:4200', description: 'Local development' },
@@ -812,12 +1489,19 @@ export function buildOpenApiSpec() {
     components: {
       schemas: componentSchemas,
       securitySchemes: {
-        BrowserSession: {type:'apiKey',in:'cookie',name:'__Host-oathweave_sso',description:'Secure HttpOnly browser session; unsafe requests require an allowed Origin'},
+        BrowserSession: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: '__Host-oathweave_sso',
+          description:
+            'Secure HttpOnly browser session; unsafe requests require an allowed Origin',
+        },
         BearerAuth: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'RS256 JWT access token obtained from POST /api/v1/auth/login',
+          description:
+            'RS256 JWT access token obtained from POST /api/v1/auth/login',
         },
         AgentToken: {
           type: 'apiKey',

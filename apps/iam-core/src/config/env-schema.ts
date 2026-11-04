@@ -6,10 +6,17 @@ import { z } from 'zod'
  * server module so configuration errors never surface as stack traces.
  */
 export const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
   PORT: z.coerce.number().default(4200),
   HOST: z.string().default('0.0.0.0'),
-  MAX_REQUEST_BODY_BYTES: z.coerce.number().int().min(1024).max(10 * 1024 * 1024).default(1024 * 1024),
+  MAX_REQUEST_BODY_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(10 * 1024 * 1024)
+    .default(1024 * 1024),
   TRUSTED_PROXY_IPS: z.string().default(''),
 
   DATABASE_URL: z.string().min(1),
@@ -29,6 +36,19 @@ export const envSchema = z.object({
   TLS_KEY_PATH: z.string().optional(),
 
   CORS_ORIGIN: z.string().default('https://localhost'),
+  WEBAUTHN_RP_NAME: z.string().min(1).default('Oathweave'),
+  WEBAUTHN_RP_ID: z
+    .string()
+    .regex(/^[A-Za-z0-9.-]+$/)
+    .default('localhost'),
+  WEBAUTHN_RP_ORIGIN: z
+    .url()
+    .refine((value) => new URL(value).protocol === 'https:')
+    .default('https://localhost'),
+  IAM_RECOVERY_OUTBOX_DIRECTORY: z
+    .string()
+    .regex(/^\/(?:[^/]+\/)*[^/]+$/)
+    .optional(),
 
   AUDIT_LOG_DIR: z.string().optional(),
   AUDIT_MAX_AGE_DAYS: z.coerce.number().default(365),
@@ -44,22 +64,36 @@ export const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>
 
 const FIX_HINTS: Record<string, string> = {
-  COOKIE_SECRET: 'set COOKIE_SECRET to a random string of at least 32 characters (for example `openssl rand -hex 32`)',
-  IAM_AGENT_SECRET: 'set IAM_AGENT_SECRET to a random string of at least 16 characters (for example `openssl rand -hex 32`)',
-  DATABASE_URL: 'set DATABASE_URL to a SQLite file URL such as file:/var/lib/hive-iam/iam.db',
-  JWT_PRIVATE_KEY_PATH: 'set JWT_PRIVATE_KEY_PATH to the RS256 private key (PEM) file',
-  JWT_PUBLIC_KEY_PATH: 'set JWT_PUBLIC_KEY_PATH to the RS256 public key (PEM) file',
+  COOKIE_SECRET:
+    'set COOKIE_SECRET to a random string of at least 32 characters (for example `openssl rand -hex 32`)',
+  IAM_AGENT_SECRET:
+    'set IAM_AGENT_SECRET to a random string of at least 16 characters (for example `openssl rand -hex 32`)',
+  DATABASE_URL:
+    'set DATABASE_URL to a SQLite file URL such as file:/var/lib/hive-iam/iam.db',
+  JWT_PRIVATE_KEY_PATH:
+    'set JWT_PRIVATE_KEY_PATH to the RS256 private key (PEM) file',
+  JWT_PUBLIC_KEY_PATH:
+    'set JWT_PUBLIC_KEY_PATH to the RS256 public key (PEM) file',
 }
 
 type EnvIssue = z.core.$ZodIssue
 
-function describeProblem(issue: EnvIssue, source: Record<string, string | undefined>, name: string): string {
+function describeProblem(
+  issue: EnvIssue,
+  source: Record<string, string | undefined>,
+  name: string,
+): string {
   if (source[name] === undefined) return 'is not set'
-  if (issue.code === 'too_small' && issue.origin === 'string') return `must contain at least ${String(issue.minimum)} characters`
-  if (issue.code === 'too_small') return `must be at least ${String(issue.minimum)}`
-  if (issue.code === 'too_big') return `must be at most ${String(issue.maximum)}`
-  if (issue.code === 'invalid_value') return `must be one of ${issue.values.map(String).join(', ')}`
-  if (issue.code === 'invalid_type' && issue.expected === 'number') return 'must be a number'
+  if (issue.code === 'too_small' && issue.origin === 'string')
+    return `must contain at least ${String(issue.minimum)} characters`
+  if (issue.code === 'too_small')
+    return `must be at least ${String(issue.minimum)}`
+  if (issue.code === 'too_big')
+    return `must be at most ${String(issue.maximum)}`
+  if (issue.code === 'invalid_value')
+    return `must be one of ${issue.values.map(String).join(', ')}`
+  if (issue.code === 'invalid_type' && issue.expected === 'number')
+    return 'must be a number'
   return `is invalid (${issue.message})`
 }
 
@@ -78,7 +112,9 @@ export function describeEnvIssues(
     if (seen.has(name)) continue
     seen.add(name)
     const hint = FIX_HINTS[name] ?? `set ${name} to a valid value`
-    lines.push(`Configuration error: ${name} ${describeProblem(issue, source, name)}. Fix: ${hint} in the environment or env file.`)
+    lines.push(
+      `Configuration error: ${name} ${describeProblem(issue, source, name)}. Fix: ${hint} in the environment or env file.`,
+    )
   }
   return lines
 }
@@ -87,7 +123,9 @@ export type EnvValidation =
   | { ok: true; env: Env }
   | { ok: false; errors: string[] }
 
-export function validateEnv(source: Record<string, string | undefined> = process.env): EnvValidation {
+export function validateEnv(
+  source: Record<string, string | undefined> = process.env,
+): EnvValidation {
   const result = envSchema.safeParse(source)
   if (result.success) return { ok: true, env: result.data }
   return { ok: false, errors: describeEnvIssues(result.error.issues, source) }

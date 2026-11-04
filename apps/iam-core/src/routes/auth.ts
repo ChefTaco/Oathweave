@@ -1,28 +1,69 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { SignJWT, jwtVerify } from 'jose'
+import { SignJWT } from 'jose'
 import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { verifyPassword, hashPassword } from '../services/password-service.js'
-import { issueTokenPair, rotateRefreshToken, revokeRefreshToken, introspectToken } from '../services/token-service.js'
+import {
+  issueTokenPair,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  introspectToken,
+} from '../services/token-service.js'
 import { createSession, revokeSession } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
-import { generateTotpSecret, verifyTotpCode, generateBackupCodes, verifyBackupCode } from '../services/mfa-service.js'
+import {
+  generateTotpSecret,
+  verifyTotpCode,
+  generateBackupCodes,
+  verifyBackupCode,
+} from '../services/mfa-service.js'
 import { getClientIp } from '../utils/ip.js'
-import { getPrivateKey, getPublicKeyPem, getPublicKey } from '../utils/keys.js'
+import { getPrivateKey, getPublicKeyPem } from '../utils/keys.js'
 import { parseBody } from '../utils/validate.js'
-import { LoginSchema, RefreshSchema, ChangePasswordSchema, MfaVerifySchema, MfaChallengeSchema, MfaDisableSchema, ForgotPasswordSchema, ResetPasswordSchema } from '../schemas/auth.js'
+import {
+  LoginSchema,
+  RefreshSchema,
+  ChangePasswordSchema,
+  MfaVerifySchema,
+  MfaChallengeSchema,
+  MfaDisableSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from '../schemas/auth.js'
 import { ApiError } from '../types/index.js'
 import { env } from '../config/env.js'
 import { checkIpAllowlist } from '../utils/ip-allowlist.js'
-import { getDefaultPolicy, isPasswordExpired, validatePasswordPolicy, checkPasswordHistory, recordPasswordHistory } from '../services/password-policy-service.js'
+import {
+  getDefaultPolicy,
+  isPasswordExpired,
+  validatePasswordPolicy,
+  checkPasswordHistory,
+  recordPasswordHistory,
+} from '../services/password-policy-service.js'
 import { eventBus } from '../services/event-bus.js'
 import { checkBreachedPassword } from '../services/breach-check-service.js'
 
 import { computeSessionRisk } from '../services/session-risk-service.js'
 import { completeStepUp } from '../middleware/step-up.js'
+import {
+  recoveryOutbox,
+  deliverPasswordRecovery,
+} from '../services/recovery-delivery.js'
+import { browserClientPolicies } from '../services/browser-policies.js'
+import { browserAuthorization } from '../middleware/browser-session.js'
+import { StepUpSchema } from '../schemas/auth.js'
+import {
+  stepUpPasskeyOptions,
+  verifyStepUpPasskey,
+} from '../services/step-up-mfa.js'
+import {
+  loginChallengeUser,
+  consumeLoginChallenge,
+} from '../services/login-challenge.js'
+import { requireRecentSession } from '../middleware/recent-session.js'
 
 export const authRouter = new Hono()
 
@@ -37,7 +78,10 @@ authRouter.post(
 
     const user = await prisma.user.findFirst({
       where: { OR: [{ username }, { email: username }] },
-      include: { roles: { include: { role: true } }, webauthnCredentials: { select: { id: true } } },
+      include: {
+        roles: { include: { role: true } },
+        webauthnCredentials: { select: { id: true } },
+      },
     })
 
     if (!user) {
@@ -52,16 +96,28 @@ authRouter.post(
         detail: { reason: 'user_not_found', username },
         source: 'iam-api',
       })
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password')
+      throw new ApiError(
+        401,
+        'INVALID_CREDENTIALS',
+        'Invalid username or password',
+      )
     }
 
     // Check lockout
     if (user.lockedUntil && user.lockedUntil > new Date()) {
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password')
+      throw new ApiError(
+        401,
+        'INVALID_CREDENTIALS',
+        'Invalid username or password',
+      )
     }
 
     if (!user.active) {
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password')
+      throw new ApiError(
+        401,
+        'INVALID_CREDENTIALS',
+        'Invalid username or password',
+      )
     }
 
     const valid = await verifyPassword(user.passwordHash, password)
@@ -80,15 +136,19 @@ authRouter.post(
 
       // Emit lockout notification when account gets locked
       if (attempts >= env.RATE_LIMIT_MAX_ATTEMPTS) {
-        eventBus.publish('auth.lockout', {
-          userId: user.id,
-          email: user.email,
-          username: user.username,
-          ipAddress: ip,
-          userAgent,
-          attempts,
-          lockedUntil: new Date(Date.now() + env.RATE_LIMIT_WINDOW_MS).toISOString(),
-        }).catch(() => {})
+        eventBus
+          .publish('auth.lockout', {
+            userId: user.id,
+            email: user.email,
+            username: user.username,
+            ipAddress: ip,
+            userAgent,
+            attempts,
+            lockedUntil: new Date(
+              Date.now() + env.RATE_LIMIT_WINDOW_MS,
+            ).toISOString(),
+          })
+          .catch(() => {})
       }
 
       await logAuditEvent({
@@ -104,11 +164,17 @@ authRouter.post(
         detail: { reason: 'invalid_password', attempts },
         source: 'iam-api',
       })
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password')
+      throw new ApiError(
+        401,
+        'INVALID_CREDENTIALS',
+        'Invalid username or password',
+      )
     }
 
     // Check per-user IP allowlist (after password verified to prevent enumeration)
-    const userAllowedIps: string[] = JSON.parse((user.allowedIps as string) || '[]')
+    const userAllowedIps: string[] = JSON.parse(
+      (user.allowedIps as string) || '[]',
+    )
     if (!checkIpAllowlist(userAllowedIps, ip)) {
       await logAuditEvent({
         eventType: 'auth.ip_blocked',
@@ -120,39 +186,58 @@ authRouter.post(
         userAgent,
         action: 'login',
         outcome: 'DENIED',
-        detail: { reason: 'ip_not_allowed', blockedIp: ip, allowedIps: userAllowedIps },
+        detail: {
+          reason: 'ip_not_allowed',
+          blockedIp: ip,
+          allowedIps: userAllowedIps,
+        },
         source: 'iam-api',
       })
       // Return same error as invalid credentials to prevent IP enumeration
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password')
+      throw new ApiError(
+        401,
+        'INVALID_CREDENTIALS',
+        'Invalid username or password',
+      )
     }
 
     const roles = user.roles.map((r) => r.role.name)
-    const permissions: string[] = [...new Set(user.roles.flatMap((r) => {
-      const perms = r.role.permissions
-      return (typeof perms === 'string' ? JSON.parse(perms) : perms) as string[]
-    }))]
+    const permissions: string[] = [
+      ...new Set(
+        user.roles.flatMap((r) => {
+          const perms = r.role.permissions
+          return (
+            typeof perms === 'string' ? JSON.parse(perms) : perms
+          ) as string[]
+        }),
+      ),
+    ]
 
     // ── Password expiry check ──
     const policy = await getDefaultPolicy()
     if (isPasswordExpired(user.passwordChangedAt, policy.maxAgeDays)) {
-      return c.json({
-        passwordExpired: true,
-        message: 'Your password has expired and must be changed',
-        userId: user.id,
-      }, 403)
+      return c.json(
+        {
+          passwordExpired: true,
+          message: 'Your password has expired and must be changed',
+          userId: user.id,
+        },
+        403,
+      )
     }
 
     // ── MFA check: if enabled, return mfaToken instead of access tokens ──
-    if (user.mfaEnabled && (user.mfaSecret || user.webauthnCredentials.length > 0)) {
+    if (user.mfaEnabled) {
       const privateKey = await getPrivateKey()
       const mfaToken = await new SignJWT({
         purpose: 'mfa_challenge',
         email: user.email,
         username: user.username,
+        passwordVersion: user.passwordChangedAt?.getTime() ?? 0,
       })
         .setProtectedHeader({ alg: 'RS256' })
         .setSubject(user.id)
+        .setJti(randomBytes(16).toString('hex'))
         .setIssuer(env.JWT_ISSUER)
         .setIssuedAt()
         .setExpirationTime('5m') // 5-minute window to complete MFA
@@ -176,7 +261,7 @@ authRouter.post(
         requiresMfa: true,
         mfaToken,
         methods: [
-          ...(user.mfaSecret ? ['totp'] : []),
+          ...(user.mfaSecret && user.mfaVerifiedAt ? ['totp'] : []),
           ...(user.webauthnCredentials.length > 0 ? ['webauthn'] : []),
         ],
       })
@@ -184,10 +269,29 @@ authRouter.post(
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ip },
+      data: {
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
+      },
     })
-    const { sessionId, riskScore, riskFactors } = await createSession(user.id, ip, userAgent)
-    const tokenPair = await issueTokenPair(user.id, user.email, user.username, roles, permissions, sessionId, ip, undefined, userAgent)
+    const { sessionId, riskScore, riskFactors } = await createSession(
+      user.id,
+      ip,
+      userAgent,
+    )
+    const tokenPair = await issueTokenPair(
+      user.id,
+      user.email,
+      user.username,
+      roles,
+      permissions,
+      sessionId,
+      ip,
+      undefined,
+      userAgent,
+    )
 
     // Set refresh token as httpOnly cookie
     setCookie(c, 'iam_refresh', tokenPair.refreshToken, {
@@ -275,7 +379,8 @@ authRouter.post('/refresh', async (c) => {
     }
   }
 
-  if (!rawToken) throw new ApiError(400, 'MISSING_REFRESH_TOKEN', 'Refresh token required')
+  if (!rawToken)
+    throw new ApiError(400, 'MISSING_REFRESH_TOKEN', 'Refresh token required')
 
   const ip = getClientIp(c)
   const userAgent = c.req.header('user-agent')
@@ -309,41 +414,79 @@ authRouter.get('/me', authMiddleware, async (c) => {
       displayName: true,
       active: true,
       lastLoginAt: true,
-      roles: { include: { role: { select: { name: true, label: true, permissions: true } } } },
+      roles: {
+        include: {
+          role: { select: { name: true, label: true, permissions: true } },
+        },
+      },
     },
   })
   if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
+  if (principal.clientId && browserClientPolicies[principal.clientId])
+    return c.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        roles: principal.roles,
+        permissions: principal.permissions,
+      },
+    })
   return c.json({ user })
 })
 
 // POST /password
 authRouter.post('/password', authMiddleware, async (c) => {
   const principal = c.get('principal')
-  const { currentPassword, newPassword } = await parseBody(c, ChangePasswordSchema)
+  const { currentPassword, newPassword } = await parseBody(
+    c,
+    ChangePasswordSchema,
+  )
 
   const user = await prisma.user.findUnique({ where: { id: principal.sub } })
   if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
 
   const valid = await verifyPassword(user.passwordHash, currentPassword)
-  if (!valid) throw new ApiError(401, 'INVALID_CREDENTIALS', 'Current password is incorrect')
+  if (!valid)
+    throw new ApiError(
+      401,
+      'INVALID_CREDENTIALS',
+      'Current password is incorrect',
+    )
 
   // Validate against password policy
   const policy = await getDefaultPolicy()
   const policyErrors = validatePasswordPolicy(newPassword, policy)
   if (policyErrors.length > 0) {
-    throw new ApiError(400, 'PASSWORD_POLICY_VIOLATION', policyErrors.join('; '))
+    throw new ApiError(
+      400,
+      'PASSWORD_POLICY_VIOLATION',
+      policyErrors.join('; '),
+    )
   }
 
   // Check against known breached passwords (non-blocking on network failure)
   const breachCount = await checkBreachedPassword(newPassword)
   if (breachCount > 0) {
-    throw new ApiError(400, 'PASSWORD_BREACHED', `This password has appeared in ${breachCount} known data breach(es). Please choose a different password.`)
+    throw new ApiError(
+      400,
+      'PASSWORD_BREACHED',
+      `This password has appeared in ${breachCount} known data breach(es). Please choose a different password.`,
+    )
   }
 
   // Check password history (prevent reuse)
-  const wasUsed = await checkPasswordHistory(user.id, newPassword, policy.historyCount)
+  const wasUsed = await checkPasswordHistory(
+    user.id,
+    newPassword,
+    policy.historyCount,
+  )
   if (wasUsed) {
-    throw new ApiError(400, 'PASSWORD_REUSED', `Cannot reuse any of your last ${policy.historyCount} passwords`)
+    throw new ApiError(
+      400,
+      'PASSWORD_REUSED',
+      `Cannot reuse any of your last ${policy.historyCount} passwords`,
+    )
   }
 
   const newHash = await hashPassword(newPassword)
@@ -353,13 +496,21 @@ authRouter.post('/password', authMiddleware, async (c) => {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: newHash, encryptedPassword: null, passwordChangedAt: new Date() },
+    data: {
+      passwordHash: newHash,
+      encryptedPassword: null,
+      passwordChangedAt: new Date(),
+    },
   })
 
   // Revoke all other sessions after password change
   if (principal.sessionId) {
     const otherSessions = await prisma.session.findMany({
-      where: { userId: user.id, revokedAt: null, id: { not: principal.sessionId } },
+      where: {
+        userId: user.id,
+        revokedAt: null,
+        id: { not: principal.sessionId },
+      },
       select: { id: true },
     })
     for (const s of otherSessions) {
@@ -391,268 +542,416 @@ authRouter.get('/public-key', async (c) => {
 })
 
 // ── MFA Setup: generate TOTP secret + QR code ──
-authRouter.post('/mfa/setup', authMiddleware, async (c) => {
+authRouter.get('/mfa/status', authMiddleware, async (c) => {
   const principal = c.get('principal')
-  const user = await prisma.user.findUnique({ where: { id: principal.sub } })
+  if (principal.actorType !== 'USER')
+    throw new ApiError(403, 'FORBIDDEN', 'Interactive identity required')
+  const user = await prisma.user.findUnique({
+    where: { id: principal.sub },
+    select: {
+      mfaEnabled: true,
+      mfaSecret: true,
+      mfaVerifiedAt: true,
+      mfaBackupCodes: true,
+    },
+  })
   if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
-
-  if (user.mfaEnabled) {
-    throw new ApiError(409, 'MFA_ALREADY_ENABLED', 'MFA is already enabled. Disable it first to re-setup.')
-  }
-
-  const result = await generateTotpSecret(user.email)
-
-  // Store the secret (not yet enabled — user must verify first)
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { mfaSecret: result.secret },
-  })
-
-  await logAuditEvent({
-    eventType: 'auth.mfa_setup',
-    category: 'AUTHENTICATION',
-    actorId: principal.sub,
-    actorType: 'USER',
-    actorEmail: user.email,
-    ipAddress: getClientIp(c),
-    action: 'mfa_setup',
-    outcome: 'SUCCESS',
-    source: 'iam-api',
-  })
-
   return c.json({
-    secret: result.secret,
-    qrUri: result.uri,
-    qrDataUrl: result.qrDataUrl,
+    enabled: user.mfaEnabled,
+    totpConfigured: Boolean(user.mfaSecret && user.mfaVerifiedAt),
+    recoveryCodesRemaining: (
+      JSON.parse(user.mfaBackupCodes || '[]') as string[]
+    ).filter(Boolean).length,
   })
 })
+authRouter.post(
+  '/mfa/setup',
+  authMiddleware,
+  requireRecentSession,
+  async (c) => {
+    const principal = c.get('principal')
+    const user = await prisma.user.findUnique({ where: { id: principal.sub } })
+    if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
+
+    if (user.mfaEnabled && user.mfaSecret && user.mfaVerifiedAt) {
+      throw new ApiError(
+        409,
+        'MFA_ALREADY_ENABLED',
+        'MFA is already enabled. Disable it first to re-setup.',
+      )
+    }
+
+    const result = await generateTotpSecret(user.email)
+
+    // Store the secret (not yet enabled — user must verify first)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mfaSecret: result.secret },
+    })
+
+    await logAuditEvent({
+      eventType: 'auth.mfa_setup',
+      category: 'AUTHENTICATION',
+      actorId: principal.sub,
+      actorType: 'USER',
+      actorEmail: user.email,
+      ipAddress: getClientIp(c),
+      action: 'mfa_setup',
+      outcome: 'SUCCESS',
+      source: 'iam-api',
+    })
+
+    return c.json({
+      secret: result.secret,
+      qrUri: result.uri,
+      qrDataUrl: result.qrDataUrl,
+    })
+  },
+)
 
 // ── MFA Verify: confirm TOTP code to enable MFA ──
-authRouter.post('/mfa/verify', authMiddleware, async (c) => {
-  const principal = c.get('principal')
-  const { code } = await parseBody(c, MfaVerifySchema)
+authRouter.post(
+  '/mfa/verify',
+  authMiddleware,
+  requireRecentSession,
+  async (c) => {
+    const principal = c.get('principal')
+    const { code } = await parseBody(c, MfaVerifySchema)
 
-  const user = await prisma.user.findUnique({ where: { id: principal.sub } })
-  if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
+    const user = await prisma.user.findUnique({ where: { id: principal.sub } })
+    if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
 
-  if (!user.mfaSecret) {
-    throw new ApiError(400, 'MFA_NOT_SETUP', 'Call POST /auth/mfa/setup first')
-  }
+    if (!user.mfaSecret) {
+      throw new ApiError(
+        400,
+        'MFA_NOT_SETUP',
+        'Call POST /auth/mfa/setup first',
+      )
+    }
 
-  if (user.mfaEnabled) {
-    throw new ApiError(409, 'MFA_ALREADY_ENABLED', 'MFA is already enabled')
-  }
+    if (user.mfaEnabled && user.mfaVerifiedAt) {
+      throw new ApiError(409, 'MFA_ALREADY_ENABLED', 'MFA is already enabled')
+    }
 
-  if (!verifyTotpCode(user.mfaSecret, code)) {
-    throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP code')
-  }
+    if (!verifyTotpCode(user.mfaSecret, code)) {
+      throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP code')
+    }
 
-  // Generate backup codes
-  const { plaintextCodes, hashedCodes } = await generateBackupCodes()
+    // Generate backup codes
+    const existingCodes = JSON.parse(user.mfaBackupCodes || '[]') as string[]
+    const { plaintextCodes, hashedCodes } = existingCodes.some(Boolean)
+      ? { plaintextCodes: [] as string[], hashedCodes: existingCodes }
+      : await generateBackupCodes()
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      mfaEnabled: true,
-      mfaVerifiedAt: new Date(),
-      mfaBackupCodes: JSON.stringify(hashedCodes),
-    },
-  })
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaEnabled: true,
+        mfaVerifiedAt: new Date(),
+        mfaBackupCodes: JSON.stringify(hashedCodes),
+      },
+    })
 
-  await logAuditEvent({
-    eventType: 'auth.mfa_enabled',
-    category: 'AUTHENTICATION',
-    actorId: principal.sub,
-    actorType: 'USER',
-    actorEmail: user.email,
-    ipAddress: getClientIp(c),
-    action: 'mfa_enable',
-    outcome: 'SUCCESS',
-    source: 'iam-api',
-  })
+    await logAuditEvent({
+      eventType: 'auth.mfa_enabled',
+      category: 'AUTHENTICATION',
+      actorId: principal.sub,
+      actorType: 'USER',
+      actorEmail: user.email,
+      ipAddress: getClientIp(c),
+      action: 'mfa_enable',
+      outcome: 'SUCCESS',
+      source: 'iam-api',
+    })
 
-  return c.json({
-    success: true,
-    backupCodes: plaintextCodes,
-    message: 'MFA enabled successfully. Save your backup codes in a safe place — they will not be shown again.',
-  })
-})
+    return c.json({
+      success: true,
+      backupCodes: plaintextCodes,
+      message:
+        'MFA enabled successfully. Save your backup codes in a safe place — they will not be shown again.',
+    })
+  },
+)
+
+authRouter.post(
+  '/mfa/recovery-codes',
+  authMiddleware,
+  requireRecentSession,
+  async (c) => {
+    const principal = c.get('principal')
+    const user = await prisma.user.findUnique({ where: { id: principal.sub } })
+    if (!user?.mfaEnabled)
+      throw new ApiError(
+        400,
+        'MFA_NOT_ENABLED',
+        'Enable an authentication factor first',
+      )
+    const { plaintextCodes, hashedCodes } = await generateBackupCodes()
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mfaBackupCodes: JSON.stringify(hashedCodes) },
+    })
+    await logAuditEvent({
+      eventType: 'auth.recovery_codes_replaced',
+      category: 'AUTHENTICATION',
+      actorId: user.id,
+      actorType: 'USER',
+      ipAddress: getClientIp(c),
+      action: 'replace_recovery_codes',
+      source: 'iam-api',
+    })
+    c.header('Cache-Control', 'no-store')
+    return c.json({ backupCodes: plaintextCodes })
+  },
+)
 
 // ── MFA Disable: require password + TOTP code ──
-authRouter.post('/mfa/disable', authMiddleware, async (c) => {
-  const principal = c.get('principal')
-  const { password, code } = await parseBody(c, MfaDisableSchema)
+authRouter.post(
+  '/mfa/disable',
+  authMiddleware,
+  requireRecentSession,
+  async (c) => {
+    const principal = c.get('principal')
+    const { password, code } = await parseBody(c, MfaDisableSchema)
 
-  const user = await prisma.user.findUnique({ where: { id: principal.sub } })
-  if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
+    const user = await prisma.user.findUnique({ where: { id: principal.sub } })
+    if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
 
-  if (!user.mfaEnabled) {
-    throw new ApiError(400, 'MFA_NOT_ENABLED', 'MFA is not enabled')
-  }
+    if (!user.mfaEnabled) {
+      throw new ApiError(400, 'MFA_NOT_ENABLED', 'MFA is not enabled')
+    }
 
-  const validPassword = await verifyPassword(user.passwordHash, password)
-  if (!validPassword) {
-    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid password')
-  }
+    const validPassword = await verifyPassword(user.passwordHash, password)
+    if (!validPassword) {
+      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid password')
+    }
 
-  if (!user.mfaSecret || !verifyTotpCode(user.mfaSecret, code)) {
-    throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP code')
-  }
+    if (!user.mfaSecret || !verifyTotpCode(user.mfaSecret, code)) {
+      throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP code')
+    }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      mfaEnabled: false,
-      mfaSecret: null,
-      mfaBackupCodes: null,
-      mfaVerifiedAt: null,
-    },
-  })
+    const hasPasskeys =
+      (await prisma.webAuthnCredential.count({ where: { userId: user.id } })) >
+      0
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaEnabled: hasPasskeys,
+        mfaSecret: null,
+        mfaBackupCodes: hasPasskeys ? user.mfaBackupCodes : null,
+        mfaVerifiedAt: null,
+      },
+    })
 
-  await logAuditEvent({
-    eventType: 'auth.mfa_disabled',
-    category: 'AUTHENTICATION',
-    actorId: principal.sub,
-    actorType: 'USER',
-    actorEmail: user.email,
-    ipAddress: getClientIp(c),
-    action: 'mfa_disable',
-    outcome: 'SUCCESS',
-    source: 'iam-api',
-  })
+    await logAuditEvent({
+      eventType: 'auth.mfa_disabled',
+      category: 'AUTHENTICATION',
+      actorId: principal.sub,
+      actorType: 'USER',
+      actorEmail: user.email,
+      ipAddress: getClientIp(c),
+      action: 'mfa_disable',
+      outcome: 'SUCCESS',
+      source: 'iam-api',
+    })
 
-  return c.json({ success: true, message: 'MFA has been disabled' })
-})
+    return c.json({ success: true, message: 'MFA has been disabled' })
+  },
+)
 
 // ── MFA Challenge: complete login with TOTP code after password ──
-authRouter.post('/mfa/challenge', rateLimitMiddleware({ keyPrefix: 'rl:mfa', max: 5, windowMs: 300_000 }), async (c) => {
-  const { mfaToken, code } = await parseBody(c, MfaChallengeSchema)
-  const ip = getClientIp(c)
-  const userAgent = c.req.header('user-agent')
+authRouter.post(
+  '/mfa/challenge',
+  rateLimitMiddleware({ keyPrefix: 'rl:mfa', max: 5, windowMs: 300_000 }),
+  async (c) => {
+    const { mfaToken, code } = await parseBody(c, MfaChallengeSchema)
+    const ip = getClientIp(c)
+    const userAgent = c.req.header('user-agent')
 
-  // Verify the short-lived MFA token
-  let userId: string
-  try {
-    const publicKey = await getPublicKey()
-    const { payload } = await jwtVerify(mfaToken, publicKey, { issuer: env.JWT_ISSUER })
-    if ((payload as Record<string, unknown>).purpose !== 'mfa_challenge') {
-      throw new Error('Not an MFA token')
+    // Verify the short-lived MFA token
+    const userId = await loginChallengeUser(mfaToken)
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { roles: { include: { role: true } } },
+    })
+
+    if (
+      !user ||
+      !user.active ||
+      !user.mfaEnabled ||
+      (user.lockedUntil && user.lockedUntil > new Date())
+    ) {
+      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
     }
-    if (typeof payload.sub !== 'string' || !payload.sub) throw new Error('Missing MFA subject')
-    userId = payload.sub
-  } catch {
-    throw new ApiError(401, 'INVALID_MFA_TOKEN', 'MFA token is invalid or expired')
-  }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { roles: { include: { role: true } } },
-  })
-
-  if (!user || !user.active || !user.mfaEnabled || !user.mfaSecret || (user.lockedUntil && user.lockedUntil > new Date())) {
-    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
-  }
-
-  // Try TOTP first, then backup codes
-  let usedBackupCode = false
-  if (code.length === 6 && verifyTotpCode(user.mfaSecret, code)) {
-    // TOTP verified
-  } else {
-    // Try backup codes
-    const backupCodes: string[] = JSON.parse(user.mfaBackupCodes || '[]')
-    const matchIdx = await verifyBackupCode(code, backupCodes)
-    if (matchIdx === -1) {
-      const attempts = user.failedAttempts + 1
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          failedAttempts: attempts,
-          ...(attempts >= env.RATE_LIMIT_MAX_ATTEMPTS ? { lockedUntil: new Date(Date.now() + env.RATE_LIMIT_WINDOW_MS) } : {}),
-        },
-      })
-      await logAuditEvent({
-        eventType: 'auth.mfa_challenge.failed',
-        category: 'AUTHENTICATION',
-        actorId: userId,
-        actorType: 'USER',
-        actorEmail: user.email,
-        ipAddress: ip,
-        userAgent,
-        action: 'mfa_challenge',
-        outcome: 'FAILURE',
-        detail: { reason: 'invalid_code' },
-        source: 'iam-api',
-      })
-      throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP or backup code')
+    // Try TOTP first, then backup codes
+    let usedBackupCode = false
+    let backupReplacement: string | undefined
+    if (
+      user.mfaSecret &&
+      user.mfaVerifiedAt &&
+      code.length === 6 &&
+      verifyTotpCode(user.mfaSecret, code)
+    ) {
+      // TOTP verified
+    } else {
+      // Try backup codes
+      const backupCodes: string[] = JSON.parse(user.mfaBackupCodes || '[]')
+      const matchIdx = await verifyBackupCode(code, backupCodes)
+      if (matchIdx === -1) {
+        const attempts = user.failedAttempts + 1
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            failedAttempts: attempts,
+            ...(attempts >= env.RATE_LIMIT_MAX_ATTEMPTS
+              ? { lockedUntil: new Date(Date.now() + env.RATE_LIMIT_WINDOW_MS) }
+              : {}),
+          },
+        })
+        await logAuditEvent({
+          eventType: 'auth.mfa_challenge.failed',
+          category: 'AUTHENTICATION',
+          actorId: userId,
+          actorType: 'USER',
+          actorEmail: user.email,
+          ipAddress: ip,
+          userAgent,
+          action: 'mfa_challenge',
+          outcome: 'FAILURE',
+          detail: { reason: 'invalid_code' },
+          source: 'iam-api',
+        })
+        throw new ApiError(
+          401,
+          'INVALID_MFA_CODE',
+          'Invalid TOTP or backup code',
+        )
+      }
+      // Consume the backup code
+      backupCodes[matchIdx] = '' // Mark as used
+      backupReplacement = JSON.stringify(backupCodes)
+      usedBackupCode = true
     }
-    // Consume the backup code
-    backupCodes[matchIdx] = '' // Mark as used
+
+    await consumeLoginChallenge(mfaToken)
+    if (backupReplacement !== undefined) {
+      const consumed = await prisma.user.updateMany({
+        where: { id: userId, mfaBackupCodes: user.mfaBackupCodes },
+        data: { mfaBackupCodes: backupReplacement },
+      })
+      if (consumed.count !== 1)
+        throw new ApiError(
+          401,
+          'INVALID_MFA_CODE',
+          'Recovery code has already been used',
+        )
+    }
+    const roles = user.roles.map((r) => r.role.name)
+    const permissions: string[] = [
+      ...new Set(
+        user.roles.flatMap((r) => {
+          const perms = r.role.permissions
+          return (
+            typeof perms === 'string' ? JSON.parse(perms) : perms
+          ) as string[]
+        }),
+      ),
+    ]
+
+    const { sessionId, riskScore, riskFactors } = await createSession(
+      userId,
+      ip,
+      userAgent,
+    )
     await prisma.user.update({
       where: { id: userId },
-      data: { mfaBackupCodes: JSON.stringify(backupCodes) },
+      data: {
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
+      },
     })
-    usedBackupCode = true
-  }
-
-  const roles = user.roles.map((r) => r.role.name)
-  const permissions: string[] = [...new Set(user.roles.flatMap((r) => {
-    const perms = r.role.permissions
-    return (typeof perms === 'string' ? JSON.parse(perms) : perms) as string[]
-  }))]
-
-  const { sessionId, riskScore, riskFactors } = await createSession(userId, ip, userAgent)
-  await prisma.user.update({ where: { id: userId }, data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ip } })
-  const tokenPair = await issueTokenPair(userId, user.email, user.username, roles, permissions, sessionId, ip, undefined, userAgent)
-
-  setCookie(c, 'iam_refresh', tokenPair.refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    maxAge: env.JWT_REFRESH_TTL,
-    path: '/api/v1/auth',
-  })
-
-  await logAuditEvent({
-    eventType: 'auth.mfa_challenge',
-    category: 'AUTHENTICATION',
-    actorId: userId,
-    actorType: 'USER',
-    actorEmail: user.email,
-    ipAddress: ip,
-    userAgent,
-    action: 'mfa_challenge',
-    outcome: 'SUCCESS',
-    detail: { usedBackupCode, riskScore, riskFactors },
-    source: 'iam-api',
-  })
-
-  return c.json({
-    accessToken: tokenPair.accessToken,
-    refreshToken: tokenPair.refreshToken,
-    expiresIn: tokenPair.expiresIn,
-    sessionId,
-    riskScore,
-    riskFactors,
-    user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      displayName: user.displayName,
+    const tokenPair = await issueTokenPair(
+      userId,
+      user.email,
+      user.username,
       roles,
       permissions,
-    },
-    ...(usedBackupCode ? { warning: 'You used a backup code. Consider generating new backup codes.' } : {}),
-  })
-})
+      sessionId,
+      ip,
+      undefined,
+      userAgent,
+    )
+
+    setCookie(c, 'iam_refresh', tokenPair.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      maxAge: env.JWT_REFRESH_TTL,
+      path: '/api/v1/auth',
+    })
+
+    await logAuditEvent({
+      eventType: 'auth.mfa_challenge',
+      category: 'AUTHENTICATION',
+      actorId: userId,
+      actorType: 'USER',
+      actorEmail: user.email,
+      ipAddress: ip,
+      userAgent,
+      action: 'mfa_challenge',
+      outcome: 'SUCCESS',
+      detail: { usedBackupCode, riskScore, riskFactors },
+      source: 'iam-api',
+    })
+
+    return c.json({
+      accessToken: tokenPair.accessToken,
+      refreshToken: tokenPair.refreshToken,
+      expiresIn: tokenPair.expiresIn,
+      sessionId,
+      riskScore,
+      riskFactors,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName,
+        roles,
+        permissions,
+      },
+      ...(usedBackupCode
+        ? {
+            warning:
+              'You used a backup code. Consider generating new backup codes.',
+          }
+        : {}),
+    })
+  },
+)
 
 // ── POST /forgot-password ──
-// Always returns 200 to prevent email enumeration
+// Configured delivery returns the same response for known and unknown addresses.
 authRouter.post(
   '/forgot-password',
   rateLimitMiddleware({ keyPrefix: 'rl:forgot', max: 5, windowMs: 300_000 }),
   async (c) => {
     const { email } = await parseBody(c, ForgotPasswordSchema)
     const ip = getClientIp(c)
+    // Configuration failure is identical for every address, before any lookup.
+    let outbox: string
+    try {
+      outbox = await recoveryOutbox()
+    } catch {
+      throw new ApiError(
+        503,
+        'RECOVERY_UNAVAILABLE',
+        'Password recovery delivery is unavailable; contact your identity administrator',
+      )
+    }
 
     const user = await prisma.user.findUnique({ where: { email } })
 
@@ -675,6 +974,18 @@ authRouter.post(
 
       // Deliver the raw token through an out-of-band notification provider.
       // Logs and audit events intentionally contain only the request identifier.
+      let delivered = false
+      try {
+        await deliverPasswordRecovery(outbox, user.email, token, expiresAt)
+        delivered = true
+      } catch {
+        // A delivery failure must neither expose account existence nor leave a
+        // usable token whose delivery outcome is unknown.
+        await prisma.passwordResetToken.updateMany({
+          where: { tokenHash, usedAt: null },
+          data: { usedAt: new Date() },
+        })
+      }
 
       await logAuditEvent({
         eventType: 'auth.password_reset_requested',
@@ -684,13 +995,16 @@ authRouter.post(
         actorEmail: user.email,
         ipAddress: ip,
         action: 'password_reset_request',
-        outcome: 'SUCCESS',
+        outcome: delivered ? 'SUCCESS' : 'FAILURE',
         source: 'iam-api',
       })
     }
 
     // Always return success to prevent enumeration
-    return c.json({ message: 'If a matching account exists, a password reset link has been sent.' })
+    return c.json({
+      message:
+        'If a matching account exists, recovery instructions have been queued for delivery.',
+    })
   },
 )
 
@@ -714,7 +1028,11 @@ authRouter.post(
     })
 
     if (!resetToken) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid or expired reset token')
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'Invalid or expired reset token',
+      )
     }
 
     // Validate password against policy
@@ -728,13 +1046,25 @@ authRouter.post(
       // Check against known breached passwords
       const breachCount = await checkBreachedPassword(newPassword)
       if (breachCount > 0) {
-        throw new ApiError(400, 'PASSWORD_BREACHED', `This password has appeared in ${breachCount} known data breach(es). Please choose a different password.`)
+        throw new ApiError(
+          400,
+          'PASSWORD_BREACHED',
+          `This password has appeared in ${breachCount} known data breach(es). Please choose a different password.`,
+        )
       }
 
       // Check password history
-      const reused = await checkPasswordHistory(resetToken.userId, newPassword, policy.historyCount)
+      const reused = await checkPasswordHistory(
+        resetToken.userId,
+        newPassword,
+        policy.historyCount,
+      )
       if (reused) {
-        throw new ApiError(400, 'VALIDATION_ERROR', `Cannot reuse one of your last ${policy.historyCount} passwords`)
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          `Cannot reuse one of your last ${policy.historyCount} passwords`,
+        )
       }
     }
 
@@ -742,8 +1072,22 @@ authRouter.post(
     const passwordHash = await hashPassword(newPassword)
 
     // Update user password, mark token as used, and revoke all sessions
-    await prisma.$transaction([
-      prisma.user.update({
+    await prisma.$transaction(async (transaction) => {
+      const claimed = await transaction.passwordResetToken.updateMany({
+        where: {
+          id: resetToken.id,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+      })
+      if (claimed.count !== 1)
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          'Invalid or expired reset token',
+        )
+      await transaction.user.update({
         where: { id: resetToken.userId },
         data: {
           passwordHash,
@@ -752,17 +1096,19 @@ authRouter.post(
           failedAttempts: 0,
           lockedUntil: null,
         },
-      }),
-      prisma.passwordResetToken.update({
-        where: { id: resetToken.id },
-        data: { usedAt: new Date() },
-      }),
+      })
       // Revoke all active sessions (security: password was compromised or forgotten)
-      prisma.session.updateMany({
+      await transaction.session.updateMany({
         where: { userId: resetToken.userId, revokedAt: null },
         data: { revokedAt: new Date(), revokedBy: 'password_reset' },
-      }),
-    ])
+      })
+      await transaction.refreshToken.deleteMany({
+        where: { userId: resetToken.userId },
+      })
+      await transaction.authorizationCode.deleteMany({
+        where: { userId: resetToken.userId },
+      })
+    })
 
     // Record in password history
     if (policy) {
@@ -781,59 +1127,81 @@ authRouter.post(
       source: 'iam-api',
     })
 
-    return c.json({ message: 'Password has been reset. Please log in with your new password.' })
+    return c.json({
+      message: 'Password has been reset. Please log in with your new password.',
+    })
   },
 )
 
 // ── POST /step-up ──
 // Re-authenticate to satisfy step-up requirements on high-risk sessions.
-authRouter.post('/step-up', authMiddleware, async (c) => {
-  const principal = c.get('principal')
-  const body = await c.req.json() as { password?: string; totpCode?: string }
-  const ip = getClientIp(c)
-
-  if (!principal.sessionId) {
-    throw new ApiError(403, 'FORBIDDEN', 'Session context required')
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: principal.sub },
-    select: { id: true, email: true, passwordHash: true, mfaEnabled: true, mfaSecret: true },
-  })
-
-  if (!user) {
-    throw new ApiError(403, 'FORBIDDEN', 'User not found')
-  }
-
-  // Verify password
-  if (!body.password) {
-    throw new ApiError(400, 'VALIDATION_ERROR', 'Password is required for step-up verification')
-  }
-
-  const passwordValid = await verifyPassword(user.passwordHash, body.password)
-  if (!passwordValid) {
-    await logAuditEvent({
-      eventType: 'auth.step_up_failed',
-      category: 'AUTHENTICATION',
-      actorId: user.id,
-      actorType: 'USER',
-      actorEmail: user.email,
-      ipAddress: ip,
-      action: 'step_up_failed',
-      outcome: 'FAILURE',
-      source: 'iam-api',
-      detail: { reason: 'Invalid password' },
+authRouter.post(
+  '/step-up/options',
+  browserAuthorization,
+  rateLimitMiddleware({
+    keyPrefix: 'rl:step-up-options',
+    max: 10,
+    windowMs: 300_000,
+  }),
+  async (c) => {
+    const principal = c.get('principal')
+    if (!principal.sessionId || principal.actorType !== 'USER')
+      throw new ApiError(403, 'FORBIDDEN', 'Interactive session required')
+    return c.json({
+      data: await stepUpPasskeyOptions(principal.sub, principal.sessionId),
     })
-    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
-  }
+  },
+)
+authRouter.post(
+  '/step-up',
+  browserAuthorization,
+  rateLimitMiddleware({ keyPrefix: 'rl:step-up', max: 5, windowMs: 300_000 }),
+  async (c) => {
+    const principal = c.get('principal')
+    const body = await parseBody(c, StepUpSchema)
+    const ip = getClientIp(c)
 
-  // If MFA is enabled, also verify TOTP
-  if (user.mfaEnabled && user.mfaSecret) {
-    if (!body.totpCode) {
-      return c.json({ error: 'MFA_REQUIRED', message: 'TOTP code required for step-up' }, 403)
+    if (!principal.sessionId) {
+      throw new ApiError(403, 'FORBIDDEN', 'Session context required')
     }
-    const mfaValid = verifyTotpCode(user.mfaSecret, body.totpCode)
-    if (!mfaValid) {
+
+    const user = await prisma.user.findUnique({
+      where: { id: principal.sub },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        mfaEnabled: true,
+        mfaSecret: true,
+        mfaVerifiedAt: true,
+        active: true,
+        lockedUntil: true,
+        passwordChangedAt: true,
+      },
+    })
+
+    if (!user?.active || (user.lockedUntil && user.lockedUntil > new Date())) {
+      throw new ApiError(403, 'FORBIDDEN', 'User not found')
+    }
+    if (
+      isPasswordExpired(
+        user.passwordChangedAt,
+        (await getDefaultPolicy()).maxAgeDays,
+      )
+    )
+      throw new ApiError(403, 'PASSWORD_EXPIRED', 'Your password has expired')
+
+    // Verify password
+    if (!body.password) {
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'Password is required for step-up verification',
+      )
+    }
+
+    const passwordValid = await verifyPassword(user.passwordHash, body.password)
+    if (!passwordValid) {
       await logAuditEvent({
         eventType: 'auth.step_up_failed',
         category: 'AUTHENTICATION',
@@ -844,29 +1212,66 @@ authRouter.post('/step-up', authMiddleware, async (c) => {
         action: 'step_up_failed',
         outcome: 'FAILURE',
         source: 'iam-api',
-        detail: { reason: 'Invalid TOTP code' },
+        detail: { reason: 'Invalid password' },
       })
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid MFA code')
+      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
     }
-  }
 
-  // Mark session as step-up verified
-  await completeStepUp(principal.sessionId)
+    // If MFA is enabled, also verify TOTP
+    if (user.mfaEnabled && body.assertion) {
+      await verifyStepUpPasskey(user.id, principal.sessionId, body.assertion)
+    } else if (user.mfaEnabled) {
+      if (!user.mfaSecret || !user.mfaVerifiedAt)
+        return c.json(
+          {
+            error: 'MFA_REQUIRED',
+            message: 'A passkey assertion is required for step-up',
+            methods: ['webauthn'],
+          },
+          403,
+        )
+      if (!body.totpCode) {
+        return c.json(
+          { error: 'MFA_REQUIRED', message: 'TOTP code required for step-up' },
+          403,
+        )
+      }
+      const mfaValid = verifyTotpCode(user.mfaSecret, body.totpCode)
+      if (!mfaValid) {
+        await logAuditEvent({
+          eventType: 'auth.step_up_failed',
+          category: 'AUTHENTICATION',
+          actorId: user.id,
+          actorType: 'USER',
+          actorEmail: user.email,
+          ipAddress: ip,
+          action: 'step_up_failed',
+          outcome: 'FAILURE',
+          source: 'iam-api',
+          detail: { reason: 'Invalid TOTP code' },
+        })
+        throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid MFA code')
+      }
+    }
 
-  await logAuditEvent({
-    eventType: 'auth.step_up_verified',
-    category: 'AUTHENTICATION',
-    actorId: user.id,
-    actorType: 'USER',
-    actorEmail: user.email,
-    ipAddress: ip,
-    action: 'step_up_verified',
-    outcome: 'SUCCESS',
-    source: 'iam-api',
-  })
+    // Mark session as step-up verified
+    await completeStepUp(principal.sessionId)
 
-  return c.json({ success: true, message: 'Step-up authentication verified' })
-})
+    await logAuditEvent({
+      eventType: 'auth.step_up_verified',
+      category: 'AUTHENTICATION',
+      actorId: user.id,
+      actorType: 'USER',
+      actorEmail: user.email,
+      ipAddress: ip,
+      action: 'step_up_verified',
+      outcome: 'SUCCESS',
+      source: 'iam-api',
+    })
+
+    return c.json({ success: true, message: 'Step-up authentication verified' })
+  },
+)
 
 // ── GET /session-risk ──
 // Get current session risk score and factors.
@@ -887,8 +1292,9 @@ authRouter.get('/session-risk', authMiddleware, async (c) => {
   }
 
   const stepUpValidMs = 15 * 60 * 1000
-  const stepUpExpired = !session.stepUpVerifiedAt ||
-    (Date.now() - new Date(session.stepUpVerifiedAt).getTime()) > stepUpValidMs
+  const stepUpExpired =
+    !session.stepUpVerifiedAt ||
+    Date.now() - new Date(session.stepUpVerifiedAt).getTime() > stepUpValidMs
 
   return c.json({
     riskScore: session.riskScore,

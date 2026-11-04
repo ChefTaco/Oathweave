@@ -72,6 +72,56 @@
         },
         "type": "object"
       },
+      "AuthorizeConsentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "clientId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "codeChallenge": {
+            "type": "string"
+          },
+          "codeChallengeMethod": {
+            "enum": [
+              "S256"
+            ],
+            "type": "string"
+          },
+          "consent": {
+            "enum": [
+              "approve",
+              "deny"
+            ],
+            "type": "string"
+          },
+          "nonce": {
+            "maxLength": 256,
+            "minLength": 16,
+            "type": "string"
+          },
+          "redirectUri": {
+            "format": "uri",
+            "type": "string"
+          },
+          "responseType": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "redirectUri",
+          "responseType"
+        ],
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -335,6 +385,19 @@
         ],
         "type": "object"
       },
+      "ForgotPasswordRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
       "LoginRequest": {
         "additionalProperties": false,
         "properties": {
@@ -394,6 +457,28 @@
         ],
         "type": "object"
       },
+      "MfaStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "recoveryCodesRemaining": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "totpConfigured": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "totpConfigured",
+          "recoveryCodesRemaining"
+        ],
+        "type": "object"
+      },
       "MfaVerifyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -405,6 +490,109 @@
         },
         "required": [
           "code"
+        ],
+        "type": "object"
+      },
+      "PasskeyAuthenticationOptionsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "mfaToken": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "mfaToken"
+        ],
+        "type": "object"
+      },
+      "PasskeyAuthenticationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "mfaToken": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "response": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "mfaToken",
+          "response"
+        ],
+        "type": "object"
+      },
+      "PasskeyCredential": {
+        "additionalProperties": false,
+        "properties": {
+          "backedUp": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "friendlyName": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "friendlyName",
+          "deviceType",
+          "backedUp",
+          "credentialId",
+          "lastUsedAt",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "PasskeyOptionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PasskeyRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "friendlyName": {
+            "default": "",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "response": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "response"
         ],
         "type": "object"
       },
@@ -437,6 +625,21 @@
         },
         "type": "object"
       },
+      "RecoveryCodes": {
+        "additionalProperties": false,
+        "properties": {
+          "backupCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "backupCodes"
+        ],
+        "type": "object"
+      },
       "RefreshRequest": {
         "additionalProperties": false,
         "properties": {
@@ -447,6 +650,25 @@
         },
         "required": [
           "refreshToken"
+        ],
+        "type": "object"
+      },
+      "ResetPasswordRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "newPassword": {
+            "maxLength": 256,
+            "minLength": 8,
+            "type": "string"
+          },
+          "token": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "newPassword"
         ],
         "type": "object"
       },
@@ -569,6 +791,69 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "StepUpRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assertion": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "totpCode": {
+            "pattern": "^[0-9]{6}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "type": "object"
+      },
+      "TokenExchangeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "code_verifier": {
+            "type": "string"
+          },
+          "grant_type": {
+            "enum": [
+              "authorization_code",
+              "refresh_token",
+              "client_credentials"
+            ],
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "redirect_uri": {
+            "type": "string"
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant_type"
+        ],
         "type": "object"
       },
       "TokenInfo": {
@@ -1210,6 +1495,34 @@
         ]
       }
     },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "operationId": "requestPasswordRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Recovery request queued"
+          },
+          "503": {
+            "description": "Recovery delivery is unavailable"
+          }
+        },
+        "summary": "Queue private out-of-band recovery; identical public responses for existing and unknown accounts",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login",
@@ -1479,6 +1792,52 @@
         ]
       }
     },
+    "/api/v1/auth/mfa/recovery-codes": {
+      "post": {
+        "operationId": "replaceRecoveryCodes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Replace recovery codes after recent interactive authentication; plaintext is shown once",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/mfa/setup": {
       "post": {
         "operationId": "mfaSetup",
@@ -1488,19 +1847,21 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "backupCodes": {
-                      "items": {
-                        "type": "string"
-                      },
-                      "type": "array"
+                    "qrDataUrl": {
+                      "type": "string"
                     },
-                    "qrCode": {
+                    "qrUri": {
                       "type": "string"
                     },
                     "secret": {
                       "type": "string"
                     }
                   },
+                  "required": [
+                    "secret",
+                    "qrUri",
+                    "qrDataUrl"
+                  ],
                   "type": "object"
                 }
               }
@@ -1529,6 +1890,41 @@
         ]
       }
     },
+    "/api/v1/auth/mfa/status": {
+      "get": {
+        "operationId": "getOwnMfaStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/mfa/verify": {
       "post": {
         "operationId": "mfaVerify",
@@ -1549,10 +1945,20 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "backupCodes": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "message": {
                       "type": "string"
                     }
                   },
+                  "required": [
+                    "message",
+                    "backupCodes"
+                  ],
                   "type": "object"
                 }
               }
@@ -1727,6 +2133,142 @@
           }
         },
         "summary": "Refresh access token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "operationId": "resetPassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password replaced; sign in again"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "summary": "Consume an expiring one-use reset token and revoke prior sessions, refresh tokens and authorization codes",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/step-up": {
+      "post": {
+        "operationId": "completeStepUp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepUpRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Session re-authenticated"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Verify the password and an enabled MFA method for the current session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/step-up/options": {
+      "post": {
+        "operationId": "stepUpPasskeyOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptionsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "tags": [
           "Auth"
         ]
@@ -2300,6 +2842,330 @@
         ]
       }
     },
+    "/api/v1/mfa/webauthn/authenticate": {
+      "post": {
+        "operationId": "authenticatePasskey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAuthenticationRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated; native token response or browser session"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "Verify a single-use MFA ceremony; browser opt-in returns only an HttpOnly SSO session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/authenticate-options": {
+      "get": {
+        "operationId": "nativePasskeyAuthenticationOptions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "mfaToken",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptionsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "Native compatibility; browsers use POST to keep challenge credentials out of URLs",
+        "tags": [
+          "Auth"
+        ]
+      },
+      "post": {
+        "operationId": "passkeyAuthenticationOptions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAuthenticationOptionsRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptionsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/credentials": {
+      "get": {
+        "operationId": "listOwnPasskeys",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/PasskeyCredential"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/credentials/{id}": {
+      "delete": {
+        "operationId": "deleteOwnPasskey",
+        "parameters": [
+          {
+            "description": "Passkey record identifier",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passkey removed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/options": {
+      "get": {
+        "operationId": "registerPasskeyOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptionsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/register": {
+      "post": {
+        "operationId": "registerPasskey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey registered"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/oauth/authorize": {
       "get": {
         "operationId": "oauthAuthorize",
@@ -2420,6 +3286,13 @@
                   "codeChallengeMethod": {
                     "enum": [
                       "S256"
+                    ],
+                    "type": "string"
+                  },
+                  "consent": {
+                    "enum": [
+                      "approve",
+                      "deny"
                     ],
                     "type": "string"
                   },
