@@ -112,16 +112,20 @@ describe('browser SSO session transport', () => {
     expect(response.status).toBe(200)
     return response
   }
-  it('replaces refresh credentials with a secure server-owned SSO cookie', async () => {
+  it('replaces native bearer credentials with a secure server-owned SSO cookie', async () => {
     const response = await login()
-    expect(await response.json()).toEqual({
-      accessToken: 'obviously-fake-access',
-    })
+    expect(await response.json()).toEqual({})
     expect(response.headers.get('set-cookie')).toMatch(/^__Host-oathweave_sso=/)
     expect(response.headers.get('set-cookie')).toContain('HttpOnly')
     expect(response.headers.get('set-cookie')).toContain('SameSite=Strict')
     expect(response.headers.get('set-cookie')).not.toContain('iam_refresh')
     expect(mocks.deleted).toHaveBeenCalledOnce()
+  })
+  it('preserves native login credentials when browser SSO was not requested',async()=>{
+    const response=await app().request('/login',{method:'POST'});
+    expect(await response.json()).toEqual({accessToken:'obviously-fake-access',refreshToken:'obviously-fake-refresh'});
+    expect(response.headers.get('set-cookie')).toContain('iam_refresh=');
+    expect(mocks.deleted).not.toHaveBeenCalled();
   })
   it('rejects login CSRF before credential handling', async () => {
     const response = await app().request('/login', {

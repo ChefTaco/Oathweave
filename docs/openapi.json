@@ -1213,6 +1213,20 @@
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login",
+        "parameters": [
+          {
+            "description": "Opt into the approved-origin server-owned SSO session. Native access and refresh credentials are omitted from this response.",
+            "in": "header",
+            "name": "X-Oathweave-Browser",
+            "required": false,
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1244,7 +1258,7 @@
                 }
               }
             },
-            "description": "Login successful"
+            "description": "Native login returns credentials. Browser SSO mode returns a server-owned cookie and public profile without native access/refresh tokens."
           },
           "400": {
             "content": {

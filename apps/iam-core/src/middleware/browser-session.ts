@@ -65,8 +65,10 @@ export const establishBrowserSession: MiddlewareHandler = async (c, next) => {
       tokenHash: createHash('sha256').update(body.refreshToken).digest('hex'),
     },
   })
+  delete body.accessToken
   delete body.refreshToken
   c.res.headers.delete('set-cookie')
+  c.res.headers.delete('content-length')
   c.res = new Response(JSON.stringify(body), {
     status: c.res.status,
     headers: c.res.headers,

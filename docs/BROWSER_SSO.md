@@ -13,7 +13,9 @@ Set `IAM_BROWSER_CLIENT_POLICIES` to a protected JSON object, for example:
 
 The permission list is a ceiling intersected with the user's current permissions.
 It does not grant permissions by itself. Identity administration does not imply
-product administration. Browser access and ID tokens expire within fifteen minutes,
+product administration. Interactive browser login returns only its server-owned session and public profile;
+native access/refresh credentials are removed from that response. Product access
+and ID tokens expire within fifteen minutes,
 and browser code exchange does not return refresh credentials.
 
 Set `IAM_BROWSER_ISSUER=https://identity.example.com` for browser clients. The

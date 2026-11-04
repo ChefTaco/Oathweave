@@ -280,9 +280,10 @@ export function buildOpenApiSpec() {
         tags: ['Auth'],
         summary: 'Login with username and password',
         operationId: 'login',
+        parameters:[{name:'X-Oathweave-Browser',in:'header',required:false,schema:{type:'string',enum:['true']},description:'Opt into the approved-origin server-owned SSO session. Native access and refresh credentials are omitted from this response.'}],
         requestBody: jsonBody(ref('LoginRequest')),
         responses: {
-          ...success({ type: 'object', properties: { accessToken: { type: 'string' }, refreshToken: { type: 'string' }, expiresIn: { type: 'number' } } }, 'Login successful'),
+          ...success({ type: 'object', properties: { accessToken: { type: 'string' }, refreshToken: { type: 'string' }, expiresIn: { type: 'number' } } }, 'Native login returns credentials. Browser SSO mode returns a server-owned cookie and public profile without native access/refresh tokens.'),
           400: err400, 401: err401,
         },
       },
