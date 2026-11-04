@@ -11,6 +11,7 @@ import { ApiError } from '../types/index.js'
 import { assertMayGrantPermissions, assertMayManageClient, resolveActor } from '../services/privilege-guard.js'
 import { clientCredentialsPermissionCeiling } from '../services/token-service.js'
 import { parseJsonFields, parseJsonFieldsArray } from '../utils/serialize.js'
+import { browserClientPolicies } from '../services/browser-policies.js'
 
 const ARGON2_OPTIONS: argon2.Options = {
   type: argon2.argon2id,
@@ -39,11 +40,18 @@ clientsRouter.post('/', requirePermission('iam:clients:write'), async (c) => {
   const existing = await prisma.client.findUnique({ where: { name: body.name } })
   if (existing) throw new ApiError(409, 'CONFLICT', 'Client name already exists')
 
+  // Suite public-client policy keys are stable OAuth identifiers. Allocate that
+  // identifier on creation; existing/native client identities are never renamed.
+  const browserId = body.clientType === 'public' && Object.hasOwn(browserClientPolicies, body.name) ? body.name : undefined
+  if (browserId && await prisma.client.findUnique({ where: { id: browserId } })) {
+    throw new ApiError(409, 'CONFLICT', 'Client identifier already exists')
+  }
   const secretHash = body.secret
     ? await argon2.hash(body.secret, ARGON2_OPTIONS)
     : null
   const client = await prisma.client.create({
     data: {
+      ...(browserId ? { id: browserId } : {}),
       name: body.name,
       description: body.description,
       secretHash,
