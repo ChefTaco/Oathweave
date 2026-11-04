@@ -1,0 +1,669 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/ChefTaco/hive",
+  "revision": "78fb6cced1aade79b4c55160754f4d6466bf8891",
+  "source": "services/hive-iam",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "94aa161eceb4ac862fb199d7530fa59e1adf11bc4ab60183b34b26cf81eac5e1"
+    },
+    {
+      "path": "README.md",
+      "sha256": "8655c20ead732b3a4bb64f3d3e122d2416a456c94433b0137fdbe19db4ae29c4"
+    },
+    {
+      "path": "apps/iam-core/.dockerignore",
+      "sha256": "ca377829b7533e16e4d6e5d651e70420066fc676b7454f3dbe78ed5f93d5fe77"
+    },
+    {
+      "path": "apps/iam-core/.env.example",
+      "sha256": "432d3ea11ced5d7eb79529e4ac6a4524f750f64b8c9316addbcd816016dda268"
+    },
+    {
+      "path": "apps/iam-core/.gitignore",
+      "sha256": "d9da959bf61e1eedaed4b7e389600fbf1a9b651d7e2192596552619ee6cb6f7d"
+    },
+    {
+      "path": "apps/iam-core/Dockerfile",
+      "sha256": "0d6dbbd152804c8e30c0a47b209180cc687d315195bf967ad885d51851cd111a"
+    },
+    {
+      "path": "apps/iam-core/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "apps/iam-core/README.md",
+      "sha256": "d790c0c24e67ce4f1b3e0de2c5ee4a457c4c75f1de9cdde43ed4c8387fc227c8"
+    },
+    {
+      "path": "apps/iam-core/docker/.env.example",
+      "sha256": "37d2d7f4b8d72b4085b38f19fcb7a2cfc738cadd67308d82deda39daa6fd3126"
+    },
+    {
+      "path": "apps/iam-core/docker/compose.yml",
+      "sha256": "8674f4c1c6c2b0d850b988e926ebdf8f25cbd82426b0ff8e2313b5725324f676"
+    },
+    {
+      "path": "apps/iam-core/package-lock.json",
+      "sha256": "568bdcaa834544027aa864fca969191dbe580732b8dbf0e050cd3257dd4bfe1f"
+    },
+    {
+      "path": "apps/iam-core/package.json",
+      "sha256": "5c94a166753b85a67bc42f2b25c6961c9be50fd29bd583f8fad846bcb33d00fb"
+    },
+    {
+      "path": "apps/iam-core/prisma.config.ts",
+      "sha256": "a56981b576b4eecd9272cf58ab8a8da401051ea4fe82aec703274c5bdedf2906"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260227021829_init/migration.sql",
+      "sha256": "27a51b34e024f2340c9aacad43aa0fee3d8ce511bcebddfa7dc0d16e49d2bffa"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260302172332_add_mfa_fields_and_ip_allowlist/migration.sql",
+      "sha256": "b41e07b8301e527ef4c6339364947ec56ad33e7628ad0c68bc8b14dfb82d464b"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260302175254_add_password_policy/migration.sql",
+      "sha256": "5d58dd2f1dff32e8bf7de7da3c597f2dbeaff927055b1ce35384579898b24325"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260302205912_add_oauth2_authorization_code/migration.sql",
+      "sha256": "0dfc5794f8361930ec90d63464e0b6d087a6d61f564139937ce694a6e3a8c02e"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260311001958_add_refresh_token_binding/migration.sql",
+      "sha256": "d70b28a4a460b2598d5f67e385f9faef4c11ee4fc8be5d661b6ce33ad0bb7bb9"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260311091616_session_risk_scoring/migration.sql",
+      "sha256": "08c527547472f469e20d822cbabf07702a87b56989fd6c6b91817cdf60e71359"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260311223152_add_client_type/migration.sql",
+      "sha256": "af6dff44a9abb351720e20719b554d21968a1dfb03f50e3d334d99d9836b083a"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260313133733_add_webauthn_credentials/migration.sql",
+      "sha256": "5f430ee58fa2022b65b3645385dcc51b60d7407d8f7f3cd24b3c71eb4aedb417"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260313175124_add_device_trust_and_step_up/migration.sql",
+      "sha256": "918acc0f4977ce57a8abdeda3a35240b03c72705e9b2c02180e557558f2f7f92"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260319135240_add_encrypted_password/migration.sql",
+      "sha256": "6ba0c4d0bb542547a0e3002625fb4485a914ce69da68caddd3799fdee013a1df"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260709000000_remove_password_escrow/migration.sql",
+      "sha256": "acdba54e290004286c433b316bf0d46758dc9d212a43a5fa3db627ce741ef053"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/20260907101000_actor_enrollment/migration.sql",
+      "sha256": "22619ae6753eb55ca1e05c18c53e6317e6b9680e9d895eb213725bcf45a241ce"
+    },
+    {
+      "path": "apps/iam-core/prisma/migrations/migration_lock.toml",
+      "sha256": "3389dbaf2a3cf4b413275867ac6f550b27f79efe85ee9c12082cdd8c5b8239c4"
+    },
+    {
+      "path": "apps/iam-core/prisma/schema.prisma",
+      "sha256": "409846bbada992bdcca8bd769933ac7567681cd542f8f94c6706cf556a249a6a"
+    },
+    {
+      "path": "apps/iam-core/prisma/seed-client-secret.ts",
+      "sha256": "a75ec12d58de27c30a851831afd4d78b53edb857d759729965e77fd72a6110ec"
+    },
+    {
+      "path": "apps/iam-core/prisma/seed.ts",
+      "sha256": "d75be3b4dcff1c634be3c3481bc2065f61698ad44bc4bb2ba55cb864c3c69da8"
+    },
+    {
+      "path": "apps/iam-core/scripts/finalize-seed-build.mjs",
+      "sha256": "de0ad4fba0eeec9aa3eef0fb41e92312b7511a1268836dace32336da036cf7d4"
+    },
+    {
+      "path": "apps/iam-core/scripts/rotate-jwt-signing-key.sh",
+      "sha256": "31b922e2674b6760eec8a74e69808395aef6bbc084ac85ce2432207698ef3728"
+    },
+    {
+      "path": "apps/iam-core/scripts/run-db-release-gate.sh",
+      "sha256": "0a5a5accf19d4b25a6a8cdd6096ca5ebe93f702250e920b16c9a11be2f1a2697"
+    },
+    {
+      "path": "apps/iam-core/scripts/validate-jwt-keyring.mjs",
+      "sha256": "1c7d355f7c136f1c1d54c52391fb08ab1204495edc649387312f86821a281aa4"
+    },
+    {
+      "path": "apps/iam-core/src/cli.ts",
+      "sha256": "371cdcea3061d7fee5287d093f67a3130ee20076697f9085359f7d70928e975d"
+    },
+    {
+      "path": "apps/iam-core/src/cli/args.test.ts",
+      "sha256": "c1bc9062892f3be48bcaa203a0788857530930169ac83e0252c3793214f8c896"
+    },
+    {
+      "path": "apps/iam-core/src/cli/args.ts",
+      "sha256": "8db94dc39ee3179e96b37a445845abc73dfb6e9c184c35ff8b371ae2ddf7a8a5"
+    },
+    {
+      "path": "apps/iam-core/src/cli/bootstrap.test.ts",
+      "sha256": "85ab062734b31c607d71a1f7dbac1e8379ff862e584239ee2409673d14ff3822"
+    },
+    {
+      "path": "apps/iam-core/src/cli/bootstrap.ts",
+      "sha256": "3233eaac4bc1f025395034c98e1078609a556a1309e3541da5e66fe507a7886e"
+    },
+    {
+      "path": "apps/iam-core/src/cli/constants.ts",
+      "sha256": "a348c4eb7eb5fdae405d40cb64ca533ce0999b75d7b449e9a52ffa967c7976cd"
+    },
+    {
+      "path": "apps/iam-core/src/cli/defaults.test.ts",
+      "sha256": "ee77ac649f750151fa34bb2e7d92768dfd6b4bb32212f9063d66eb4551db1a22"
+    },
+    {
+      "path": "apps/iam-core/src/cli/defaults.ts",
+      "sha256": "2b55e71e86f76f1521d9037b021ba71bd829f5f94b784a84edcbf04974f9c7bb"
+    },
+    {
+      "path": "apps/iam-core/src/cli/env-doc.test.ts",
+      "sha256": "3f3fcdac886323b9f105b43efd5cc9e45bb47548a9f74e47226fc1abd1ce6365"
+    },
+    {
+      "path": "apps/iam-core/src/cli/env-doc.ts",
+      "sha256": "a026996380acc1ebdfd5113e415284e8467845ac46b29a6aaaa809ad25df3653"
+    },
+    {
+      "path": "apps/iam-core/src/cli/migrate.test.ts",
+      "sha256": "79eda622f6f476911b21444b7128def54c83149d926237b31548f24dc0ccd764"
+    },
+    {
+      "path": "apps/iam-core/src/cli/migrate.ts",
+      "sha256": "8ebaa74ec7674924d1ac6bf94fa63fb16b52736710c0e53ae3272aa574f41e57"
+    },
+    {
+      "path": "apps/iam-core/src/cli/paths.ts",
+      "sha256": "c76783e6192620bfc8a267888e937826511cf526982c1854f5dd6c01e37134c7"
+    },
+    {
+      "path": "apps/iam-core/src/cli/preflight.test.ts",
+      "sha256": "e76437110297f813e461be76145d7c83707aba851c5f473b7af58b7268ff8327"
+    },
+    {
+      "path": "apps/iam-core/src/cli/preflight.ts",
+      "sha256": "a496d5b2a234dae44b7fa017a4d720b4ca82a279ac5112d69d7f9ebf17ca0f4f"
+    },
+    {
+      "path": "apps/iam-core/src/config/env-schema.test.ts",
+      "sha256": "70edac312927e9fc01b8b7975d412576b180afaad74422b12ff80caef2dfc4d2"
+    },
+    {
+      "path": "apps/iam-core/src/config/env-schema.ts",
+      "sha256": "b1a593dcbe84fd2a1815b02f09a503a4b3bf9dd60a366e4ef953db6f8d7b8e06"
+    },
+    {
+      "path": "apps/iam-core/src/config/env.ts",
+      "sha256": "e136def48606b8a2d3167d230760e34c8685cafde087665d6ec9380f514eaac2"
+    },
+    {
+      "path": "apps/iam-core/src/config/version.ts",
+      "sha256": "0cc521e2f97d445490af0ec7b07dce9b09d6be572b3029b663e097f409d544c5"
+    },
+    {
+      "path": "apps/iam-core/src/db/client.ts",
+      "sha256": "a6f7398a87154c48cde67c10864d437a2eb2f27df6b9f04df49c6ca5b82cbe68"
+    },
+    {
+      "path": "apps/iam-core/src/index.ts",
+      "sha256": "a5f921c26818c69b3ff0de4e063445e7bf8e517dee6e1e0a849e0bcdab41f88f"
+    },
+    {
+      "path": "apps/iam-core/src/main.ts",
+      "sha256": "c30410d234d7a5b2b1e02d80b3c91362e5b759c1a4a508dd50ac7b27f9a8173c"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/auth.test.ts",
+      "sha256": "970aac157cb22be69bf499cd3867e9a73741839a76059c790626626af60ea4e3"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/auth.ts",
+      "sha256": "696c98d0a24b9e4ce673d8e19c6aed00413f8a4d97ab76f039a2bdd08b9cd2cd"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/client-auth.ts",
+      "sha256": "d7513b30f2e6a104ff5330e438a87e9e937c8f71f808da33d4718a840e1d7b27"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/error-handler.ts",
+      "sha256": "91b31630bf7f5630d047fc790c3d87ad068df23e79f12f8f8ad4671e6ad62259"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/rate-limit.ts",
+      "sha256": "68b1332c355ee1bbe0aa3350d9f23031ce459a78e009fa9537a1af7d387cde88"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/rbac.test.ts",
+      "sha256": "6c7613c713741f078ae5ec5bfef18ea071b3341acdd920037bd27920fa7f0a2b"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/rbac.ts",
+      "sha256": "0a7cdef3f8f9b645e78e50b87b63c87600f1f0d3fc0f37feb1e273b5a073c940"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/request-logger.test.ts",
+      "sha256": "f2ba73e00eaf9e33eb2a786865244a1d132cd13c55e0e083668fc96ced7ce92d"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/request-logger.ts",
+      "sha256": "c625a3d0b2611ebdc9e6b25816fdeb326c1611e59ad1703e12552dacd6df6f78"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/security-headers.ts",
+      "sha256": "0f249a6681f008bdd4cb47d6fc7b6bd082f25b857234ee11fac68fbbc903c5d2"
+    },
+    {
+      "path": "apps/iam-core/src/middleware/step-up.ts",
+      "sha256": "3efb27e943215483ce39567dfd1051f06575106d02a3d72a3fc2604af8281f9d"
+    },
+    {
+      "path": "apps/iam-core/src/openapi/spec.ts",
+      "sha256": "3595f08ca2542ab3fed722cf447e60c9674afd323926a514e5bc01df5b3dc3a0"
+    },
+    {
+      "path": "apps/iam-core/src/queue/audit-queue.ts",
+      "sha256": "fabbb117bf06b5a9d7cb6a72070aad4b1da7a97902e581dd5df435481345d1b2"
+    },
+    {
+      "path": "apps/iam-core/src/queue/audit-worker.test.ts",
+      "sha256": "9f0c084130aafb396b348c2104247bb06cf6ce63e45133d00f74aa24b730c687"
+    },
+    {
+      "path": "apps/iam-core/src/queue/audit-worker.ts",
+      "sha256": "158d29e48e9482a5b01e5c159ed2cc45559d206a1c5552f77bd834f0c077785b"
+    },
+    {
+      "path": "apps/iam-core/src/routes/audit.ts",
+      "sha256": "193d8a8f2a12311e18084293f08a72a2c515a361994cb0f101ec05edf0c87a98"
+    },
+    {
+      "path": "apps/iam-core/src/routes/auth.ts",
+      "sha256": "c181d42ac51267618194ade5c8f48eab63d26d57088450c18300e9bc423d865d"
+    },
+    {
+      "path": "apps/iam-core/src/routes/clients.ts",
+      "sha256": "92a04059f6d0f994b6195c25063bfcba43571d599875e308eaa784837284a614"
+    },
+    {
+      "path": "apps/iam-core/src/routes/devices.ts",
+      "sha256": "342d7f410682ce820ddfb10e787a68040bf6b2cfd29d0bb91eabb0710d563c33"
+    },
+    {
+      "path": "apps/iam-core/src/routes/docs.ts",
+      "sha256": "98965d59b6785fee1bba78ee724a6bdec426c122e827b5c7c9077730401143a6"
+    },
+    {
+      "path": "apps/iam-core/src/routes/groups.ts",
+      "sha256": "cb9d30b454fce8ec53bdd8dfb8f4c78364ec52ca297139d9db6561820d994d67"
+    },
+    {
+      "path": "apps/iam-core/src/routes/health.test.ts",
+      "sha256": "f39aa41c311e7b188313f70e8a00b2afda58225e1a5af834eca0c96baef0fccf"
+    },
+    {
+      "path": "apps/iam-core/src/routes/health.ts",
+      "sha256": "b4c7dfeb83ef7945f6f6e01e87ee77bf8d49a6debc624bc6903e9bd0eb0d1abc"
+    },
+    {
+      "path": "apps/iam-core/src/routes/oauth.ts",
+      "sha256": "a70aaed6938682075f84fad66859240dd04e43633ea50d9790eb22f152588023"
+    },
+    {
+      "path": "apps/iam-core/src/routes/password-policy.ts",
+      "sha256": "4803780e68b4642b41307cf52797921961221af5ee1fc75789ec88f55a719acd"
+    },
+    {
+      "path": "apps/iam-core/src/routes/roles.ts",
+      "sha256": "84d4078120aed717b8c86aeb6a138baa25f0c4bb2777b149e1dad81ed378b76c"
+    },
+    {
+      "path": "apps/iam-core/src/routes/service-accounts.ts",
+      "sha256": "513c585ea5417e1c01294cfa654d5ec364522720e48c28a4e509c6057fbde04a"
+    },
+    {
+      "path": "apps/iam-core/src/routes/sessions.ts",
+      "sha256": "3028f70211b05ce86889d5ea867d44290cca38e3aabc344956da2f73e94d61c1"
+    },
+    {
+      "path": "apps/iam-core/src/routes/system-users.ts",
+      "sha256": "9012d95419740a850c9941b6f95e24fdb83964ec3863e527209ca44c9248d9f9"
+    },
+    {
+      "path": "apps/iam-core/src/routes/tokens.ts",
+      "sha256": "07234dc6e0a6f8854803e1c4347b0b0ec45592aab5b0ad94e1707ede0f896324"
+    },
+    {
+      "path": "apps/iam-core/src/routes/users.ts",
+      "sha256": "d0ab0ab8fc04614acd1410344df5373ca0fe37142d4d34883b293831e7c5d304"
+    },
+    {
+      "path": "apps/iam-core/src/routes/webauthn.ts",
+      "sha256": "a1e305772b6e7ed86aeef6ff4a66b4f19535dc8acfa6b23ab575aa47d990fe04"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/auth.test.ts",
+      "sha256": "a72a060782819997d67d6a17dc8e3aba478f635717e354254e736108d14f60d2"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/auth.ts",
+      "sha256": "ffdd67bfba9ebf444e4efeeb25c1793514cc76e931cbe24fe71d6aa419962859"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/clients.test.ts",
+      "sha256": "84295b2c5f8ed354cfd27b900a618ea5abf9478a44ec8d3e7eede8b785638237"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/clients.ts",
+      "sha256": "cae699158d8a50934c9c3256ab0b5d72c7740d96eea343bf7eef8c35f1d943ab"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/groups.ts",
+      "sha256": "8df988278e24617bb67aec8f6a197df94cf8c6ce6b99d80cf8f0341e0a74272b"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/index.ts",
+      "sha256": "da057c4a347fdb263d97afce36268feed28f77010ec9af56ec45c9c14769af92"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/oauth.ts",
+      "sha256": "cd7498ff93da28f4044177d4f7f6cae4aaf736d433a04fed35d88de48062629e"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/roles.ts",
+      "sha256": "9da46c22c19ddc173184c42e63e1d09247cbeadf193b771d4ac621454015d735"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/service-accounts.ts",
+      "sha256": "dc23cd4e2d40810c55ef02806e5b2370a9d1c47c22034f3a56642dfd2dbc9724"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/system-users.ts",
+      "sha256": "3b7590803fe5d00fae5e312b563d4836266ca2dc5fa1ccaf65cad6639c3f5b62"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/users.test.ts",
+      "sha256": "5f7634a175cd54c91b5bd5082d3a4c3a750b782d8806ee0e65204abc8c9302fc"
+    },
+    {
+      "path": "apps/iam-core/src/schemas/users.ts",
+      "sha256": "3d2f3e6d9677a2fa21ac5387446e1543506960cdf5165abcd12a58a85d0306f4"
+    },
+    {
+      "path": "apps/iam-core/src/scripts/reset-admin-password.test.ts",
+      "sha256": "25e892fb7e3a4f2db7f2f34892e6978a0c5cdd93449a696f1645cc5c24e42324"
+    },
+    {
+      "path": "apps/iam-core/src/scripts/reset-admin-password.ts",
+      "sha256": "045eeed2869ac56cd696cbfd28a00c692b8eed970d70d3fdc820d1e57d252dc1"
+    },
+    {
+      "path": "apps/iam-core/src/server.ts",
+      "sha256": "54a32481099c14e8991f8caf937615ca8efc1f56cf5d9f6ac38b08546fd374a0"
+    },
+    {
+      "path": "apps/iam-core/src/services/audit-file-writer.ts",
+      "sha256": "202f21c3b1ffdc9a3f0ff77b92421e037983ae77514bc25b4f073862fd7a3663"
+    },
+    {
+      "path": "apps/iam-core/src/services/audit-service.ts",
+      "sha256": "64c57061a8628f64e77107cb35d0166c9ad86781bd410c429fa6ae80fbcc5f65"
+    },
+    {
+      "path": "apps/iam-core/src/services/breach-check-service.test.ts",
+      "sha256": "0e3bb851e498d38038a16116b500e9f05de1e784af0aa9783d4925f6eaede0d9"
+    },
+    {
+      "path": "apps/iam-core/src/services/breach-check-service.ts",
+      "sha256": "307e15e0dcf0ed623c4272ee0852211b72f23d8c612c6d2f1913d9ed53b7cb76"
+    },
+    {
+      "path": "apps/iam-core/src/services/ceremony-store.test.ts",
+      "sha256": "6f77328cd71392ffbbddf90b69f56a2d78caad32228436c2522f92cabf2e6241"
+    },
+    {
+      "path": "apps/iam-core/src/services/ceremony-store.ts",
+      "sha256": "ca437f064b631e6c115e7474b34a0072a33373224af2da830bf0b02bceacb361"
+    },
+    {
+      "path": "apps/iam-core/src/services/client-policies.test.ts",
+      "sha256": "1d5fda2ee2781d932c46f2cbae7e4725d0ed524adaa6927cd092da81e221c89d"
+    },
+    {
+      "path": "apps/iam-core/src/services/client-policies.ts",
+      "sha256": "202a71b11a5c1e661271722df573cb788ffb48125ec253936d8755f02e65eb3e"
+    },
+    {
+      "path": "apps/iam-core/src/services/device-trust-service.ts",
+      "sha256": "51971c0a21471437c86e134e1dac6b78f3d2e57ca11244907c392ee7f94687eb"
+    },
+    {
+      "path": "apps/iam-core/src/services/event-bus.ts",
+      "sha256": "c1cb2890556bd12df045ba40129343f402b7279521d295cd59db5d1a59bede51"
+    },
+    {
+      "path": "apps/iam-core/src/services/group-service.ts",
+      "sha256": "42345199bd2560d27c1dd45e26f5393eecacd9ceb5b53e2a5115bf7e2f7c85c5"
+    },
+    {
+      "path": "apps/iam-core/src/services/mfa-service.ts",
+      "sha256": "d9ce41b9bda8ab316d40c0ad915f0852a33ba5f456c95887c5e831f999ba6cb3"
+    },
+    {
+      "path": "apps/iam-core/src/services/oauth-service.test.ts",
+      "sha256": "ea386ab13563ffc97b14123209408045e0364711f3606a7b206931eadf410465"
+    },
+    {
+      "path": "apps/iam-core/src/services/oauth-service.ts",
+      "sha256": "c8034af7b40306791d0607edd688fb5645a5a7c31225fa0f7eded8436737dd41"
+    },
+    {
+      "path": "apps/iam-core/src/services/password-policy-service.ts",
+      "sha256": "6951229ebd26371628f930ddebcf6a974d5be048eff5783a40d7ee012d489b97"
+    },
+    {
+      "path": "apps/iam-core/src/services/password-service.test.ts",
+      "sha256": "e13dde96f59a74db916c6e5497fecb2e4faa025d2fe4770c790042a4c5010c16"
+    },
+    {
+      "path": "apps/iam-core/src/services/password-service.ts",
+      "sha256": "5b01967e0ecd1d116acf42c1a26e53820c48ffdb5de61d70d311f7211008ea7c"
+    },
+    {
+      "path": "apps/iam-core/src/services/privilege-guard.test.ts",
+      "sha256": "e3de1540ab72cf7f9cc33c4e49157c6a9a82171bf7b2b7adc4a1b57bd4221d5f"
+    },
+    {
+      "path": "apps/iam-core/src/services/privilege-guard.ts",
+      "sha256": "1dfadb9052e5e02d1e391ff07d4a091427e45fca942a56472b13084fd71e505e"
+    },
+    {
+      "path": "apps/iam-core/src/services/sa-service.ts",
+      "sha256": "d0f6e00089111123d49ecbe374bf8fb078a25c7dd9974adb0ee6e7c1cd903cd3"
+    },
+    {
+      "path": "apps/iam-core/src/services/seed-client-secret.test.ts",
+      "sha256": "d67446512cb5c5b0d0368dbfb3df8ba7f8ab7a9197236ac0dbfa72dc1727910e"
+    },
+    {
+      "path": "apps/iam-core/src/services/session-risk-service.ts",
+      "sha256": "3d05b57820ec824d1cb9783fb514ff3dfcc14a2f19d6ea0030ac6010e60fb7f3"
+    },
+    {
+      "path": "apps/iam-core/src/services/session-service.ts",
+      "sha256": "1572cd9c0b2f323ef2b7353a0371cd9b484be44602888e22387c0ba01f6c2248"
+    },
+    {
+      "path": "apps/iam-core/src/services/token-service.test.ts",
+      "sha256": "5d469e54a9be29649044464e9f4d1a68a0947cce36fc4ff4d2f4ee21037d7a67"
+    },
+    {
+      "path": "apps/iam-core/src/services/token-service.ts",
+      "sha256": "bfc3e3ea13270ffd78a97cc08fe238392e5675117e64ac7a0b4728d7f58519f7"
+    },
+    {
+      "path": "apps/iam-core/src/services/webauthn-service.ts",
+      "sha256": "3ccbcf6444fc2eed0c5dc8949ba90d46f30960ca7d38d596bd116eb940b18aac"
+    },
+    {
+      "path": "apps/iam-core/src/startup-migrations.ts",
+      "sha256": "cf6648534c08aee65ee504664acaad7f193e93b3204cab7da2c845ceccf21065"
+    },
+    {
+      "path": "apps/iam-core/src/types/index.test.ts",
+      "sha256": "752cc03901f00ae21d8f886dd9f2935a80e5ee84b5903630b96a4f04cdc3d8ea"
+    },
+    {
+      "path": "apps/iam-core/src/types/index.ts",
+      "sha256": "94edb3317b14799f30a1cb97da2cb4ec279317ad45362a1412e6967535d58838"
+    },
+    {
+      "path": "apps/iam-core/src/utils/ip-allowlist.test.ts",
+      "sha256": "0842e7458c1d9dfeaa20c6c6930b038b517bf5a55e2402b3157a0859307e6670"
+    },
+    {
+      "path": "apps/iam-core/src/utils/ip-allowlist.ts",
+      "sha256": "3dcd07e7c9b6fc3615be1dab895e9d94914294817257814862108cfaaeeb1e41"
+    },
+    {
+      "path": "apps/iam-core/src/utils/ip.test.ts",
+      "sha256": "db6211e352f320f5a043fbde9b9352008054fa79fcc84a3e5622eb7099aa9994"
+    },
+    {
+      "path": "apps/iam-core/src/utils/ip.ts",
+      "sha256": "d0423fd5b11754e4f99f3f2efc3de2260a6177d0a17dd46ee5a9443f8240885c"
+    },
+    {
+      "path": "apps/iam-core/src/utils/keys.test.ts",
+      "sha256": "bca2307945739f14fad51568a102dfefa11b572759886850d1125776cf1e1564"
+    },
+    {
+      "path": "apps/iam-core/src/utils/keys.ts",
+      "sha256": "a9a8cbf716f09e9cd27adf0a9b6b797e336265c18a8da668734f2759aae59b22"
+    },
+    {
+      "path": "apps/iam-core/src/utils/serialize.ts",
+      "sha256": "6a7e4d87b39714a2a674fa85da3117fd91fd169eb282d05ca6f4ef6c18697688"
+    },
+    {
+      "path": "apps/iam-core/src/utils/validate.test.ts",
+      "sha256": "d6f2e6c4e0d083e993d01d35ea4ebe1dea0028dbb5dac973b71a04abb319bac8"
+    },
+    {
+      "path": "apps/iam-core/src/utils/validate.ts",
+      "sha256": "5ebd60aa1c3dc2111ed6da70d5ea9368b3b309b907bd28613fd355befd442288"
+    },
+    {
+      "path": "apps/iam-core/tsconfig.json",
+      "sha256": "4947780d283520ab420600d4bd9bbf35d4290238b9cac5d1a1cb8783204d0a50"
+    },
+    {
+      "path": "apps/iam-core/tsconfig.seed.json",
+      "sha256": "1e4e08ca3e114347f467a4ddcee153c0b8afb7df2f96e08bcdd9c13b37fc512e"
+    },
+    {
+      "path": "apps/iam-core/vitest.config.ts",
+      "sha256": "ed79eedc10ff5b5149c1973f86082df47bb20db1c82eecfcc2262de0dd207604"
+    },
+    {
+      "path": "docs/APP_ARCHITECTURE_IAM.md",
+      "sha256": "92292169ab8944949405910f6244a786e98f7c0c587afeb5050b165cc412c047"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "929bcfa748bf80255cabc862fc3e9c54e3e879274c0ecc1ef0cc47ef44b3a63a"
+    },
+    {
+      "path": "package.json",
+      "sha256": "b21bea0cebaaae9dd8cfc66c62e6b2ce52e63f9871e1d25877b34bed453db8d2"
+    },
+    {
+      "path": "packages/iam-sdk/.gitignore",
+      "sha256": "363fe1aa9989d456e12c95791319aac1c09d759fc9bb84014bb70f440cfcb153"
+    },
+    {
+      "path": "packages/iam-sdk/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "packages/iam-sdk/README.md",
+      "sha256": "d212d4ad82a85fdabd7bd4828171131e7a4e725fd7c2f251bef09a5997c18a45"
+    },
+    {
+      "path": "packages/iam-sdk/package-lock.json",
+      "sha256": "b479d5766b2e44411ea19b0011538cdf8ba6e10d756c9aac17e104f1c312ddf5"
+    },
+    {
+      "path": "packages/iam-sdk/package.json",
+      "sha256": "e4bd1d6029997ae6b6f6c1ccc4011a35e8ce1f8bc6af4ae0a2d9ddb386a4118b"
+    },
+    {
+      "path": "packages/iam-sdk/src/cache.ts",
+      "sha256": "dbaac6b745ffa11f5526caaf2c03cdbb4e462e511ba828e2b59d92625c634bd7"
+    },
+    {
+      "path": "packages/iam-sdk/src/index.ts",
+      "sha256": "d921d0a404dbad73189d6aede2ba75a7e62b15ba259ba47fc80c761c6e12b95b"
+    },
+    {
+      "path": "packages/iam-sdk/src/middleware/hono.test.ts",
+      "sha256": "628dad5948104296aa1a4a077a7371a09cc2d0334d4deb0bfaea63e48cfb5d36"
+    },
+    {
+      "path": "packages/iam-sdk/src/middleware/hono.ts",
+      "sha256": "f0e4d245d8ecd89613aa421a7441bbe7a8fe389a857c77148ac844d73293e3c7"
+    },
+    {
+      "path": "packages/iam-sdk/src/refresh.ts",
+      "sha256": "53d0853d067e24f9f09d679cde5107f608b0fc61a18ff30a3c50d3931f6abf4c"
+    },
+    {
+      "path": "packages/iam-sdk/src/types.ts",
+      "sha256": "a364ff3fb9f3135b450e479df0d9d569639eb32c69cdf6ce3735bda5968140c8"
+    },
+    {
+      "path": "packages/iam-sdk/src/verify.test.ts",
+      "sha256": "b329ed8f3b9149a6da086600a854afca642848ce05c93825521d257d3d0587d3"
+    },
+    {
+      "path": "packages/iam-sdk/src/verify.ts",
+      "sha256": "e33d35a54296b2c3d5c0f3f1d62ee5b8b962b61bdc546569d78568e1d9cbd7a5"
+    },
+    {
+      "path": "packages/iam-sdk/tsconfig.json",
+      "sha256": "0d5139034099c7822c661b2c4de504857dc53b53c1159f761d5a1403e591e972"
+    },
+    {
+      "path": "packages/iam-sdk/vitest.config.ts",
+      "sha256": "aad3acda0482cb91f32255657c43390e1398fb4b43f3588964935788d90b46c8"
+    },
+    {
+      "path": "scripts/deploy-iam-core.sh",
+      "sha256": "846da440feecf4479fb7133ad8fb7124bc200453183404d9b74c600a5235d61c"
+    },
+    {
+      "path": "scripts/generate-keys.sh",
+      "sha256": "125cc2aab559dd2f2869963f9cd0f44746758e250e7c70955e788d10f903a2bd"
+    },
+    {
+      "path": "scripts/reset-iam-locks.sh",
+      "sha256": "e906d37da49fadd791e2eb0f12a2712388e588ab9e29f89072e81bcdce138dc7"
+    },
+    {
+      "path": "scripts/test-iam-api.sh",
+      "sha256": "f0320a48e0c5a8fd275cf2882ede598bcaeeb558fe2f6ae49e3e4cac3c1a8749"
+    }
+  ],
+  "note": "Source snapshot checksums before product-specific changes. No private history or untracked files included."
+}
