@@ -45,6 +45,7 @@ export const envSchema = z.object({
     .url()
     .refine((value) => new URL(value).protocol === 'https:')
     .default('https://localhost'),
+  OATHWEAVE_SUITE_BOOTSTRAP_FILE: z.string().regex(/^\//).optional(),
   IAM_RECOVERY_OUTBOX_DIRECTORY: z
     .string()
     .regex(/^\/(?:[^/]+\/)*[^/]+$/)

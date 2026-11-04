@@ -1,8 +1,13 @@
 import 'dotenv/config'
-import { PrismaClient } from '../src/db/generated/index.js'
+import { PrismaClient, type Prisma } from '../src/db/generated/index.js'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import * as argon2 from 'argon2'
 import { planSeedClientSecret } from './seed-client-secret.js'
+import {
+  loadSuiteBootstrap,
+  suiteAdminPermissions,
+  type SuiteBootstrap,
+} from './suite-bootstrap.js'
 
 const ARGON2_OPTIONS: argon2.Options = {
   type: argon2.argon2id,
@@ -65,7 +70,8 @@ const SYSTEM_ROLES = [
   {
     name: 'OPERATOR',
     label: 'Operator',
-    description: 'Read all resources, revoke sessions; cannot change roles or users',
+    description:
+      'Read all resources, revoke sessions; cannot change roles or users',
     isSystem: true,
     permissions: [
       'iam:users:read',
@@ -96,11 +102,18 @@ const SYSTEM_ROLES = [
     label: 'Deploy Agent',
     description: 'Authorize software deployment events via the Ubuntu agent',
     isSystem: true,
-    permissions: ['iam:system:login', 'iam:system:deploy', 'iam:tokens:introspect'],
+    permissions: [
+      'iam:system:login',
+      'iam:system:deploy',
+      'iam:tokens:introspect',
+    ],
   },
 ]
 
-async function main() {
+async function seedRecords(
+  database: Prisma.TransactionClient,
+  suite: SuiteBootstrap | undefined,
+) {
   console.log('Seeding IAM database...')
 
   // Upsert all system roles
@@ -109,7 +122,7 @@ async function main() {
       ...role,
       permissions: JSON.stringify(role.permissions),
     }
-    await prisma.role.upsert({
+    await database.role.upsert({
       where: { name: role.name },
       update: {
         label: data.label,
@@ -126,7 +139,9 @@ async function main() {
   const adminPassword = process.env['SEED_ADMIN_PASSWORD']
   const adminUsername = process.env['SEED_ADMIN_USERNAME'] ?? 'admin'
   if (!adminPassword || adminPassword.length < 16) {
-    throw new Error('SEED_ADMIN_PASSWORD is required and must contain at least 16 characters')
+    throw new Error(
+      'SEED_ADMIN_PASSWORD is required and must contain at least 16 characters',
+    )
   }
 
   const passwordHash = await argon2.hash(adminPassword, {
@@ -136,12 +151,15 @@ async function main() {
     parallelism: 4,
   })
 
-  const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } })
+  const superAdminRole = await database.role.findUniqueOrThrow({
+    where: { name: 'SUPER_ADMIN' },
+  })
 
-  const admin = await prisma.user.upsert({
+  const admin = await database.user.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
+      ...(suite ? { id: suite.adminId } : {}),
       email: adminEmail,
       username: adminUsername,
       displayName: 'IAM Administrator',
@@ -152,7 +170,7 @@ async function main() {
     },
   })
 
-  await prisma.userRoleAssignment.upsert({
+  await database.userRoleAssignment.upsert({
     where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } },
     update: {},
     create: { userId: admin.id, roleId: superAdminRole.id },
@@ -162,9 +180,13 @@ async function main() {
   // Create default client for Hive
   const hiveClientSecretFromEnv = process.env['SEED_HIVE_CLIENT_SECRET']
   if (hiveClientSecretFromEnv && hiveClientSecretFromEnv.length < 32) {
-    throw new Error('SEED_HIVE_CLIENT_SECRET must contain at least 32 characters')
+    throw new Error(
+      'SEED_HIVE_CLIENT_SECRET must contain at least 32 characters',
+    )
   }
-  const existingHiveClient = await prisma.client.findUnique({ where: { name: 'hive' } })
+  const existingHiveClient = await database.client.findUnique({
+    where: { name: 'hive' },
+  })
   const hiveSecretPlan = planSeedClientSecret({
     clientName: 'hive',
     envName: 'SEED_HIVE_CLIENT_SECRET',
@@ -172,20 +194,28 @@ async function main() {
     existingSecretHash: existingHiveClient?.secretHash ?? null,
     suppliedSecret: hiveClientSecretFromEnv,
   })
-  const hiveClientSecretHash = hiveSecretPlan === 'preserve'
-    ? undefined
-    : await argon2.hash(hiveClientSecretFromEnv!, ARGON2_OPTIONS)
+  const hiveClientSecretHash =
+    hiveSecretPlan === 'preserve'
+      ? undefined
+      : await argon2.hash(hiveClientSecretFromEnv!, ARGON2_OPTIONS)
 
-  const configuredHivePublicUrl = process.env['SEED_HIVE_PUBLIC_URL']?.replace(/\/+$/, '')
+  const configuredHivePublicUrl = process.env['SEED_HIVE_PUBLIC_URL']?.replace(
+    /\/+$/,
+    '',
+  )
   const hivePublicUrl = configuredHivePublicUrl ?? 'https://hive.example.com'
-  await prisma.client.upsert({
+  await database.client.upsert({
     where: { name: 'hive' },
     update: {
       firstParty: true,
       clientType: 'confidential',
-      ...(configuredHivePublicUrl ? { redirectUris: JSON.stringify([configuredHivePublicUrl]) } : {}),
+      ...(configuredHivePublicUrl
+        ? { redirectUris: JSON.stringify([configuredHivePublicUrl]) }
+        : {}),
       grantTypes: '["authorization_code","refresh_token","client_credentials"]',
-      ...(hiveSecretPlan === 'provision' ? { secretHash: hiveClientSecretHash } : {}),
+      ...(hiveSecretPlan === 'provision'
+        ? { secretHash: hiveClientSecretHash }
+        : {}),
     },
     create: {
       name: 'hive',
@@ -200,14 +230,23 @@ async function main() {
   })
   console.log(`  ✓ Client: hive`)
 
-  const configuredRouterRedirectUri = process.env['SEED_HIVE_ROUTER_REDIRECT_URI']
-    ?? (configuredHivePublicUrl ? `${configuredHivePublicUrl}/api/auth/oidc/callback` : undefined)
-  const routerRedirectUri = configuredRouterRedirectUri ?? `${hivePublicUrl}/api/auth/oidc/callback`
-  const routerClientSecretFromEnv = process.env['SEED_HIVE_ROUTER_CLIENT_SECRET']
+  const configuredRouterRedirectUri =
+    process.env['SEED_HIVE_ROUTER_REDIRECT_URI'] ??
+    (configuredHivePublicUrl
+      ? `${configuredHivePublicUrl}/api/auth/oidc/callback`
+      : undefined)
+  const routerRedirectUri =
+    configuredRouterRedirectUri ?? `${hivePublicUrl}/api/auth/oidc/callback`
+  const routerClientSecretFromEnv =
+    process.env['SEED_HIVE_ROUTER_CLIENT_SECRET']
   if (routerClientSecretFromEnv && routerClientSecretFromEnv.length < 32) {
-    throw new Error('SEED_HIVE_ROUTER_CLIENT_SECRET must contain at least 32 characters')
+    throw new Error(
+      'SEED_HIVE_ROUTER_CLIENT_SECRET must contain at least 32 characters',
+    )
   }
-  const existingRouterClient = await prisma.client.findUnique({ where: { id: 'hive-router' } })
+  const existingRouterClient = await database.client.findUnique({
+    where: { id: 'hive-router' },
+  })
   const routerSecretPlan = planSeedClientSecret({
     clientName: 'hive-router',
     envName: 'SEED_HIVE_ROUTER_CLIENT_SECRET',
@@ -215,11 +254,12 @@ async function main() {
     existingSecretHash: existingRouterClient?.secretHash ?? null,
     suppliedSecret: routerClientSecretFromEnv,
   })
-  const routerClientSecretHash = routerSecretPlan === 'preserve'
-    ? undefined
-    : await argon2.hash(routerClientSecretFromEnv!, ARGON2_OPTIONS)
+  const routerClientSecretHash =
+    routerSecretPlan === 'preserve'
+      ? undefined
+      : await argon2.hash(routerClientSecretFromEnv!, ARGON2_OPTIONS)
 
-  await prisma.client.upsert({
+  await database.client.upsert({
     where: { id: 'hive-router' },
     update: {
       name: 'hive-router',
@@ -227,9 +267,13 @@ async function main() {
       active: true,
       firstParty: true,
       clientType: 'confidential',
-      ...(configuredRouterRedirectUri ? { redirectUris: JSON.stringify([configuredRouterRedirectUri]) } : {}),
+      ...(configuredRouterRedirectUri
+        ? { redirectUris: JSON.stringify([configuredRouterRedirectUri]) }
+        : {}),
       grantTypes: '["authorization_code","refresh_token","client_credentials"]',
-      ...(routerSecretPlan === 'provision' ? { secretHash: routerClientSecretHash } : {}),
+      ...(routerSecretPlan === 'provision'
+        ? { secretHash: routerClientSecretHash }
+        : {}),
     },
     create: {
       id: 'hive-router',
@@ -245,12 +289,17 @@ async function main() {
   })
   console.log(`  ✓ Client: hive-router`)
 
-  const securityExporterSecret = process.env['SEED_SECURITY_EXPORTER_CLIENT_SECRET']
+  const securityExporterSecret =
+    process.env['SEED_SECURITY_EXPORTER_CLIENT_SECRET']
   if (securityExporterSecret) {
     if (securityExporterSecret.length < 32) {
-      throw new Error('SEED_SECURITY_EXPORTER_CLIENT_SECRET must contain at least 32 characters')
+      throw new Error(
+        'SEED_SECURITY_EXPORTER_CLIENT_SECRET must contain at least 32 characters',
+      )
     }
-    const existingSecurityExporterClient = await prisma.client.findUnique({ where: { id: 'security-exporter' } })
+    const existingSecurityExporterClient = await database.client.findUnique({
+      where: { id: 'security-exporter' },
+    })
     const securityExporterSecretPlan = planSeedClientSecret({
       clientName: 'security-exporter',
       envName: 'SEED_SECURITY_EXPORTER_CLIENT_SECRET',
@@ -258,10 +307,11 @@ async function main() {
       existingSecretHash: existingSecurityExporterClient?.secretHash ?? null,
       suppliedSecret: securityExporterSecret,
     })
-    const securityExporterSecretHash = securityExporterSecretPlan === 'preserve'
-      ? undefined
-      : await argon2.hash(securityExporterSecret, ARGON2_OPTIONS)
-    await prisma.client.upsert({
+    const securityExporterSecretHash =
+      securityExporterSecretPlan === 'preserve'
+        ? undefined
+        : await argon2.hash(securityExporterSecret, ARGON2_OPTIONS)
+    await database.client.upsert({
       where: { id: 'security-exporter' },
       update: {
         name: 'security-exporter',
@@ -271,7 +321,9 @@ async function main() {
         clientType: 'confidential',
         redirectUris: '[]',
         grantTypes: '["client_credentials"]',
-        ...(securityExporterSecretPlan === 'provision' ? { secretHash: securityExporterSecretHash } : {}),
+        ...(securityExporterSecretPlan === 'provision'
+          ? { secretHash: securityExporterSecretHash }
+          : {}),
       },
       create: {
         id: 'security-exporter',
@@ -291,9 +343,13 @@ async function main() {
   const examplePortalSecret = process.env['SEED_EXAMPLE_PORTAL_CLIENT_SECRET']
   if (examplePortalSecret) {
     if (examplePortalSecret.length < 32) {
-      throw new Error('SEED_EXAMPLE_PORTAL_CLIENT_SECRET must contain at least 32 characters')
+      throw new Error(
+        'SEED_EXAMPLE_PORTAL_CLIENT_SECRET must contain at least 32 characters',
+      )
     }
-    const existingExamplePortalClient = await prisma.client.findUnique({ where: { id: 'example-portal' } })
+    const existingExamplePortalClient = await database.client.findUnique({
+      where: { id: 'example-portal' },
+    })
     const examplePortalSecretPlan = planSeedClientSecret({
       clientName: 'example-portal',
       envName: 'SEED_EXAMPLE_PORTAL_CLIENT_SECRET',
@@ -301,12 +357,14 @@ async function main() {
       existingSecretHash: existingExamplePortalClient?.secretHash ?? null,
       suppliedSecret: examplePortalSecret,
     })
-    const examplePortalSecretHash = examplePortalSecretPlan === 'preserve'
-      ? undefined
-      : await argon2.hash(examplePortalSecret, ARGON2_OPTIONS)
-    const examplePortalRedirectUri = process.env['SEED_EXAMPLE_PORTAL_REDIRECT_URI']
-      ?? 'https://client.example.com/api/auth/callback/hive-iam'
-    await prisma.client.upsert({
+    const examplePortalSecretHash =
+      examplePortalSecretPlan === 'preserve'
+        ? undefined
+        : await argon2.hash(examplePortalSecret, ARGON2_OPTIONS)
+    const examplePortalRedirectUri =
+      process.env['SEED_EXAMPLE_PORTAL_REDIRECT_URI'] ??
+      'https://client.example.com/api/auth/callback/hive-iam'
+    await database.client.upsert({
       where: { id: 'example-portal' },
       update: {
         name: 'example-portal',
@@ -315,8 +373,11 @@ async function main() {
         firstParty: true,
         clientType: 'confidential',
         redirectUris: JSON.stringify([examplePortalRedirectUri]),
-        grantTypes: '["authorization_code","refresh_token","client_credentials"]',
-        ...(examplePortalSecretPlan === 'provision' ? { secretHash: examplePortalSecretHash } : {}),
+        grantTypes:
+          '["authorization_code","refresh_token","client_credentials"]',
+        ...(examplePortalSecretPlan === 'provision'
+          ? { secretHash: examplePortalSecretHash }
+          : {}),
       },
       create: {
         id: 'example-portal',
@@ -327,13 +388,64 @@ async function main() {
         clientType: 'confidential',
         firstParty: true,
         redirectUris: JSON.stringify([examplePortalRedirectUri]),
-        grantTypes: '["authorization_code","refresh_token","client_credentials"]',
+        grantTypes:
+          '["authorization_code","refresh_token","client_credentials"]',
       },
     })
-    console.log('  ✓ Client: example-portal (aud=example-portal, example-portal:read only)')
+    console.log(
+      '  ✓ Client: example-portal (aud=example-portal, example-portal:read only)',
+    )
+  }
+
+  if (suite) {
+    const role = await database.role.create({
+      data: {
+        name: 'SUITE_ADMIN',
+        label: 'Suite Administrator',
+        description: 'Explicit initial console resource grants',
+        isSystem: false,
+        permissions: JSON.stringify(suiteAdminPermissions(suite)),
+      },
+    })
+    await database.userRoleAssignment.create({
+      data: { userId: admin.id, roleId: role.id },
+    })
+    for (const client of suite.clients) {
+      await database.client.create({
+        data: {
+          id: client.id,
+          name: client.id,
+          description: `HiveXUI ${client.audience} browser client`,
+          clientType: 'public',
+          active: true,
+          firstParty: client.firstParty,
+          redirectUris: JSON.stringify(client.redirectUris),
+          grantTypes: '["authorization_code"]',
+        },
+      })
+    }
+    console.log('  ✓ Initial suite resource grants and public browser clients')
   }
 
   console.log('\nSeed completed.')
+}
+
+async function main() {
+  const suite = loadSuiteBootstrap(process.env)
+  await prisma.$transaction(
+    async (database) => {
+      if (
+        suite &&
+        ((await database.user.count()) !== 0 ||
+          (await database.client.count()) !== 0)
+      )
+        throw new Error(
+          'Suite bootstrap requires an empty identity store; existing installations require reviewed account linking and client registration',
+        )
+      await seedRecords(database, suite)
+    },
+    { timeout: 120_000 },
+  )
 }
 
 main()

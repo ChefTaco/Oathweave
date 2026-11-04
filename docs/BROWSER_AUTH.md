@@ -1,5 +1,23 @@
 # Browser identity and recovery
 
+Fresh suite installations may supply `OATHWEAVE_SUITE_BOOTSTRAP_FILE`, an absolute,
+server-owned mode-0600 JSON file. Its version-1 contract contains a preallocated
+`adminId` and `clients` with stable `hivexui-*` IDs, resource audiences, explicit
+permissions, exact `redirectUris` and `firstParty` flags. Client permissions must
+match `IAM_BROWSER_CLIENT_POLICIES` and belong to their resource namespace. The
+file must include an Oathweave client; all clients use the same console callback
+origin. The initial administrator receives the union of these explicit grants in
+the `SUITE_ADMIN` role. There are no wildcard grants or public client secrets.
+
+This contract is consumed only during first-start seeding of an empty store.
+Existing installations use the authorized APIs and reviewed account links.
+All seed records commit together. A protected `.bootstrap-pending.json` receipt
+binds interrupted first initialization to the same database and seed inputs;
+retries preserve the generated initial credentials and signing keys. Existing
+empty databases without that receipt require recovery. `npm run test:bootstrap`
+kills a disposable seed, proves transaction rollback, resumes it, checks stable
+credentials and IDs, and refuses direct suite seeding of a populated store.
+
 Register HiveXUI public clients through the authorized clients API with exact
 HTTPS callback URIs, S256 PKCE, an explicit audience and least-privilege browser
 policy. Existing client IDs and native issuer URLs remain unchanged. Non-first-party

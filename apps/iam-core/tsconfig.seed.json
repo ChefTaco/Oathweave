@@ -9,6 +9,6 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["prisma/seed.ts", "prisma/seed-client-secret.ts"],
+  "include": ["prisma/seed.ts", "prisma/seed-client-secret.ts", "prisma/suite-bootstrap.ts"],
   "exclude": []
 }

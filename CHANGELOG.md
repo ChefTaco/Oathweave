@@ -2,6 +2,10 @@
 
 ## Unreleased ecosystem extraction
 
+- Make first-start seeding atomic and permit interrupted initialization only with
+  its protected receipt and unchanged seed inputs. Optional fresh-suite bootstrap
+  registers explicit public clients and resource grants without modifying existing
+  identity stores.
 Register configured suite public clients through the authorized client API using
 their stable browser-policy identifiers. Existing and native client identifiers
 remain unchanged; no client secret is required for PKCE browser clients.

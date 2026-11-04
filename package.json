@@ -25,7 +25,8 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "bootstrap": "npm ci --ignore-scripts && npm --prefix tooling/release ci --ignore-scripts && npm run hooks:install",
     "generate:openapi": "tsx scripts/openapi.ts --write",
-    "check:openapi": "tsx scripts/openapi.ts"
+    "check:openapi": "tsx scripts/openapi.ts",
+    "test:bootstrap": "npm run build && node scripts/bootstrap-rehearsal.mjs"
   },
   "overrides": {
     "@hono/node-server": "2.1.5",
