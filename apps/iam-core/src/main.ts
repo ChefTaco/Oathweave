@@ -7,6 +7,7 @@ import { env } from './config/env.js'
 import { startAuditWorker } from './queue/audit-worker.js'
 import { startAuditRetention, stopAuditRetention } from './services/audit-file-writer.js'
 import { IAM_VERSION } from './config/version.js'
+import { authLimitsRelaxed, relaxedAuthLimitsWarning } from './config/auth-limits.js'
 
 /**
  * Start the IAM HTTP(S) server. Shared by the systemd entry point
@@ -15,6 +16,7 @@ import { IAM_VERSION } from './config/version.js'
 export async function startServer(): Promise<void> {
   (await import('./release/runtime.js')).startUpdateChecks(IAM_VERSION);
   console.log(`Hive IAM Core v${IAM_VERSION} — starting...`)
+  if (authLimitsRelaxed()) console.warn(relaxedAuthLimitsWarning())
 
   // Start BullMQ audit worker
   const worker = startAuditWorker()

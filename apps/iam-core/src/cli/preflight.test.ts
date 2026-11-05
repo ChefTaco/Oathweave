@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { checkConfig, checkDataDirs, checkSigningKeys, checkTls, redactUrl, redisFailureLine } from './preflight.js'
+import { checkAuthLimits, checkConfig, checkDataDirs, checkSigningKeys, checkTls, redactUrl, redisFailureLine } from './preflight.js'
 
 const root = mkdtempSync(join(tmpdir(), 'hive-iam-preflight-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -78,5 +78,15 @@ describe('preflight checks', () => {
     const line = redisFailureLine('redis://user:hunter2hunter2@redis:6379', new Error('connect ECONNREFUSED'))
     expect(line).not.toContain('hunter2')
     expect(line).toMatch(/^Dependency error: cannot reach Redis .*REDIS_URL.*Fix: start Redis \(for example `docker run/)
+  })
+})
+
+describe('checkAuthLimits', () => {
+  it('warns only while relaxed limits are on', () => {
+    expect(checkAuthLimits({})).toEqual([])
+    expect(checkAuthLimits({ RELAX_AUTH_LIMITS: 'false' })).toEqual([])
+    expect(checkAuthLimits({ RELAX_AUTH_LIMITS: 'true' })).toEqual([
+      expect.objectContaining({ name: 'auth-limits', status: 'warn' }),
+    ])
   })
 })

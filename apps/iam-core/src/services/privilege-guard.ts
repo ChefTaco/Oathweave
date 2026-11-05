@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { prisma } from '../db/client.js'
+import { accountLockActive } from '../config/auth-limits.js'
 import { ApiError, type Principal } from '../types/index.js'
 import { clientCredentialsPermissionCeiling } from './token-service.js'
 
@@ -142,7 +143,7 @@ export async function resolveActor(c: Context): Promise<Actor> {
   }
   if (!operator.iamSubject) throw new ApiError(403, 'FORBIDDEN', 'The Router did not identify the IAM user behind this request')
   const user = await prisma.user.findUnique({ where: { id: operator.iamSubject }, select: { id: true, active: true, lockedUntil: true } })
-  if (!user || !user.active || (user.lockedUntil && user.lockedUntil > new Date())) {
+  if (!user || !user.active || accountLockActive(user.lockedUntil)) {
     throw new ApiError(403, 'FORBIDDEN', 'The IAM user behind this Router request is not active')
   }
   // Same grants the user's own access token carries (direct roles).

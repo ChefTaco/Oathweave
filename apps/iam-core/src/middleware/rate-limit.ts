@@ -1,17 +1,27 @@
 import type { MiddlewareHandler } from 'hono'
 import { redisConnection } from '../queue/audit-queue.js'
 import { env } from '../config/env.js'
+import { authAttemptCeiling } from '../config/auth-limits.js'
 import { getClientIp } from '../utils/ip.js'
 
 /**
  * Sliding-window rate limiter backed by Redis.
  * Keyed by IP address.
+ *
+ * `authAttempt` marks credential and second-factor checks, whose ceiling is
+ * raised while RELAX_AUTH_LIMITS is on. Other limiters are never relaxed.
  */
 export function rateLimitMiddleware(
-  opts: { windowMs?: number; max?: number; keyPrefix?: string } = {},
+  opts: {
+    windowMs?: number
+    max?: number
+    keyPrefix?: string
+    authAttempt?: boolean
+  } = {},
 ): MiddlewareHandler {
   const windowMs = opts.windowMs ?? env.RATE_LIMIT_WINDOW_MS
-  const max = opts.max ?? env.RATE_LIMIT_MAX_ATTEMPTS
+  const configuredMax = opts.max ?? env.RATE_LIMIT_MAX_ATTEMPTS
+  const max = opts.authAttempt ? authAttemptCeiling(configuredMax) : configuredMax
   const prefix = opts.keyPrefix ?? 'rl'
 
   return async (c, next) => {

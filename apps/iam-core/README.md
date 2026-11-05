@@ -170,13 +170,24 @@ hive-iam-server migrate   Back up and apply schema migrations; --plan is read-on
 hive-iam-server check     Validate config, TLS, data directory, signing keys and Redis
 hive-iam-server env-schema  Print the environment variables as JSON
 hive-iam-server reset-admin Reset the admin password from IAM_RESET_PASSWORD
-Options: --env-file <path> (repeatable), --no-migrate, --help, --version
+Options: --env-file <path> (repeatable), --no-migrate, --relax-auth-limits, --help, --version
 ```
 
 `check` writes nothing and starts no listeners; it exits 0 when everything is
 usable and 1 otherwise, so it works as a pre-start gate. `start --no-migrate`
 refuses to start while migrations are pending, for operators who migrate as a
 separate step.
+
+`start --relax-auth-limits`, or `RELAX_AUTH_LIMITS=true` for containers, is for
+testing only. Sign-in, MFA, passkey and step-up throttles stay enabled with a
+ceiling of 10000 attempts per window, and failed passwords or MFA codes neither
+count against an account nor lock it. Failure locks already on an account are
+ignored while the mode is on; administrator locks, the password recovery
+throttles and all credential checks still apply. Nothing is written to the
+stored password policy or to accounts, so removing the flag restores normal
+behaviour on the next start. The server prints a warning at startup, and every
+`/api/v1/health` response reports the mode in the public `authLimitsRelaxed`
+boolean.
 
 ## Docker
 

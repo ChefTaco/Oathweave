@@ -65,6 +65,11 @@ export const envSchema = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
   RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().default(5),
+  // Testing only. Exactly `true` or `false`, so a typo fails closed at startup.
+  RELAX_AUTH_LIMITS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 
   IAM_AGENT_SECRET: z.string().min(16),
 }).superRefine((source, context) => {

@@ -444,6 +444,11 @@ export function buildOpenApiSpec() {
           properties: {
             status: { type: 'string' },
             timestamp: { type: 'string' },
+            authLimitsRelaxed: {
+              type: 'boolean',
+              description:
+                'True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout',
+            },
             checks: { type: 'array', items: { type: 'object' } },
           },
         }),
@@ -459,6 +464,11 @@ export function buildOpenApiSpec() {
           properties: {
             status: { type: 'string' },
             timestamp: { type: 'string' },
+            authLimitsRelaxed: {
+              type: 'boolean',
+              description:
+                'True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout',
+            },
             checks: { type: 'array', items: { type: 'object' } },
           },
         }),
@@ -474,6 +484,11 @@ export function buildOpenApiSpec() {
           properties: {
             status: { type: 'string' },
             timestamp: { type: 'string' },
+            authLimitsRelaxed: {
+              type: 'boolean',
+              description:
+                'True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout',
+            },
             checks: { type: 'array', items: { type: 'object' } },
           },
         }),
@@ -489,6 +504,11 @@ export function buildOpenApiSpec() {
           properties: {
             status: { type: 'string' },
             timestamp: { type: 'string' },
+            authLimitsRelaxed: {
+              type: 'boolean',
+              description:
+                'True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout',
+            },
             checks: { type: 'array', items: { type: 'object' } },
           },
         }),

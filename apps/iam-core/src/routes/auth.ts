@@ -35,6 +35,7 @@ import {
 } from '../schemas/auth.js'
 import { ApiError } from '../types/index.js'
 import { env } from '../config/env.js'
+import { accountLockActive, authLimitsRelaxed } from '../config/auth-limits.js'
 import { checkIpAllowlist } from '../utils/ip-allowlist.js'
 import {
   getDefaultPolicy,
@@ -70,7 +71,7 @@ export const authRouter = new Hono()
 // POST /login
 authRouter.post(
   '/login',
-  rateLimitMiddleware({ keyPrefix: 'rl:login' }),
+  rateLimitMiddleware({ keyPrefix: 'rl:login', authAttempt: true }),
   async (c) => {
     const { username, password } = await parseBody(c, LoginSchema)
     const ip = getClientIp(c)
@@ -104,7 +105,7 @@ authRouter.post(
     }
 
     // Check lockout
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
+    if (accountLockActive(user.lockedUntil)) {
       throw new ApiError(
         401,
         'INVALID_CREDENTIALS',
@@ -122,7 +123,9 @@ authRouter.post(
 
     const valid = await verifyPassword(user.passwordHash, password)
     if (!valid) {
-      // Increment failure count
+      // Increment failure count. Relaxed mode records nothing against the
+      // account, so disabling it cannot lock on a counter inflated by testing.
+      const relaxed = authLimitsRelaxed()
       const attempts = user.failedAttempts + 1
       const lockUpdate =
         attempts >= env.RATE_LIMIT_MAX_ATTEMPTS
@@ -132,10 +135,11 @@ authRouter.post(
             }
           : { failedAttempts: attempts }
 
-      await prisma.user.update({ where: { id: user.id }, data: lockUpdate })
+      if (!relaxed)
+        await prisma.user.update({ where: { id: user.id }, data: lockUpdate })
 
       // Emit lockout notification when account gets locked
-      if (attempts >= env.RATE_LIMIT_MAX_ATTEMPTS) {
+      if (!relaxed && attempts >= env.RATE_LIMIT_MAX_ATTEMPTS) {
         eventBus
           .publish('auth.lockout', {
             userId: user.id,
@@ -161,7 +165,11 @@ authRouter.post(
         userAgent,
         action: 'login',
         outcome: 'FAILURE',
-        detail: { reason: 'invalid_password', attempts },
+        detail: {
+          reason: 'invalid_password',
+          attempts,
+          ...(relaxed ? { authLimitsRelaxed: true } : {}),
+        },
         source: 'iam-api',
       })
       throw new ApiError(
@@ -762,7 +770,12 @@ authRouter.post(
 // ── MFA Challenge: complete login with TOTP code after password ──
 authRouter.post(
   '/mfa/challenge',
-  rateLimitMiddleware({ keyPrefix: 'rl:mfa', max: 5, windowMs: 300_000 }),
+  rateLimitMiddleware({
+    keyPrefix: 'rl:mfa',
+    max: 5,
+    windowMs: 300_000,
+    authAttempt: true,
+  }),
   async (c) => {
     const { mfaToken, code } = await parseBody(c, MfaChallengeSchema)
     const ip = getClientIp(c)
@@ -780,7 +793,7 @@ authRouter.post(
       !user ||
       !user.active ||
       !user.mfaEnabled ||
-      (user.lockedUntil && user.lockedUntil > new Date())
+      accountLockActive(user.lockedUntil)
     ) {
       throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
     }
@@ -801,15 +814,20 @@ authRouter.post(
       const matchIdx = await verifyBackupCode(code, backupCodes)
       if (matchIdx === -1) {
         const attempts = user.failedAttempts + 1
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            failedAttempts: attempts,
-            ...(attempts >= env.RATE_LIMIT_MAX_ATTEMPTS
-              ? { lockedUntil: new Date(Date.now() + env.RATE_LIMIT_WINDOW_MS) }
-              : {}),
-          },
-        })
+        if (!authLimitsRelaxed())
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              failedAttempts: attempts,
+              ...(attempts >= env.RATE_LIMIT_MAX_ATTEMPTS
+                ? {
+                    lockedUntil: new Date(
+                      Date.now() + env.RATE_LIMIT_WINDOW_MS,
+                    ),
+                  }
+                : {}),
+            },
+          })
         await logAuditEvent({
           eventType: 'auth.mfa_challenge.failed',
           category: 'AUTHENTICATION',
@@ -1142,6 +1160,7 @@ authRouter.post(
     keyPrefix: 'rl:step-up-options',
     max: 10,
     windowMs: 300_000,
+    authAttempt: true,
   }),
   async (c) => {
     const principal = c.get('principal')
@@ -1155,7 +1174,12 @@ authRouter.post(
 authRouter.post(
   '/step-up',
   browserAuthorization,
-  rateLimitMiddleware({ keyPrefix: 'rl:step-up', max: 5, windowMs: 300_000 }),
+  rateLimitMiddleware({
+    keyPrefix: 'rl:step-up',
+    max: 5,
+    windowMs: 300_000,
+    authAttempt: true,
+  }),
   async (c) => {
     const principal = c.get('principal')
     const body = await parseBody(c, StepUpSchema)
@@ -1180,7 +1204,7 @@ authRouter.post(
       },
     })
 
-    if (!user?.active || (user.lockedUntil && user.lockedUntil > new Date())) {
+    if (!user?.active || accountLockActive(user.lockedUntil)) {
       throw new ApiError(403, 'FORBIDDEN', 'User not found')
     }
     if (

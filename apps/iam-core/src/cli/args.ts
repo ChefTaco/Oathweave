@@ -5,6 +5,7 @@ export interface CliOptions {
   command: Command | 'help' | 'version'
   envFiles: string[]
   migrate: boolean
+  relaxAuthLimits: boolean
 }
 
 export class UsageError extends Error {}
@@ -33,6 +34,11 @@ Options:
                      May be given more than once (earlier files win).
   --no-migrate       start: do not apply migrations; refuse to start if any
                      are pending.
+  --relax-auth-limits
+                     start: for testing only. Raise sign-in, MFA and step-up
+                     throttles to 10000 attempts per window and stop failed
+                     attempts locking accounts. Sets RELAX_AUTH_LIMITS=true.
+                     Stored password policy is never changed.
   -h, --help         Show this help.
   -v, --version      Print the version.
 
@@ -40,7 +46,7 @@ Data defaults to \${HIVE_HOME:-~/.hive}/iam. See https://github.com/ChefTaco/hiv
 `
 
 export function parseArgs(argv: readonly string[]): CliOptions {
-  const options: CliOptions = { command: 'start', envFiles: [], migrate: true }
+  const options: CliOptions = { command: 'start', envFiles: [], migrate: true, relaxAuthLimits: false }
   let commandSeen = false
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]!
@@ -63,11 +69,17 @@ export function parseArgs(argv: readonly string[]): CliOptions {
       options.migrate = false
       continue
     }
+    if (arg === '--relax-auth-limits') {
+      options.relaxAuthLimits = true
+      continue
+    }
     if (arg.startsWith('-')) throw new UsageError(`unknown option ${arg}`)
     if (commandSeen) throw new UsageError(`unexpected argument ${arg}`)
     if (!(COMMANDS as readonly string[]).includes(arg)) throw new UsageError(`unknown command ${arg}`)
     options.command = arg as Command
     commandSeen = true
   }
+  if (options.relaxAuthLimits && options.command !== 'start')
+    throw new UsageError('--relax-auth-limits applies only to the start command')
   return options
 }

@@ -232,6 +232,8 @@ async function prepareData(
 }
 
 async function commandStart(options: CliOptions): Promise<void> {
+  // Set before env files load: the explicit flag wins over any file value.
+  if (options.relaxAuthLimits) process.env['RELAX_AUTH_LIMITS'] = 'true'
   const defaults = prepareConfig(options)
   requireValidConfig()
   const tls = checkTls(process.env)

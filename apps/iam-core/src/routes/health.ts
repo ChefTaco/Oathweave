@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import { prisma } from '../db/client.js'
 import { redisConnection } from '../queue/audit-queue.js'
 import { IAM_VERSION } from '../config/version.js'
+import { authLimitsRelaxed } from '../config/auth-limits.js'
 
 import type { HealthCheck } from '../types/index.js'
 
@@ -30,6 +31,7 @@ export interface IamDependencyReport {
   version: string
   uptime: number
   timestamp: string
+  authLimitsRelaxed: boolean
   checks: HealthCheck[]
 }
 
@@ -89,6 +91,7 @@ export async function buildIamDependencyReport(clients: IamHealthClients = { dat
     version: IAM_VERSION,
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
+    authLimitsRelaxed: authLimitsRelaxed(),
     checks,
   }
 }
@@ -108,6 +111,7 @@ healthRouter.get('/live', (c) => c.json({
   version: IAM_VERSION,
   uptime: Math.floor(process.uptime()),
   timestamp: new Date().toISOString(),
+  authLimitsRelaxed: authLimitsRelaxed(),
   checks: [{ name: 'process', status: 'pass', message: 'running' }],
 }))
 

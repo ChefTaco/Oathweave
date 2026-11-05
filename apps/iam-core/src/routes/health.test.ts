@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
+const config = vi.hoisted(() => ({ relaxed: false }))
+vi.mock('../config/auth-limits.js', () => ({
+  authLimitsRelaxed: () => config.relaxed,
+}))
+
 vi.mock('../db/client.js', () => ({
   prisma: { $queryRawUnsafe: vi.fn(async () => 1) },
 }))
@@ -43,5 +48,15 @@ describe('IAM health routes', () => {
     expect(response.status).toBe(200)
     expect(body.status).toBe('ok')
     expect(body.checks).toEqual([expect.objectContaining({ name: 'process', status: 'pass' })])
+  })
+
+  it.each(['/live', '/ready', '/dependencies', '/'])('reports only a boolean relaxed-limits state on %s', async (path) => {
+    for (const relaxed of [false, true]) {
+      config.relaxed = relaxed
+      const response = await healthRouter.request(path)
+      const body = await response.json() as { authLimitsRelaxed: unknown }
+      expect(body.authLimitsRelaxed).toBe(relaxed)
+    }
+    config.relaxed = false
   })
 })

@@ -21,6 +21,7 @@ import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { env } from '../config/env.js'
+import { accountLockActive } from '../config/auth-limits.js'
 import { getClientIp } from '../utils/ip.js'
 import { credentialLookupIds } from '../services/webauthn-credentials.js'
 import {
@@ -193,6 +194,7 @@ webauthnRouter.get(
     keyPrefix: 'rl:webauthn-options',
     max: 10,
     windowMs: 300_000,
+    authAttempt: true,
   }),
   authenticationOptions,
 )
@@ -202,6 +204,7 @@ webauthnRouter.post(
     keyPrefix: 'rl:webauthn-options',
     max: 10,
     windowMs: 300_000,
+    authAttempt: true,
   }),
   authenticationOptions,
 )
@@ -213,6 +216,7 @@ webauthnRouter.post(
     keyPrefix: 'rl:webauthn-auth',
     max: 5,
     windowMs: 300_000,
+    authAttempt: true,
   }),
   async (c) => {
     const body = AuthenticationBodySchema.parse(await c.req.json())
@@ -225,7 +229,7 @@ webauthnRouter.post(
     if (
       !challengeUser?.active ||
       !challengeUser.mfaEnabled ||
-      (challengeUser.lockedUntil && challengeUser.lockedUntil > new Date())
+      accountLockActive(challengeUser.lockedUntil)
     ) {
       throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
     }

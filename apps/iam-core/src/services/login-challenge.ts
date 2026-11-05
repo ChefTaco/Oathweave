@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { jwtVerify } from 'jose'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
+import { accountLockActive } from '../config/auth-limits.js'
 import { getPublicKey } from '../utils/keys.js'
 import { redisConnection } from '../queue/audit-queue.js'
 import { ApiError } from '../types/index.js'
@@ -31,7 +32,7 @@ export async function loginChallengeUser(token: string): Promise<string> {
     if (
       !user?.active ||
       !user.mfaEnabled ||
-      (user.lockedUntil && user.lockedUntil > new Date()) ||
+      accountLockActive(user.lockedUntil) ||
       (user.passwordChangedAt?.getTime() ?? 0) !== payload.passwordVersion
     )
       throw new Error('Identity changed')

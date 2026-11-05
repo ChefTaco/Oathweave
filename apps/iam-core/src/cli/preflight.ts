@@ -215,9 +215,16 @@ export async function checkRedis(source: Source): Promise<CheckResult> {
   }
 }
 
+export function checkAuthLimits(source: Source): CheckResult[] {
+  return source['RELAX_AUTH_LIMITS'] === 'true'
+    ? [warn('auth-limits', 'RELAX_AUTH_LIMITS=true: sign-in limits and account lockout are relaxed; for testing only')]
+    : []
+}
+
 export async function runChecks(source: Source, managedSigningKeys: boolean): Promise<CheckResult[]> {
   return [
     ...checkConfig(source),
+    ...checkAuthLimits(source),
     checkTls(source),
     ...checkDataDirs(source),
     ...checkSigningKeys(source, managedSigningKeys),

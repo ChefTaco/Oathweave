@@ -14,6 +14,7 @@ import {
 } from '../schemas/system-users.js'
 import { ApiError } from '../types/index.js'
 import { env } from '../config/env.js'
+import { accountLockActive } from '../config/auth-limits.js'
 import { parseJsonFields, parseJsonFieldsArray } from '../utils/serialize.js'
 
 function constantTimeEqual(a: string, b: string): boolean {
@@ -166,7 +167,7 @@ systemUsersRouter.post('/check', async (c) => {
 
   if (!systemUser) return deny('no_system_user_mapping')
   if (!systemUser.user.active) return deny('user_inactive')
-  if (systemUser.user.lockedUntil && systemUser.user.lockedUntil > new Date()) return deny('account_locked')
+  if (accountLockActive(systemUser.user.lockedUntil)) return deny('account_locked')
 
   const permissions: string[] = [
     ...new Set(systemUser.user.roles.flatMap((r) => {

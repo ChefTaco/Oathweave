@@ -6786,6 +6786,10 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "authLimitsRelaxed": {
+                      "description": "True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout",
+                      "type": "boolean"
+                    },
                     "checks": {
                       "items": {
                         "type": "object"
@@ -6821,6 +6825,10 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "authLimitsRelaxed": {
+                      "description": "True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout",
+                      "type": "boolean"
+                    },
                     "checks": {
                       "items": {
                         "type": "object"
@@ -6856,6 +6864,10 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "authLimitsRelaxed": {
+                      "description": "True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout",
+                      "type": "boolean"
+                    },
                     "checks": {
                       "items": {
                         "type": "object"
@@ -6891,6 +6903,10 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "authLimitsRelaxed": {
+                      "description": "True while RELAX_AUTH_LIMITS testing mode raises sign-in throttles and disables failure lockout",
+                      "type": "boolean"
+                    },
                     "checks": {
                       "items": {
                         "type": "object"
