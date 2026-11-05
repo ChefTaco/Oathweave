@@ -9,6 +9,7 @@ const audiences = [
   'hiveskills',
   'cindertrace',
   'chattermost',
+  'magnus',
 ] as const
 const permission = z.string().regex(/^[a-z0-9-]+(?::[a-z0-9-]+)+$/)
 const callback = z.url().refine((value) => {
@@ -40,6 +41,7 @@ const client = z
         hiveskills: 'hiveskills:',
         cindertrace: 'cindertrace:',
         chattermost: 'chattermost:',
+        magnus: 'magnus:',
       } as const
     )[value.audience]
     if (value.permissions.some((item) => !item.startsWith(prefix)))
