@@ -110,12 +110,14 @@ export class EnrollmentStore {
       const id = enrollment.iamId ?? nanoid()
       if (row.action === 'enroll') {
         if (!this.database.prepare('SELECT id FROM clients WHERE id = ? AND active = 1').get(policy.iamClientId)) throw new ApiError(400, 'INVALID_CLIENT', 'Enrollment client is missing or disabled')
-        this.database.prepare('INSERT INTO service_accounts (id,name,description,clientId,apiKeyHash,apiKeyPrefix,active,allowedIps,expiresAt,createdBy,createdAt,updatedAt) VALUES (?,?,?,?,?,?,1,?,?,?,?,?)').run(id, 'actor:' + this.installationId + ':' + policy.agentId, policy.description, policy.iamClientId, hash, rawKey.slice(3).split('.')[0]!, JSON.stringify(policy.allowedIps), enrollment.credentialExpiresAt, row.ownerId, this.now(), this.now())
-        for (const roleId of policy.roleIds) this.database.prepare('INSERT INTO service_account_role_assignments (serviceAccountId,roleId,grantedAt) VALUES (?,?,?)').run(id, roleId, this.now())
+        this.database.prepare('INSERT INTO service_accounts (id,name,description,clientId,apiKeyHash,apiKeyPrefix,active,allowedIps,expiresAt,createdBy,createdAt,updatedAt) VALUES (?,?,?,?,?,?,1,?,?,?,?,?)').run(id, 'actor:' + this.installationId + ':' + policy.agentId, policy.description, policy.iamClientId, hash, rawKey.slice(3).split('.')[0]!, JSON.stringify(policy.allowedIps), enrollment.credentialExpiresAt === null ? null : new Date(enrollment.credentialExpiresAt).toISOString().replace('Z', '+00:00'), row.ownerId, new Date(this.now()).toISOString().replace('Z', '+00:00'), new Date(this.now()).toISOString().replace('Z', '+00:00'))
+        for (const roleId of policy.roleIds) this.database.prepare('INSERT INTO service_account_role_assignments (serviceAccountId,roleId,grantedAt) VALUES (?,?,?)').run(id, roleId, new Date(this.now()).toISOString().replace('Z', '+00:00'))
       } else {
+        const existing = this.database.prepare('SELECT active,expiresAt FROM service_accounts WHERE id = ?').get(id) as { active: number; expiresAt: number | string | null } | undefined
+        if (row.action !== 'disable' && (!existing?.active || existing.expiresAt !== null && (typeof existing.expiresAt === 'number' ? existing.expiresAt : Date.parse(existing.expiresAt)) <= this.now())) throw new ApiError(409, 'IDENTITY_UNAVAILABLE', 'The existing service identity is missing, disabled or expired')
         const result = row.action === 'disable'
-          ? this.database.prepare('UPDATE service_accounts SET active = 0, updatedAt = ? WHERE id = ?').run(this.now(), id)
-          : this.database.prepare('UPDATE service_accounts SET apiKeyHash = ?, apiKeyPrefix = ?, updatedAt = ? WHERE id = ? AND active = 1 AND (expiresAt IS NULL OR expiresAt > ?)').run(hash, rawKey.slice(3).split('.')[0]!, this.now(), id, this.now())
+          ? this.database.prepare('UPDATE service_accounts SET active = 0, updatedAt = ? WHERE id = ?').run(new Date(this.now()).toISOString().replace('Z', '+00:00'), id)
+          : this.database.prepare('UPDATE service_accounts SET apiKeyHash = ?, apiKeyPrefix = ?, updatedAt = ? WHERE id = ? AND active = 1').run(hash, rawKey.slice(3).split('.')[0]!, new Date(this.now()).toISOString().replace('Z', '+00:00'), id)
         if (!result.changes) throw new ApiError(409, 'IDENTITY_UNAVAILABLE', 'The existing service identity is missing, disabled or expired')
       }
       // complete() also takes a transaction; better-sqlite3 nests with savepoints.

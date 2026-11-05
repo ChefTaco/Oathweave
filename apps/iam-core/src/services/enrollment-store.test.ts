@@ -88,3 +88,24 @@ it('keeps identical public actor and operation IDs, leases and acknowledgements 
   expect(database.prepare('SELECT count(*) AS n FROM service_accounts').get()).toEqual({n:2})
  }finally{database.close()}
 })
+
+it('uses native Prisma timestamp format and rejects expired legacy numeric and ISO service identities before rotation', () => {
+ const database=fixture();let now=Date.now();const store=new EnrollmentStore(database,enrollmentCipher('e'.repeat(64)),'fixture-installation',()=>now)
+ try {
+  const run=store.begin('fixture-owner',policy.agentId,'enroll',policy)
+  store.localIdentity(run.lease!,run.operation.id,policy,'sa_fakepref.fixture-credential','fake-hash')
+  const identity=database.prepare('SELECT id,expiresAt,createdAt FROM service_accounts').get() as {id:string;expiresAt:string;createdAt:string}
+  expect(identity.expiresAt).toBe(new Date(store.get(policy.agentId).credentialExpiresAt!).toISOString().replace('Z','+00:00'))
+  expect(identity.createdAt).toBe(new Date(now).toISOString().replace('Z','+00:00'))
+  store.complete(run.lease!,run.operation.id,'emberpath','fixture-router','fixture-key');store.complete(run.lease!,run.operation.id,'hivemem',policy.agentId,'fixture-token');store.finish(run.lease!,run.operation.id);store.release(run.lease!)
+  const rotate=store.begin('fixture-owner',policy.agentId,'rotate',undefined,randomUUID())
+  for(const expired of [now-1,new Date(now-1).toISOString().replace('Z','+00:00')]) {
+    database.prepare('UPDATE service_accounts SET expiresAt=? WHERE id=?').run(expired,identity.id)
+    expect(()=>store.localIdentity(rotate.lease!,rotate.operation.id,policy,'sa_fakepref.fixture-rotated','new-fake-hash')).toThrow(/expired/)
+    expect(database.prepare('SELECT apiKeyHash FROM service_accounts WHERE id=?').get(identity.id)).toEqual({apiKeyHash:'fake-hash'})
+  }
+  database.prepare('UPDATE service_accounts SET expiresAt=? WHERE id=?').run(identity.expiresAt,identity.id)
+  store.localIdentity(rotate.lease!,rotate.operation.id,policy,'sa_fakepref.fixture-rotated','new-fake-hash')
+  expect(database.prepare('SELECT expiresAt FROM service_accounts WHERE id=?').get(identity.id)).toEqual({expiresAt:identity.expiresAt})
+ } finally {database.close()}
+})
