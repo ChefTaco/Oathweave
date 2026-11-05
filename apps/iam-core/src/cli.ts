@@ -288,7 +288,20 @@ async function commandResetAdmin(options: CliOptions): Promise<number> {
   })
 }
 
+async function commandIssueResetToken(args: readonly string[]): Promise<number> {
+  const { parseIssueResetToken, issueResetToken } = await import('./cli/issue-reset-token.js')
+  const options = parseIssueResetToken(args)
+  const [{ prisma }, { auditQueue }] = await Promise.all([
+    import('./db/client.js'),
+    import('./queue/audit-queue.js'),
+  ])
+  const issued = await issueResetToken(prisma as never, options, (event) => auditQueue.add('audit', event as never))
+  console.log(JSON.stringify({ account: options.account, expiresAt: issued.expiresAt }))
+  return 0
+}
+
 async function run(argv: readonly string[]): Promise<number> {
+  if (argv[0] === 'issue-reset-token') return commandIssueResetToken(argv.slice(1))
   const extra = extraArguments(argv)
   if (extra) {
     loadEnvFiles(extra.envFiles)

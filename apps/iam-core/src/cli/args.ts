@@ -27,6 +27,11 @@ Commands:
   env-schema    Print the supported environment variables as JSON.
   reset-admin   Set the admin password from IAM_RESET_PASSWORD (and optionally
                 IAM_RESET_USERNAME / IAM_RESET_EMAIL), then exit.
+  issue-reset-token
+                Issue a one-use password recovery token for one exact account. Takes
+                --account ID --username NAME --installation NAME --token-sha256 HEX
+                [--ttl-seconds N], default one day. Accepts only the token's digest.
+                The reset then goes through POST /auth/reset-password.
 
 Options:
   --env-file <path>  Load variables from a dotenv file before reading the
