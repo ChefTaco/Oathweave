@@ -275,6 +275,14 @@
         "impact": "fast",
         "readableBy": "^1.2.2",
         "note": "Add browser authorization session and nonce binding. Legacy Hive IAM binaries reject the new migration history; retain verified recovery backups."
+      },
+      {
+        "component": "iam",
+        "id": "20261105000000_identity_enrollment",
+        "checksum": "97a19a053dc977e5769b8a1d4cbb37f358ccdefdfdbd889a34d5a3d01757358b",
+        "impact": "fast",
+        "readableBy": "^1.2.2",
+        "note": "Add Oathweave-owned enrollment coordination and explicit legacy receipt migration. Older binaries reject this migration history; retain verified source and target recovery backups."
       }
     ],
     "wireCompatibility": {

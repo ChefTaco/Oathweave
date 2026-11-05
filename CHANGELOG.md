@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Move technical identity enrollment coordination into Oathweave with recent-session authorization, short-lived resource delegation, durable leases and product-owned idempotent credential receipts.
+- Add explicit source-preserving offline adoption of legacy enrollment ownership, immutable product IDs, deadlines, encrypted receipts and recovery provenance. Independent installations and unknown legacy outcomes cannot be silently combined or replayed.
+
+
 ## Unreleased ecosystem extraction
 
 - Make first-start seeding atomic and permit interrupted initialization only with

@@ -267,11 +267,12 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
   const verificationKeys = createLocalJWKSet(await getPublishedSigningJwks())
   try {
     const { payload } = await jwtVerify(token, verificationKeys, {
-      issuer: [...new Set([env.JWT_ISSUER, ...Object.keys(browserClientPolicies).map(id=>issuerForClient(id,env.JWT_ISSUER))])],
+      issuer: [...new Set([env.JWT_ISSUER, ...Object.keys(browserClientPolicies).map(id=>issuerForClient(id,env.JWT_ISSUER)), ...((process.env.IAM_ENROLLMENT_PRODUCTS_JSON || process.env.IAM_ENROLLMENT_INSTALLATIONS_JSON) ? [issuerForClient('oathweave-enrollment', env.JWT_ISSUER)] : [])])],
     })
     const access = payload as AccessTokenPayload
     if (payload.iss !== issuerForClient(access.clientId, env.JWT_ISSUER)) throw new Error('Access-token issuer does not match its client')
     if (access.clientId && browserClientPolicies[access.clientId] && payload.aud !== browserClientPolicies[access.clientId]!.audience) throw new Error('Invalid resource audience')
+    if (access.clientId === 'oathweave-enrollment' && (payload.delegationVersion !== 1 || typeof payload.aud !== 'string' || !['emberpath','hivemem'].includes(payload.aud) || access.actorType !== 'USER' || !access.sessionId || !access.jti || typeof payload.iat !== 'number' || typeof payload.exp !== 'number' || payload.exp <= payload.iat || payload.exp - payload.iat > 60)) throw new Error('Invalid enrollment delegation')
     if (!access.sub || !access.actorType || !Array.isArray(access.roles) || !Array.isArray(access.permissions)) {
       throw new Error('Required access-token claims are missing')
     }

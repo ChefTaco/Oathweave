@@ -24,8 +24,11 @@ import { docsRouter } from './routes/docs.js'
 import { oauthRouter } from './routes/oauth.js'
 import { webauthnRouter } from './routes/webauthn.js'
 import { devicesRouter } from './routes/devices.js'
+import { enrollmentsRouter } from './routes/enrollments.js'
+import { enrollmentConfigurations } from './services/enrollment-runtime.js'
 
 export function createApp(): Hono {
+  if (Object.keys(enrollmentConfigurations()).length) issuerForClient('oathweave-enrollment', env.JWT_ISSUER)
   for (const clientId of Object.keys(browserClientPolicies)) issuerForClient(clientId, env.JWT_ISSUER)
   const app = new Hono()
   app.use('*',async(c,next)=>{if(maintenanceActive(new URL(c.req.url).pathname))return c.json({error:'Hive is undergoing maintenance'},503);await next();return undefined})
@@ -81,6 +84,7 @@ export function createApp(): Hono {
   app.route('/api/v1/oauth', oauthRouter)
   app.route('/api/v1/mfa/webauthn', webauthnRouter)
   app.route('/api/v1/devices', devicesRouter)
+  app.route('/api/v1/enrollments', enrollmentsRouter)
   app.route('/api/docs', docsRouter)
 
   // ── 404 ──────────────────────────────────────────────────────────

@@ -423,3 +423,53 @@ model TrustedDevice {
   @@index([userId])
   @@map("trusted_devices")
 }
+
+// Suite coordination lives in IAM. Native secrets are encrypted recovery receipts.
+model ActorEnrollment {
+  actorId String @id
+  nativeActorId String
+  ownerId String
+  installationId String
+  requestHash String
+  requestJson String
+  credentialExpiresAt DateTime?
+  iamId String?
+  routerKeyId String?
+  memoryId String?
+  encryptedSecrets String?
+  receiptExpiresAt DateTime?
+  leaseUntil DateTime?
+  status String @default("pending")
+  updatedAt DateTime
+  @@unique([installationId,nativeActorId])
+}
+model ActorLifecycleOperation {
+  id String @id
+  operationId String
+  installationId String
+  bindingKey String
+  actorId String
+  ownerId String
+  action String
+  identifiersJson String
+  stepsJson String @default("{}")
+  encryptedSecrets String?
+  receiptExpiresAt DateTime?
+  status String @default("pending")
+  createdAt DateTime
+  updatedAt DateTime
+  @@index([bindingKey,status])
+  @@unique([installationId,operationId])
+}
+model ActorLifecycleLease {
+  bindingKey String @id
+  token String
+  leaseUntil DateTime
+}
+model EnrollmentMigration {
+  installationId String @id
+  sourceDigest String
+  reviewDigest String
+  importedAt DateTime
+  provenanceJson String
+}

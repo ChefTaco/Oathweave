@@ -67,7 +67,7 @@ export function issuerForClient(
   clientId: string | undefined,
   nativeIssuer: string,
 ): string {
-  if (!clientId || !browserClientPolicies[clientId]) return nativeIssuer
+  if (!clientId || !browserClientPolicies[clientId] && clientId !== 'oathweave-enrollment') return nativeIssuer
   const issuer = process.env.IAM_BROWSER_ISSUER || nativeIssuer
   const url = new URL(issuer)
   if (

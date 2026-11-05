@@ -385,6 +385,321 @@
         ],
         "type": "object"
       },
+      "EnrollmentInstallations": {
+        "additionalProperties": false,
+        "properties": {
+          "installations": {
+            "items": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "installations"
+        ],
+        "type": "object"
+      },
+      "EnrollmentInventory": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "capabilities": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "credentialExpiresAt": {
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "enrollmentStatus": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "identifiers": {
+                  "additionalProperties": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "kind": {
+                  "enum": [
+                    "service-account"
+                  ],
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "lastActivityAt": {
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "latestOperation": {
+                  "additionalProperties": false,
+                  "nullable": true,
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "action",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "legacyReceiptAvailable": {
+                  "type": "boolean"
+                },
+                "linkedResourceCount": {
+                  "type": "number"
+                },
+                "sources": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "active",
+                    "inactive"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "label",
+                "status",
+                "sources",
+                "identifiers",
+                "capabilities",
+                "linkedResourceCount",
+                "lastActivityAt",
+                "enrollmentStatus",
+                "credentialExpiresAt",
+                "latestOperation"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "installationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "installationId",
+          "data"
+        ],
+        "type": "object"
+      },
+      "EnrollmentLifecycleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId"
+        ],
+        "type": "object"
+      },
+      "EnrollmentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "maxLength": 32,
+            "minLength": 2,
+            "pattern": "^[a-z0-9_-]+$",
+            "type": "string"
+          },
+          "allowedIps": {
+            "default": [],
+            "items": {
+              "format": "ipv4",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "displayName": {
+            "maxLength": 128,
+            "minLength": 2,
+            "type": "string"
+          },
+          "expiresHours": {
+            "default": 24,
+            "maximum": 720,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "hostLabel": {
+            "default": "",
+            "maxLength": 128,
+            "type": "string"
+          },
+          "iamClientId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "owningProject": {
+            "default": "",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "roleIds": {
+            "default": [],
+            "items": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "scopes": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9-]*(?::[a-z0-9-]+)+$",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array"
+          },
+          "workspaceId": {
+            "default": "default",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_-]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentId",
+          "displayName",
+          "iamClientId",
+          "scopes"
+        ],
+        "type": "object"
+      },
+      "EnrollmentResult": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "enroll",
+              "rotate",
+              "disable"
+            ],
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "identifiers": {
+            "additionalProperties": {
+              "nullable": true,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "receiptExpiresAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "remediation": {
+            "nullable": true,
+            "type": "string"
+          },
+          "secrets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "steps": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "service": {
+                  "type": "string"
+                },
+                "state": {
+                  "enum": [
+                    "sent",
+                    "completed",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                "status": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "service",
+                "state",
+                "status",
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "actorId",
+          "action",
+          "operationId",
+          "identifiers",
+          "secrets",
+          "steps",
+          "receiptExpiresAt",
+          "remediation"
+        ],
+        "type": "object"
+      },
       "ForgotPasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -395,6 +710,30 @@
         },
         "required": [
           "email"
+        ],
+        "type": "object"
+      },
+      "LegacyEnrollmentReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "type": "string"
+          },
+          "receiptExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "secrets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "actorId",
+          "secrets",
+          "receiptExpiresAt"
         ],
         "type": "object"
       },
@@ -2699,6 +3038,757 @@
         "summary": "Rotate a confidential client secret",
         "tags": [
           "Clients"
+        ]
+      }
+    },
+    "/api/v1/enrollments": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentInventory"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "503": {
+            "description": "Enrollment APIs unconfigured"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List explicitly coordinated identities for this installation",
+        "tags": [
+          "Service Accounts"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "207": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Partial or unknown outcome; retry exact operation and policy"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Immutable policy, owner or lease conflict"
+          },
+          "410": {
+            "description": "Receipt unavailable; explicit review required"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Durably enroll an explicitly scoped technical identity across product-owned APIs",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{actorId}/disable": {
+      "post": {
+        "parameters": [
+          {
+            "description": "Explicit enrollment ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentLifecycleRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "207": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Incomplete operation; inspect and retry its existing ID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Enrollment, policy or operation conflict"
+          },
+          "410": {
+            "description": "Receipt expired or acknowledged"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Durably disable linked native identities without replacing product IDs",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{actorId}/operations/{operationId}": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Explicit enrollment ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Durable operation ID",
+            "in": "path",
+            "name": "operationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Owned operation not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Recover an owned unexpired operation receipt",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{actorId}/operations/{operationId}/receipt": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Explicit enrollment ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Durable operation ID",
+            "in": "path",
+            "name": "operationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Owned completed operation required"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Acknowledge all product and coordinator receipts without changing credentials",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{actorId}/operations/{operationId}/resume": {
+      "post": {
+        "parameters": [
+          {
+            "description": "Explicit enrollment ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Existing durable operation ID",
+            "in": "path",
+            "name": "operationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "207": {
+            "description": "Operation remains incomplete"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Legacy review, lease or policy conflict"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Explicitly resume the same durable operation and immutable policy; never replay migrated unknown outcomes",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{actorId}/receipt": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Explicit migrated actor ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "410": {
+            "description": "Original legacy receipt expired or acknowledged"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Acknowledge an owned legacy enrollment receipt",
+        "tags": [
+          "Service Accounts"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "description": "Explicit migrated actor ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyEnrollmentReceipt"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "410": {
+            "description": "Original legacy receipt expired or acknowledged"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Recover an explicitly migrated legacy enrollment receipt before its original expiry",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{actorId}/rotate": {
+      "post": {
+        "parameters": [
+          {
+            "description": "Explicit enrollment ID",
+            "in": "path",
+            "name": "actorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact installation namespace; mandatory when this authority coordinates multiple installations",
+            "in": "query",
+            "name": "installationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentLifecycleRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "207": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResult"
+                }
+              }
+            },
+            "description": "Incomplete operation; inspect and retry its existing ID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Enrollment, policy or operation conflict"
+          },
+          "410": {
+            "description": "Receipt expired or acknowledged"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Durably rotate linked native identities without replacing product IDs",
+        "tags": [
+          "Service Accounts"
+        ]
+      }
+    },
+    "/api/v1/enrollments/installations": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentInstallations"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List only explicitly authorized installation namespace identifiers; no endpoint configuration is exposed",
+        "tags": [
+          "Service Accounts"
         ]
       }
     },

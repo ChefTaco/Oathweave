@@ -1,4 +1,5 @@
 import { z, type ZodType } from 'zod'
+import { EnrollmentRequestSchema, EnrollmentLifecycleSchema, EnrollmentResultSchema, EnrollmentInventorySchema, LegacyEnrollmentReceiptSchema, EnrollmentInstallationsSchema } from '../schemas/enrollments.js'
 import {
   AuthorizeQuerySchema,
   AuthorizeConsentSchema,
@@ -186,6 +187,12 @@ export function buildOpenApiSpec() {
     UpdateClientRequest: zod(UpdateClientSchema),
     RotateClientSecretRequest: zod(RotateClientSecretSchema),
     CreateServiceAccountRequest: zod(CreateServiceAccountSchema),
+    EnrollmentRequest: zod(EnrollmentRequestSchema),
+    EnrollmentLifecycleRequest: zod(EnrollmentLifecycleSchema),
+    EnrollmentResult: zod(EnrollmentResultSchema),
+    EnrollmentInventory: zod(EnrollmentInventorySchema),
+    LegacyEnrollmentReceipt: zod(LegacyEnrollmentReceiptSchema),
+    EnrollmentInstallations: zod(EnrollmentInstallationsSchema),
     UpdateServiceAccountRequest: zod(UpdateServiceAccountSchema),
     CreateSystemUserRequest: zod(CreateSystemUserSchema),
     UpdateSystemUserRequest: zod(UpdateSystemUserSchema),
@@ -1474,6 +1481,17 @@ export function buildOpenApiSpec() {
     },
   })
 
+  paths['/api/v1/enrollments'] = {
+    get: { tags: ['Service Accounts'], summary: 'List explicitly coordinated identities for this installation', security: [{ BearerAuth: [] }], responses: { ...success(ref('EnrollmentInventory')), 401: err401, 403: err403, 503: { description: 'Enrollment APIs unconfigured' } } },
+    post: { tags: ['Service Accounts'], summary: 'Durably enroll an explicitly scoped technical identity across product-owned APIs', security: [{ BearerAuth: [] }], requestBody: jsonBody(ref('EnrollmentRequest')), responses: { ...created(ref('EnrollmentResult')), 207: { description: 'Partial or unknown outcome; retry exact operation and policy', content: { 'application/json': { schema: ref('EnrollmentResult') } } }, 401: err401, 403: err403, 409: { description: 'Immutable policy, owner or lease conflict' }, 410: { description: 'Receipt unavailable; explicit review required' } } },
+  }
+  for (const action of ['rotate','disable']) paths[`/api/v1/enrollments/{actorId}/${action}`] = { post: { tags: ['Service Accounts'], summary: `Durably ${action} linked native identities without replacing product IDs`, security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit enrollment ID')], requestBody: jsonBody(ref('EnrollmentLifecycleRequest')), responses: { ...success(ref('EnrollmentResult')), 207: { description: 'Incomplete operation; inspect and retry its existing ID', content: { 'application/json': { schema: ref('EnrollmentResult') } } }, 401: err401, 403: err403, 409: { description: 'Enrollment, policy or operation conflict' }, 410: { description: 'Receipt expired or acknowledged' } } } }
+  paths['/api/v1/enrollments/{actorId}/operations/{operationId}'] = { get: { tags: ['Service Accounts'], summary: 'Recover an owned unexpired operation receipt', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit enrollment ID'),pp('operationId','Durable operation ID')], responses: { ...success(ref('EnrollmentResult')), 401: err401, 403: err403, 404: { description: 'Owned operation not found' } } } }
+  paths['/api/v1/enrollments/{actorId}/operations/{operationId}/resume'] = { post: { tags: ['Service Accounts'], summary: 'Explicitly resume the same durable operation and immutable policy; never replay migrated unknown outcomes', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit enrollment ID'),pp('operationId','Existing durable operation ID')], responses: { ...success(ref('EnrollmentResult')), 207: { description: 'Operation remains incomplete' }, 401: err401, 403: err403, 409: { description: 'Legacy review, lease or policy conflict' } } } }
+  paths['/api/v1/enrollments/{actorId}/operations/{operationId}/receipt'] = { delete: { tags: ['Service Accounts'], summary: 'Acknowledge all product and coordinator receipts without changing credentials', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit enrollment ID'),pp('operationId','Durable operation ID')], responses: { ...success({ type: 'object', properties: { ok: { type: 'boolean' } } }), 401: err401, 403: err403, 409: { description: 'Owned completed operation required' } } } }
+  paths['/api/v1/enrollments/{actorId}/receipt'] = Object.fromEntries(['get','delete'].map(method => [method, { tags: ['Service Accounts'], summary: method === 'get' ? 'Recover an explicitly migrated legacy enrollment receipt before its original expiry' : 'Acknowledge an owned legacy enrollment receipt', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit migrated actor ID')], responses: { ...success(method === 'get' ? ref('LegacyEnrollmentReceipt') : { type: 'object' }), 401: err401, 403: err403, 410: { description: 'Original legacy receipt expired or acknowledged' } } }]))
+  paths['/api/v1/enrollments/installations'] = { get: { tags: ['Service Accounts'], summary: 'List only explicitly authorized installation namespace identifiers; no endpoint configuration is exposed', security: [{ BearerAuth: [] }], responses: { ...success(ref('EnrollmentInstallations')), 401: err401, 403: err403 } } }
+  for (const [path,item] of Object.entries(paths)) if (path.startsWith('/api/v1/enrollments') && path !== '/api/v1/enrollments/installations') for (const operation of Object.values(item as Record<string,{parameters?:unknown[]}>)) operation.parameters = [...(operation.parameters ?? []), qp('installationId','Exact installation namespace; mandatory when this authority coordinates multiple installations',false,{type:'string',pattern:'^[a-z0-9][a-z0-9-]{0,63}$'})]
   return {
     openapi: '3.1.0',
     info: {
