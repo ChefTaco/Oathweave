@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.0.0 - 2026-11-05
+
 - Add `start --relax-auth-limits` and `RELAX_AUTH_LIMITS` for testing. Sign-in, MFA, passkey and step-up throttles rise to 10000 attempts per window and failed attempts stop locking accounts, at runtime only. Health responses report `authLimitsRelaxed`, and startup prints a warning. Behaviour without the flag is unchanged.
 
 - Add explicitly selected public-browser OIDC discovery with a configured interactive authorization portal and API prefix on the browser issuer origin. Reject invalid configuration and unregistered/inactive/confidential selections without changing native discovery.
@@ -12,13 +14,11 @@
 
 - Preserve native DateTime storage compatibility for atomic enrollment credentials and reject expired ISO or legacy numeric identities before rotation.
 
-## Unreleased
-
 - Move technical identity enrollment coordination into Oathweave with recent-session authorization, short-lived resource delegation, durable leases and product-owned idempotent credential receipts.
 - Add explicit source-preserving offline adoption of legacy enrollment ownership, immutable product IDs, deadlines, encrypted receipts and recovery provenance. Independent installations and unknown legacy outcomes cannot be silently combined or replayed.
 
 
-## Unreleased ecosystem extraction
+### Ecosystem extraction
 
 - Make first-start seeding atomic and permit interrupted initialization only with
   its protected receipt and unchanged seed inputs. Optional fresh-suite bootstrap
