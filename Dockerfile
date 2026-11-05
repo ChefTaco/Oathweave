@@ -17,6 +17,12 @@ COPY --from=build --chown=node:node /build/packages/iam-sdk/package.json /app/pa
 COPY LICENSE NOTICE /app/
 COPY scripts/container-health.mjs /app/healthcheck.mjs
 ENV HIVE_HEALTH_URL=https://localhost:4200/api/v1/health/ready
+# The runtime runs only node. Remove the base image's package managers (npm and
+# corepack bundle vulnerable dependencies) and apt; dpkg's database stays so
+# scanners still see the installed OS packages.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+ && dpkg --purge --force-remove-protected --force-remove-essential apt libapt-pkg6.0 \
+ && rm -rf /etc/apt /var/lib/apt /var/cache/apt /var/log/apt
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 CMD ["node", "/app/healthcheck.mjs"]
 USER node
 WORKDIR /app/apps/iam-core
