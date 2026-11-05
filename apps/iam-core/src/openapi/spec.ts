@@ -260,17 +260,6 @@ export function buildOpenApiSpec() {
         createdAt: { type: 'string', format: 'date-time' },
       },
     },
-    Session: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        userId: { type: 'string' },
-        ipAddress: { type: 'string' },
-        userAgent: { type: 'string' },
-        expiresAt: { type: 'string', format: 'date-time' },
-        createdAt: { type: 'string', format: 'date-time' },
-      },
-    },
     AuditEvent: {
       type: 'object',
       properties: {
@@ -299,6 +288,22 @@ export function buildOpenApiSpec() {
         iat: { type: 'number' },
       },
     },
+    Session: {
+      type: 'object',
+      required: ['id', 'userId', 'createdAt', 'expiresAt', 'revokedAt'],
+      properties: {
+        id: { type: 'string' }, userId: { type: 'string' },
+        ipAddress: { type: ['string', 'null'] }, userAgent: { type: ['string', 'null'] },
+        riskScore: { type: 'number' }, riskFactors: { type: ['string', 'null'] },
+        deviceFingerprint: { type: ['string', 'null'] },
+        createdAt: { type: 'string', format: 'date-time' },
+        expiresAt: { type: 'string', format: 'date-time' },
+        stepUpVerifiedAt: { type: ['string', 'null'], format: 'date-time' },
+        revokedAt: { type: ['string', 'null'], format: 'date-time' },
+        revokedBy: { type: ['string', 'null'] },
+        user: { type: 'object', properties: { email: { type: 'string' }, username: { type: 'string' }, displayName: { type: ['string', 'null'] } } },
+      },
+    },
     PasswordPolicy: {
       type: 'object',
       properties: {
@@ -315,6 +320,36 @@ export function buildOpenApiSpec() {
   }
 
   const paths: Record<string, unknown> = {
+    '/api/v1/sessions': {
+      get: {
+        tags: ['Sessions'], operationId: 'listSessions',
+        summary: 'Review distinct active sessions; requires iam:sessions:revoke',
+        security: [{ BearerAuth: [] }],
+        responses: { ...success({ type: 'object', required: ['sessions'], properties: { sessions: { type: 'array', items: ref('Session') } } }), 401: err401, 403: err403 },
+      },
+    },
+    '/api/v1/sessions/{id}': {
+      delete: {
+        tags: ['Sessions'], operationId: 'revokeSession', summary: 'Revoke an explicitly selected session and its refresh credentials',
+        security: [{ BearerAuth: [] }], parameters: [pp('id', 'Exact session identity')],
+        responses: { ...success({ type: 'object', properties: { success: { const: true } } }), 401: err401, 403: err403, 404: err404 },
+      },
+    },
+    '/api/v1/sessions/user/{userId}': {
+      delete: {
+        tags: ['Sessions'], operationId: 'revokeAllUserSessions', summary: 'Explicitly revoke every session of the selected user',
+        security: [{ BearerAuth: [] }], parameters: [pp('userId', 'Exact user identity')],
+        responses: { ...success({ type: 'object', properties: { success: { const: true } } }), 401: err401, 403: err403 },
+      },
+    },
+    '/api/v1/sessions/deduplicate': {
+      post: {
+        tags: ['Sessions'], operationId: 'deduplicateSessions', deprecated: true,
+        summary: 'Refuse heuristic revocation; select explicit session IDs instead',
+        description: 'Shared IP addresses and browser metadata do not establish that sessions are duplicates. Returns EXPLICIT_SESSION_SELECTION_REQUIRED without changing credentials.',
+        security: [{ BearerAuth: [] }], responses: { 401: err401, 403: err403, 409: err409 },
+      },
+    },
     '/api/v1/browser/session': {
       get: {
         tags: ['Auth'],
@@ -1009,53 +1044,6 @@ export function buildOpenApiSpec() {
         operationId: 'introspectToken',
         security: [{ BearerAuth: [] }],
         responses: { ...success(ref('TokenInfo')), 401: err401 },
-      },
-    },
-
-    // ── Sessions ──
-    '/api/v1/sessions': {
-      get: {
-        tags: ['Sessions'],
-        summary: 'List active sessions',
-        operationId: 'listSessions',
-        security: [{ BearerAuth: [] }],
-        parameters: [
-          qp('userId', 'Filter by user ID'),
-          qp('page', 'Page number', false, { type: 'integer', default: 1 }),
-          qp('limit', 'Items per page', false, {
-            type: 'integer',
-            default: 50,
-          }),
-        ],
-        responses: {
-          ...success({
-            type: 'object',
-            properties: {
-              sessions: { type: 'array', items: ref('Session') },
-              total: { type: 'integer' },
-            },
-          }),
-          401: err401,
-          403: err403,
-        },
-      },
-    },
-    '/api/v1/sessions/{id}': {
-      delete: {
-        tags: ['Sessions'],
-        summary: 'Revoke a session',
-        operationId: 'revokeSession',
-        security: [{ BearerAuth: [] }],
-        parameters: [pp('id', 'Session ID')],
-        responses: {
-          ...success({
-            type: 'object',
-            properties: { message: { type: 'string' } },
-          }),
-          401: err401,
-          403: err403,
-          404: err404,
-        },
       },
     },
 

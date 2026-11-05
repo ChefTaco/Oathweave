@@ -1,5 +1,9 @@
 # Changelog
 
+- Preserve independent sign-ins behind a shared IP/browser fingerprint. Session
+  revocation requires explicit session or user selection; the legacy heuristic
+  cleanup endpoint returns a migration message without invalidating credentials.
+
 - Preserve native DateTime storage compatibility for atomic enrollment credentials and reject expired ISO or legacy numeric identities before rotation.
 
 ## Unreleased

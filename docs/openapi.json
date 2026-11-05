@@ -1113,6 +1113,12 @@
             "format": "date-time",
             "type": "string"
           },
+          "deviceFingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "expiresAt": {
             "format": "date-time",
             "type": "string"
@@ -1121,15 +1127,74 @@
             "type": "string"
           },
           "ipAddress": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revokedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "riskFactors": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "stepUpVerifiedAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user": {
+            "properties": {
+              "displayName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "type": "object"
           },
           "userAgent": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "userId": {
             "type": "string"
           }
         },
+        "required": [
+          "id",
+          "userId",
+          "createdAt",
+          "expiresAt",
+          "revokedAt"
+        ],
         "type": "object"
       },
       "StepUpRequest": {
@@ -5424,37 +5489,6 @@
     "/api/v1/sessions": {
       "get": {
         "operationId": "listSessions",
-        "parameters": [
-          {
-            "description": "Filter by user ID",
-            "in": "query",
-            "name": "userId",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Page number",
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "type": "integer"
-            }
-          },
-          {
-            "description": "Items per page",
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "type": "integer"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -5466,11 +5500,11 @@
                         "$ref": "#/components/schemas/Session"
                       },
                       "type": "array"
-                    },
-                    "total": {
-                      "type": "integer"
                     }
                   },
+                  "required": [
+                    "sessions"
+                  ],
                   "type": "object"
                 }
               }
@@ -5503,7 +5537,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "List active sessions",
+        "summary": "Review distinct active sessions; requires iam:sessions:revoke",
         "tags": [
           "Sessions"
         ]
@@ -5514,7 +5548,7 @@
         "operationId": "revokeSession",
         "parameters": [
           {
-            "description": "Session ID",
+            "description": "Exact session identity",
             "in": "path",
             "name": "id",
             "required": true,
@@ -5529,8 +5563,8 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "message": {
-                      "type": "string"
+                    "success": {
+                      "const": true
                     }
                   },
                   "type": "object"
@@ -5575,7 +5609,117 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Revoke a session",
+        "summary": "Revoke an explicitly selected session and its refresh credentials",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/deduplicate": {
+      "post": {
+        "deprecated": true,
+        "description": "Shared IP addresses and browser metadata do not establish that sessions are duplicates. Returns EXPLICIT_SESSION_SELECTION_REQUIRED without changing credentials.",
+        "operationId": "deduplicateSessions",
+        "responses": {
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Refuse heuristic revocation; select explicit session IDs instead",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/user/{userId}": {
+      "delete": {
+        "operationId": "revokeAllUserSessions",
+        "parameters": [
+          {
+            "description": "Exact user identity",
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "success": {
+                      "const": true
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Explicitly revoke every session of the selected user",
         "tags": [
           "Sessions"
         ]

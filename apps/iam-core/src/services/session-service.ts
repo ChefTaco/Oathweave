@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
+import { ApiError } from '../types/index.js'
 import { computeSessionRisk, deriveDeviceFingerprint } from './session-risk-service.js'
 
 export async function createSession(
@@ -8,31 +9,8 @@ export async function createSession(
   ipAddress?: string,
   userAgent?: string,
 ): Promise<{ sessionId: string; riskScore: number; riskFactors: string[] }> {
-  // Revoke older sessions from the same user + IP + userAgent to prevent
-  // duplicate accumulation (e.g. repeated logins from the same browser).
-  if (ipAddress && userAgent) {
-    const stale = await prisma.session.findMany({
-      where: {
-        userId,
-        ipAddress,
-        userAgent,
-        revokedAt: null,
-      },
-      select: { id: true },
-    })
-    if (stale.length > 0) {
-      await prisma.session.updateMany({
-        where: { id: { in: stale.map((s) => s.id) } },
-        data: { revokedAt: new Date() },
-      })
-      // Revoke refresh tokens tied to those sessions
-      await prisma.refreshToken.updateMany({
-        where: { sessionId: { in: stale.map((s) => s.id) }, revokedAt: null },
-        data: { revokedAt: new Date() },
-      })
-    }
-  }
-
+  // Network/browser metadata is shared by independent clients behind NAT.
+  // Retain it for risk analysis, never as authority to revoke another session.
   const { score, factors } = await computeSessionRisk({ userId, ipAddress, userAgent })
   const fingerprint = deriveDeviceFingerprint(userAgent, ipAddress)
 
@@ -86,38 +64,11 @@ export async function listActiveSessions(userId?: string) {
   })
 }
 
-/**
- * Revoke duplicate active sessions for the same user + IP + userAgent,
- * keeping only the most recent one per combination.
- */
+/** Retained compatibility entrypoint: callers must select exact session IDs. */
 export async function deduplicateSessions(): Promise<number> {
-  const active = await prisma.session.findMany({
-    where: { revokedAt: null, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  const seen = new Map<string, string>()          // compositeKey → kept sessionId
-  const toRevoke: string[] = []
-
-  for (const s of active) {
-    const key = `${s.userId}|${s.ipAddress ?? ''}|${s.userAgent ?? ''}`
-    if (!seen.has(key)) {
-      seen.set(key, s.id)                          // keep newest
-    } else {
-      toRevoke.push(s.id)                          // duplicate — revoke
-    }
-  }
-
-  if (toRevoke.length > 0) {
-    await prisma.session.updateMany({
-      where: { id: { in: toRevoke } },
-      data: { revokedAt: new Date() },
-    })
-    await prisma.refreshToken.updateMany({
-      where: { sessionId: { in: toRevoke }, revokedAt: null },
-      data: { revokedAt: new Date() },
-    })
-  }
-
-  return toRevoke.length
+  throw new ApiError(
+    409,
+    'EXPLICIT_SESSION_SELECTION_REQUIRED',
+    'IP addresses and browser metadata do not identify duplicate sessions. Review active sessions and revoke explicit session IDs instead.',
+  )
 }
