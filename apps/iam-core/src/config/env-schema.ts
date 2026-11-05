@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { browserDiscoveryConfigurationSchema } from './browser-discovery.js'
 
 /**
  * Side-effect-free environment schema. `config/env.ts` parses `process.env`
@@ -27,6 +28,9 @@ export const envSchema = z.object({
   JWT_PUBLIC_KEY_PATH: z.string().min(1),
   JWT_PREVIOUS_PUBLIC_KEY_PATHS: z.string().default(''),
   JWT_ISSUER: z.string().default('https://hive:4200'),
+  IAM_BROWSER_ISSUER: z.string().optional(),
+  IAM_BROWSER_AUTHORIZATION_URL: z.string().optional(),
+  IAM_BROWSER_API_BASE_URL: z.string().optional(),
   JWT_ACCESS_TTL: z.coerce.number().default(900),
   JWT_REFRESH_TTL: z.coerce.number().default(604800),
 
@@ -63,6 +67,10 @@ export const envSchema = z.object({
   RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().default(5),
 
   IAM_AGENT_SECRET: z.string().min(16),
+}).superRefine((source, context) => {
+  if (source.IAM_BROWSER_AUTHORIZATION_URL === undefined && source.IAM_BROWSER_API_BASE_URL === undefined) return
+  const result = browserDiscoveryConfigurationSchema.safeParse(source)
+  if (!result.success) for (const issue of result.error.issues) context.addIssue({code:'custom',path:issue.path,message:issue.message})
 })
 
 export type Env = z.infer<typeof envSchema>

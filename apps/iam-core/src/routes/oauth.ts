@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { getBrowserOpenIdConfiguration } from '../services/browser-discovery.js'
 import {
   issuerForClient,
   browserClientPolicies,
@@ -483,7 +484,13 @@ oauthRouter.get('/userinfo', authMiddleware, async (c) => {
 })
 
 // ── GET /.well-known/openid-configuration — OIDC Discovery ──
-oauthRouter.get('/.well-known/openid-configuration', (c) => {
+oauthRouter.get('/.well-known/openid-configuration', async (c) => {
+  const clients = c.req.queries('client_id')
+  if (clients) {
+    c.header('Cache-Control', 'no-store')
+    if (clients.length !== 1 || !clients[0]) throw new ApiError(400, 'INVALID_CLIENT', 'Select one registered public browser client')
+    return c.json(await getBrowserOpenIdConfiguration(clients[0]))
+  }
   const proto = c.req.header('x-forwarded-proto') ?? 'https'
   const host =
     c.req.header('x-forwarded-host') ?? c.req.header('host') ?? 'localhost:4200'

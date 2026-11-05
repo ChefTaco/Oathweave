@@ -1,4 +1,5 @@
 import { z, type ZodType } from 'zod'
+import { BrowserOpenIdConfigurationSchema } from '../schemas/discovery.js'
 import * as browserContracts from '../schemas/browser-contracts.js'
 import { EnrollmentRequestSchema, EnrollmentLifecycleSchema, EnrollmentResultSchema, EnrollmentInventorySchema, LegacyEnrollmentReceiptSchema, EnrollmentInstallationsSchema } from '../schemas/enrollments.js'
 import {
@@ -157,6 +158,7 @@ export function buildOpenApiSpec() {
   ]
 
   const componentSchemas: Record<string, unknown> = {
+    BrowserOpenIdConfiguration: zod(BrowserOpenIdConfigurationSchema),
     ...Object.fromEntries(Object.entries(browserContracts).map(([name,schema]) => [name.replace(/Schema$/, ''), z.toJSONSchema(schema, { target:'draft-2020-12', io:'input' })])),
     // Request schemas from Zod
     LoginRequest: zod(LoginSchema),
@@ -1482,6 +1484,16 @@ export function buildOpenApiSpec() {
   paths['/api/v1/enrollments/{actorId}/receipt'] = Object.fromEntries(['get','delete'].map(method => [method, { tags: ['Service Accounts'], summary: method === 'get' ? 'Recover an explicitly migrated legacy enrollment receipt before its original expiry' : 'Acknowledge an owned legacy enrollment receipt', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit migrated actor ID')], responses: { ...success(method === 'get' ? ref('LegacyEnrollmentReceipt') : { type: 'object' }), 401: err401, 403: err403, 410: { description: 'Original legacy receipt expired or acknowledged' } } }]))
   paths['/api/v1/enrollments/installations'] = { get: { tags: ['Service Accounts'], summary: 'List only explicitly authorized installation namespace identifiers; no endpoint configuration is exposed', security: [{ BearerAuth: [] }], responses: { ...success(ref('EnrollmentInstallations')), 401: err401, 403: err403 } } }
   for (const [path,item] of Object.entries(paths)) if (path.startsWith('/api/v1/enrollments') && path !== '/api/v1/enrollments/installations') for (const operation of Object.values(item as Record<string,{parameters?:unknown[]}>)) operation.parameters = [...(operation.parameters ?? []), qp('installationId','Exact installation namespace; mandatory when this authority coordinates multiple installations',false,{type:'string',pattern:'^[a-z0-9][a-z0-9-]{0,63}$'})]
+  paths['/api/v1/oauth/.well-known/openid-configuration'] = { get: {
+    tags: ['Auth'], operationId: 'discoverOpenIdConfiguration',
+    summary: 'Native discovery by default; select an active registered public browser client for configured interactive metadata',
+    parameters: [qp('client_id','Explicit IAM_BROWSER_CLIENT_POLICIES client identifier; never inferred from headers',false,{type:'string',pattern:'^hivexui-[a-z0-9-]+$'})],
+    responses: {
+      200: { description: 'Without client_id the native discovery document is unchanged. With client_id this is BrowserOpenIdConfiguration, with no-store caching.', content: { 'application/json': { schema: { anyOf: [ref('BrowserOpenIdConfiguration'), {type:'object',description:'Retained native discovery metadata',additionalProperties:true}] } } } },
+      400: { description: 'Unknown, inactive, non-public, empty or repeated browser client selection' },
+      503: { description: 'Explicit browser issuer, authorization portal and API base are not configured' },
+    },
+  } }
   const browserResponses: Array<[string,string,string,number]> = [
     ['/users','get','IamUsersResponse',200],['/users','post','IamUserMutationResponse',201],['/users/{id}','patch','IamUserMutationResponse',200],
     ['/roles','get','IamRolesResponse',200],['/roles','post','IamRoleResponse',201],['/roles/{id}','patch','IamRoleResponse',200],

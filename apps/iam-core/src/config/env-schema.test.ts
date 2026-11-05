@@ -34,3 +34,13 @@ describe('environment validation', () => {
     }
   })
 })
+
+it('requires explicit HTTPS same-origin metadata configuration without reflecting invalid values',()=>{
+ const configured={...valid,IAM_BROWSER_ISSUER:'https://identity.example.com',IAM_BROWSER_AUTHORIZATION_URL:'https://identity.example.com/auth/authorize',IAM_BROWSER_API_BASE_URL:'https://identity.example.com/api/oathweave'}
+ expect(validateEnv(configured).ok).toBe(true)
+ for(const override of [{IAM_BROWSER_API_BASE_URL:undefined},{IAM_BROWSER_ISSUER:undefined},{IAM_BROWSER_AUTHORIZATION_URL:'http://identity.example.com/auth'},{IAM_BROWSER_API_BASE_URL:'https://other.example.com/api'},{IAM_BROWSER_AUTHORIZATION_URL:'https://deploy:obviously-fake-secret@identity.example.com/auth'},{IAM_BROWSER_API_BASE_URL:'https://identity.example.com/api?token=obviously-fake'},{IAM_BROWSER_API_BASE_URL:'not-a-url'},{IAM_BROWSER_AUTHORIZATION_URL:'https://identity.example.com/auth#fragment'},{IAM_BROWSER_API_BASE_URL:'https://identity.example.com/api?'},{IAM_BROWSER_AUTHORIZATION_URL:'https://identity.example.com/auth#'}]){
+  const result=validateEnv({...configured,...override});expect(result.ok).toBe(false)
+  if(!result.ok)for(const line of result.errors){expect(line).not.toContain('obviously-fake-secret');expect(line).not.toContain('other.example.com')}
+ }
+ expect(validateEnv({...valid,IAM_BROWSER_ISSUER:'retained-legacy-setting'}).ok).toBe(true)
+})

@@ -43,3 +43,36 @@ A disposable real-service acceptance test lives in Hive's
 state and proves native/browser issuer separation, PKCE, one-use codes, exact
 resource HTTP read access, preserved local product identity, unauthorized-write
 denial and logout revocation. It never uses production credentials.
+
+## Interactive browser client discovery
+
+Native discovery remains unchanged at
+`GET /api/v1/oauth/.well-known/openid-configuration` without a client selection.
+For an interactive relying party, explicitly select its registered public client:
+`GET /api/v1/oauth/.well-known/openid-configuration?client_id=hivexui-security-console`.
+The selected ID must exist in `IAM_BROWSER_CLIENT_POLICIES` and in the database as
+an active public client. Empty, repeated, unknown, inactive and confidential client
+selections fail without returning native metadata.
+
+Configure all three public values for this optional discovery profile:
+
+```dotenv
+IAM_BROWSER_ISSUER=https://identity.example.com
+IAM_BROWSER_AUTHORIZATION_URL=https://identity.example.com/auth/authorize
+IAM_BROWSER_API_BASE_URL=https://identity.example.com/api/oathweave
+```
+
+The authorization URL is the interactive sign-in/consent portal. The API base is
+the public ingress prefix serving this Oathweave API; discovery appends
+`/oauth/token`, `/oauth/userinfo` and `/oauth/jwks`. Every value must be HTTPS,
+without credentials, query parameters or fragments; both endpoints must share the
+browser issuer's exact origin, including its port. Supplying either endpoint
+requires the complete valid configuration at startup. Selecting browser discovery
+without that configuration returns `503 BROWSER_DISCOVERY_UNCONFIGURED`.
+
+Browser discovery ignores host and forwarding headers, sets `Cache-Control:
+no-store`, emits no credentials/cookies or redirects, and advertises only public
+Authorization Code with S256 PKCE. It does not create clients, sessions, accounts
+or keys. Registration, redirect URI checks, consent and resource authorization
+remain enforced separately during authorization and token exchange. No unselected
+client or issuer is inferred from a request's origin.

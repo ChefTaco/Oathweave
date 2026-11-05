@@ -1,5 +1,7 @@
 # Changelog
 
+- Add explicitly selected public-browser OIDC discovery with a configured interactive authorization portal and API prefix on the browser issuer origin. Reject invalid configuration and unregistered/inactive/confidential selections without changing native discovery.
+
 - Export standalone browser-safe identity, enrollment and authentication validators from the owning product, preserving request refinements and native response envelopes. Document actual administration response contracts and verify export drift.
 
 - Preserve independent sign-ins behind a shared IP/browser fingerprint. Session

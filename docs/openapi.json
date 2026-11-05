@@ -305,6 +305,154 @@
         ],
         "type": "object"
       },
+      "BrowserOpenIdConfiguration": {
+        "additionalProperties": false,
+        "properties": {
+          "authorization_endpoint": {
+            "format": "uri",
+            "type": "string"
+          },
+          "claims_supported": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "code_challenge_methods_supported": {
+            "items": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "S256"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "grant_types_supported": {
+            "items": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "authorization_code"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "id_token_signing_alg_values_supported": {
+            "items": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "RS256"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "issuer": {
+            "format": "uri",
+            "type": "string"
+          },
+          "jwks_uri": {
+            "format": "uri",
+            "type": "string"
+          },
+          "response_types_supported": {
+            "items": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "code"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "scopes_supported": {
+            "items": {
+              "enum": [
+                "openid",
+                "profile",
+                "email"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subject_types_supported": {
+            "items": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "public"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "token_endpoint": {
+            "format": "uri",
+            "type": "string"
+          },
+          "token_endpoint_auth_methods_supported": {
+            "items": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "none"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "userinfo_endpoint": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer",
+          "authorization_endpoint",
+          "token_endpoint",
+          "userinfo_endpoint",
+          "jwks_uri",
+          "response_types_supported",
+          "grant_types_supported",
+          "subject_types_supported",
+          "id_token_signing_alg_values_supported",
+          "scopes_supported",
+          "token_endpoint_auth_methods_supported",
+          "code_challenge_methods_supported",
+          "claims_supported"
+        ],
+        "type": "object"
+      },
       "BrowserResourceUserResponse": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -7088,6 +7236,54 @@
             "BearerAuth": []
           }
         ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/.well-known/openid-configuration": {
+      "get": {
+        "operationId": "discoverOpenIdConfiguration",
+        "parameters": [
+          {
+            "description": "Explicit IAM_BROWSER_CLIENT_POLICIES client identifier; never inferred from headers",
+            "in": "query",
+            "name": "client_id",
+            "required": false,
+            "schema": {
+              "pattern": "^hivexui-[a-z0-9-]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BrowserOpenIdConfiguration"
+                    },
+                    {
+                      "additionalProperties": true,
+                      "description": "Retained native discovery metadata",
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Without client_id the native discovery document is unchanged. With client_id this is BrowserOpenIdConfiguration, with no-store caching."
+          },
+          "400": {
+            "description": "Unknown, inactive, non-public, empty or repeated browser client selection"
+          },
+          "503": {
+            "description": "Explicit browser issuer, authorization portal and API base are not configured"
+          }
+        },
+        "summary": "Native discovery by default; select an active registered public browser client for configured interactive metadata",
         "tags": [
           "Auth"
         ]
