@@ -167,3 +167,12 @@ Images are local candidates until registry publication and release acceptance.
 
 Browser clients, passkeys, step-up and private recovery delivery are documented in
 [the browser authentication guide](docs/BROWSER_AUTH.md). Existing production migration gates remain required.
+
+Browser consumers use the product-owned `docs/browser-contracts.ts` candidate
+artifact with its exact SHA256 and version. `npm run contracts:browser` exports
+the pure Zod validators without database, server or signing dependencies;
+`npm run check:browser` rejects source/export drift. The export preserves request
+refinements, defaults and bounds that cannot be recovered from OpenAPI alone.
+`docs/openapi.json` also describes the actual browser administration envelopes,
+including existing native client mutation serialization. Publication remains a
+separate release action; consumers pin reviewed immutable snapshots until then.

@@ -1,5 +1,7 @@
 # Changelog
 
+- Export standalone browser-safe identity, enrollment and authentication validators from the owning product, preserving request refinements and native response envelopes. Document actual administration response contracts and verify export drift.
+
 - Preserve independent sign-ins behind a shared IP/browser fingerprint. Session
   revocation requires explicit session or user selection; the legacy heuristic
   cleanup endpoint returns a migration message without invalidating credentials.

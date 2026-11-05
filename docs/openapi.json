@@ -122,6 +122,301 @@
         ],
         "type": "object"
       },
+      "BrowserAuthorizationResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state",
+          "iss"
+        ],
+        "type": "object"
+      },
+      "BrowserConsentDetails": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "audience": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "clientDescription": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clientName": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "scope": {
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientName",
+          "clientDescription",
+          "audience",
+          "scope",
+          "permissions"
+        ],
+        "type": "object"
+      },
+      "BrowserLoginResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "properties": {
+              "methods": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "mfaToken": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "requiresMfa": {
+                "const": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requiresMfa",
+              "mfaToken",
+              "methods"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "expiresIn": {
+                "type": "number"
+              },
+              "requiresMfa": {
+                "const": false,
+                "type": "boolean"
+              },
+              "riskFactors": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "riskScore": {
+                "type": "number"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "user": {
+                "properties": {
+                  "displayName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "permissions": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "roles": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "email",
+                  "username",
+                  "displayName",
+                  "roles",
+                  "permissions"
+                ],
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "BrowserMessageResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "BrowserOkResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "ok": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      },
+      "BrowserResourceUserResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "user": {
+            "properties": {
+              "displayName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "permissions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "roles": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username",
+              "displayName",
+              "roles",
+              "permissions"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "BrowserSessionResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "principal": {
+            "properties": {
+              "permissions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "roles": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "sub": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sub",
+              "roles",
+              "permissions"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "principal"
+        ],
+        "type": "object"
+      },
+      "BrowserTokenResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "access_token": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "expires_in": {
+            "maximum": 900,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "id_token": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "token_type": {
+            "const": "Bearer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id_token",
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -228,6 +523,229 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "CreateIamClientRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "allowedIps": {
+            "default": [],
+            "items": {
+              "format": "ipv4",
+              "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "clientType": {
+            "default": "confidential",
+            "enum": [
+              "public",
+              "confidential"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "firstParty": {
+            "default": false,
+            "type": "boolean"
+          },
+          "grantTypes": {
+            "default": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "items": {
+              "enum": [
+                "authorization_code",
+                "refresh_token",
+                "client_credentials"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 2,
+            "pattern": "^[a-z0-9-]+$",
+            "type": "string"
+          },
+          "redirectUris": {
+            "default": [],
+            "items": {
+              "format": "uri",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "secret": {
+            "minLength": 16,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "CreateIamRoleRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 2,
+            "pattern": "^[A-Z0-9_]+$",
+            "type": "string"
+          },
+          "permissions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "label"
+        ],
+        "type": "object"
+      },
+      "CreateIamServiceAccountRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "allowedIps": {
+            "default": [],
+            "items": {
+              "format": "ipv4",
+              "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "clientId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 2,
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 16,
+            "type": "string"
+          },
+          "roleIds": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "clientId"
+        ],
+        "type": "object"
+      },
+      "CreateIamSystemUserRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "authorizedHosts": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "linuxUsername": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "sshPublicKey": {
+            "type": "string"
+          },
+          "sudoEnabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "userId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "linuxUsername"
+        ],
+        "type": "object"
+      },
+      "CreateIamUserRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "default": true,
+            "type": "boolean"
+          },
+          "displayName": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 8,
+            "type": "string"
+          },
+          "roleIds": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 2,
+            "pattern": "^[a-z0-9_-]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "username",
+          "displayName",
+          "password"
         ],
         "type": "object"
       },
@@ -713,6 +1231,2038 @@
         ],
         "type": "object"
       },
+      "IamAssignRolesRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "roleIds": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "roleIds"
+        ],
+        "type": "object"
+      },
+      "IamAuditEvent": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actorEmail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorType": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": {},
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "hostName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "timestamp",
+          "eventType",
+          "category",
+          "actorType",
+          "action",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      "IamAuditResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "events": {
+            "items": {
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "actorEmail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actorId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actorType": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "detail": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": {},
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "eventType": {
+                  "type": "string"
+                },
+                "hostName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "ipAddress": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "outcome": {
+                  "type": "string"
+                },
+                "resourceId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resourceType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "timestamp",
+                "eventType",
+                "category",
+                "actorType",
+                "action",
+                "outcome"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "events",
+          "total",
+          "page",
+          "limit"
+        ],
+        "type": "object"
+      },
+      "IamAuditStats": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "byCategory": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "deniedCount": {
+            "type": "number"
+          },
+          "failureCount": {
+            "type": "number"
+          },
+          "successCount": {
+            "type": "number"
+          },
+          "totalEvents": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "totalEvents",
+          "successCount",
+          "failureCount",
+          "deniedCount",
+          "byCategory"
+        ],
+        "type": "object"
+      },
+      "IamClient": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "allowedIps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "clientType": {
+            "enum": [
+              "public",
+              "confidential"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "firstParty": {
+            "type": "boolean"
+          },
+          "grantTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "redirectUris": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "active",
+          "clientType",
+          "redirectUris",
+          "grantTypes",
+          "firstParty",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "IamClientMutationResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "client": {
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "allowedIps": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "clientType": {
+                "enum": [
+                  "public",
+                  "confidential"
+                ],
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "firstParty": {
+                "type": "boolean"
+              },
+              "grantTypes": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "redirectUris": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description",
+              "active",
+              "clientType",
+              "redirectUris",
+              "grantTypes",
+              "firstParty"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "client"
+        ],
+        "type": "object"
+      },
+      "IamClientsResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "clients": {
+            "items": {
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "allowedIps": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "clientType": {
+                  "enum": [
+                    "public",
+                    "confidential"
+                  ],
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "firstParty": {
+                  "type": "boolean"
+                },
+                "grantTypes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "redirectUris": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "active",
+                "clientType",
+                "redirectUris",
+                "grantTypes",
+                "firstParty",
+                "createdAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "clients"
+        ],
+        "type": "object"
+      },
+      "IamCreatedServiceAccountResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "warning": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "apiKey",
+          "warning"
+        ],
+        "type": "object"
+      },
+      "IamHealthResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": {},
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "IamPasswordPolicy": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "historyCount": {
+            "type": "number"
+          },
+          "lockoutAttempts": {
+            "type": "number"
+          },
+          "lockoutDurationMin": {
+            "type": "number"
+          },
+          "maxAgeDays": {
+            "type": "number"
+          },
+          "maxLength": {
+            "type": "number"
+          },
+          "minLength": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "requireLowercase": {
+            "type": "boolean"
+          },
+          "requireNumbers": {
+            "type": "boolean"
+          },
+          "requireSpecial": {
+            "type": "boolean"
+          },
+          "requireUppercase": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "minLength",
+          "maxLength",
+          "requireUppercase",
+          "requireLowercase",
+          "requireNumbers",
+          "requireSpecial",
+          "maxAgeDays",
+          "historyCount",
+          "lockoutAttempts",
+          "lockoutDurationMin"
+        ],
+        "type": "object"
+      },
+      "IamPasswordPolicyResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "policy": {
+            "properties": {
+              "historyCount": {
+                "type": "number"
+              },
+              "lockoutAttempts": {
+                "type": "number"
+              },
+              "lockoutDurationMin": {
+                "type": "number"
+              },
+              "maxAgeDays": {
+                "type": "number"
+              },
+              "maxLength": {
+                "type": "number"
+              },
+              "minLength": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "requireLowercase": {
+                "type": "boolean"
+              },
+              "requireNumbers": {
+                "type": "boolean"
+              },
+              "requireSpecial": {
+                "type": "boolean"
+              },
+              "requireUppercase": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "minLength",
+              "maxLength",
+              "requireUppercase",
+              "requireLowercase",
+              "requireNumbers",
+              "requireSpecial",
+              "maxAgeDays",
+              "historyCount",
+              "lockoutAttempts",
+              "lockoutDurationMin"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
+      "IamRole": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isSystem": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "label",
+          "description",
+          "permissions",
+          "isSystem",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "IamRoleAssignment": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "grantedAt": {
+            "type": "string"
+          },
+          "grantedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "roleId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "type": "object"
+      },
+      "IamRoleResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "role": {
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "isSystem": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "permissions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "label",
+              "description",
+              "permissions",
+              "isSystem",
+              "createdAt",
+              "updatedAt"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "type": "object"
+      },
+      "IamRolesResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "roles": {
+            "items": {
+              "properties": {
+                "createdAt": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "isSystem": {
+                  "type": "boolean"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "permissions": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "label",
+                "description",
+                "permissions",
+                "isSystem",
+                "createdAt",
+                "updatedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles"
+        ],
+        "type": "object"
+      },
+      "IamRoleSummary": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "IamRotatedServiceAccountResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "warning": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiKey",
+          "warning"
+        ],
+        "type": "object"
+      },
+      "IamRotatePasswordRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "minLength": 8,
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "type": "object"
+      },
+      "IamServiceAccount": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "allowedIps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "apiKeyPrefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client": {
+            "anyOf": [
+              {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastUsedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "properties": {
+                "grantedAt": {
+                  "type": "string"
+                },
+                "grantedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "role": {
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "roleId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "active",
+          "lastUsedAt",
+          "createdAt",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "IamServiceAccountMutationResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "serviceAccount": {
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "allowedIps": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "apiKeyPrefix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expiresAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "keyPrefix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastUsedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "roles": {
+                "items": {
+                  "properties": {
+                    "grantedAt": {
+                      "type": "string"
+                    },
+                    "grantedBy": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "role": {
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "roleId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description",
+              "active",
+              "lastUsedAt",
+              "createdAt"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "serviceAccount"
+        ],
+        "type": "object"
+      },
+      "IamServiceAccountsResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "serviceAccounts": {
+            "items": {
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "allowedIps": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "apiKeyPrefix": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "client": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expiresAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "keyPrefix": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lastUsedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "roles": {
+                  "items": {
+                    "properties": {
+                      "grantedAt": {
+                        "type": "string"
+                      },
+                      "grantedBy": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "role": {
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "roleId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "active",
+                "lastUsedAt",
+                "createdAt",
+                "roles"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "serviceAccounts"
+        ],
+        "type": "object"
+      },
+      "IamSession": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "riskFactors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "stepUpVerifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user": {
+            "anyOf": [
+              {
+                "properties": {
+                  "displayName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "username",
+                  "displayName"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "userAgent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "ipAddress",
+          "userAgent",
+          "createdAt",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "IamSessionsResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "sessions": {
+            "items": {
+              "properties": {
+                "createdAt": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "ipAddress": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "riskFactors": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "riskScore": {
+                  "type": "number"
+                },
+                "stepUpVerifiedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "user": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "displayName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "username": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "email",
+                        "username",
+                        "displayName"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "userAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "userId",
+                "ipAddress",
+                "userAgent",
+                "createdAt",
+                "expiresAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions"
+        ],
+        "type": "object"
+      },
+      "IamSuccessResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "IamSystemUser": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "authorizedHosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "linuxUsername": {
+            "type": "string"
+          },
+          "sshPublicKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sudoEnabled": {
+            "type": "boolean"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "displayName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "username",
+                  "displayName",
+                  "active"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "linuxUsername",
+          "sudoEnabled",
+          "authorizedHosts",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "IamSystemUserResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "systemUser": {
+            "properties": {
+              "authorizedHosts": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "linuxUsername": {
+                "type": "string"
+              },
+              "sshPublicKey": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sudoEnabled": {
+                "type": "boolean"
+              },
+              "user": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "active": {
+                        "type": "boolean"
+                      },
+                      "displayName": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "username": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "email",
+                      "username",
+                      "displayName",
+                      "active"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "userId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "userId",
+              "linuxUsername",
+              "sudoEnabled",
+              "authorizedHosts",
+              "createdAt"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "systemUser"
+        ],
+        "type": "object"
+      },
+      "IamSystemUsersResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "systemUsers": {
+            "items": {
+              "properties": {
+                "authorizedHosts": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "linuxUsername": {
+                  "type": "string"
+                },
+                "sshPublicKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sudoEnabled": {
+                  "type": "boolean"
+                },
+                "user": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "displayName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "username": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "email",
+                        "username",
+                        "displayName",
+                        "active"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "userId",
+                "linuxUsername",
+                "sudoEnabled",
+                "authorizedHosts",
+                "createdAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "systemUsers"
+        ],
+        "type": "object"
+      },
+      "IamUser": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string"
+          },
+          "failedAttempts": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastLoginAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lockedUntil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mfaEnabled": {
+            "type": "boolean"
+          },
+          "mfaVerifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "passkeyCount": {
+            "type": "number"
+          },
+          "passwordChangedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roles": {
+            "items": {
+              "properties": {
+                "grantedAt": {
+                  "type": "string"
+                },
+                "grantedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "role": {
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "roleId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "trustedDeviceCount": {
+            "type": "number"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "username",
+          "displayName",
+          "active",
+          "lastLoginAt",
+          "createdAt",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "IamUserMutationResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "user": {
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": "string"
+              },
+              "failedAttempts": {
+                "type": "number"
+              },
+              "id": {
+                "type": "string"
+              },
+              "lastLoginAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lockedUntil": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mfaEnabled": {
+                "type": "boolean"
+              },
+              "mfaVerifiedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "passkeyCount": {
+                "type": "number"
+              },
+              "passwordChangedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "roles": {
+                "items": {
+                  "properties": {
+                    "grantedAt": {
+                      "type": "string"
+                    },
+                    "grantedBy": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "role": {
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "roleId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "trustedDeviceCount": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "username",
+              "displayName",
+              "active",
+              "lastLoginAt",
+              "createdAt"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "IamUsersResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "limit": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "users": {
+            "items": {
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "email": {
+                  "type": "string"
+                },
+                "failedAttempts": {
+                  "type": "number"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "lastLoginAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lockedUntil": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mfaEnabled": {
+                  "type": "boolean"
+                },
+                "mfaVerifiedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "passkeyCount": {
+                  "type": "number"
+                },
+                "passwordChangedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "roles": {
+                  "items": {
+                    "properties": {
+                      "grantedAt": {
+                        "type": "string"
+                      },
+                      "grantedBy": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "role": {
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "roleId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "trustedDeviceCount": {
+                  "type": "number"
+                },
+                "username": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "username",
+                "displayName",
+                "active",
+                "lastLoginAt",
+                "createdAt",
+                "roles"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "users",
+          "total",
+          "page",
+          "limit"
+        ],
+        "type": "object"
+      },
       "LegacyEnrollmentReceipt": {
         "additionalProperties": false,
         "properties": {
@@ -793,6 +3343,24 @@
         "required": [
           "password",
           "code"
+        ],
+        "type": "object"
+      },
+      "MfaSetupResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "qrDataUrl": {
+            "format": "starts_with",
+            "pattern": "^data:image\\/png;base64,.*",
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "qrDataUrl"
         ],
         "type": "object"
       },
@@ -901,6 +3469,64 @@
           "credentialId",
           "lastUsedAt",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "PasskeyCredentialsResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "data": {
+            "items": {
+              "properties": {
+                "backedUp": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "type": "string"
+                },
+                "credentialId": {
+                  "type": "string"
+                },
+                "deviceType": {
+                  "type": "string"
+                },
+                "friendlyName": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "friendlyName",
+                "deviceType",
+                "backedUp",
+                "credentialId",
+                "lastUsedAt",
+                "createdAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
         ],
         "type": "object"
       },
@@ -1332,6 +3958,191 @@
         },
         "type": "object"
       },
+      "UpdateIamClientRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "allowedIps": {
+            "items": {
+              "format": "ipv4",
+              "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "firstParty": {
+            "type": "boolean"
+          },
+          "grantTypes": {
+            "items": {
+              "enum": [
+                "authorization_code",
+                "refresh_token",
+                "client_credentials"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "redirectUris": {
+            "items": {
+              "format": "uri",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateIamPasswordPolicyRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "historyCount": {
+            "maximum": 24,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lockoutAttempts": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "lockoutDurationMin": {
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxAgeDays": {
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxLength": {
+            "maximum": 256,
+            "minimum": 8,
+            "type": "integer"
+          },
+          "minLength": {
+            "maximum": 128,
+            "minimum": 6,
+            "type": "integer"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "requireLowercase": {
+            "type": "boolean"
+          },
+          "requireNumbers": {
+            "type": "boolean"
+          },
+          "requireSpecial": {
+            "type": "boolean"
+          },
+          "requireUppercase": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateIamRoleRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateIamServiceAccountRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "allowedIps": {
+            "items": {
+              "format": "ipv4",
+              "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateIamSystemUserRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "authorizedHosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sshPublicKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sudoEnabled": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateIamUserRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "displayName": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 8,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateRoleRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1575,22 +4386,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "events": {
-                      "items": {
-                        "$ref": "#/components/schemas/AuditEvent"
-                      },
-                      "type": "array"
-                    },
-                    "total": {
-                      "type": "integer"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamAuditResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -1795,31 +4595,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "byCategory": {
-                      "additionalProperties": {
-                        "type": "integer"
-                      },
-                      "type": "object"
-                    },
-                    "deniedCount": {
-                      "type": "integer"
-                    },
-                    "failureCount": {
-                      "type": "integer"
-                    },
-                    "successCount": {
-                      "type": "integer"
-                    },
-                    "totalEvents": {
-                      "type": "integer"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamAuditStats"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -2744,19 +5524,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "clients": {
-                      "items": {
-                        "$ref": "#/components/schemas/Client"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamClientsResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -2797,11 +5569,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Client"
+                  "$ref": "#/components/schemas/IamClientMutationResponse"
                 }
               }
             },
-            "description": "Created"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -2945,11 +5717,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Client"
+                  "$ref": "#/components/schemas/IamClientMutationResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -4657,11 +7429,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PasswordPolicy"
+                  "$ref": "#/components/schemas/IamPasswordPolicyResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -4716,11 +7488,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PasswordPolicy"
+                  "$ref": "#/components/schemas/IamPasswordPolicyResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -4820,19 +7592,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "roles": {
-                      "items": {
-                        "$ref": "#/components/schemas/Role"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamRolesResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -4873,11 +7637,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Role"
+                  "$ref": "#/components/schemas/IamRoleResponse"
                 }
               }
             },
-            "description": "Created"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -5086,11 +7850,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Role"
+                  "$ref": "#/components/schemas/IamRoleResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -5152,19 +7916,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "serviceAccounts": {
-                      "items": {
-                        "$ref": "#/components/schemas/ServiceAccount"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamServiceAccountsResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -5205,11 +7961,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceAccount"
+                  "$ref": "#/components/schemas/IamCreatedServiceAccountResponse"
                 }
               }
             },
-            "description": "Created"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -5353,11 +8109,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceAccount"
+                  "$ref": "#/components/schemas/IamServiceAccountMutationResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -5430,19 +8186,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "apiKey": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamRotatedServiceAccountResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -5494,22 +8242,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "sessions": {
-                      "items": {
-                        "$ref": "#/components/schemas/Session"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "sessions"
-                  ],
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamSessionsResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -5733,19 +8470,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "systemUsers": {
-                      "items": {
-                        "type": "object"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamSystemUsersResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -5786,11 +8515,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamSystemUserResponse"
                 }
               }
             },
-            "description": "Created"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -5934,11 +8663,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamSystemUserResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -6076,22 +8805,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "total": {
-                      "type": "integer"
-                    },
-                    "users": {
-                      "items": {
-                        "$ref": "#/components/schemas/User"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IamUsersResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "401": {
             "content": {
@@ -6142,11 +8860,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/IamUserMutationResponse"
                 }
               }
             },
-            "description": "Created"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {
@@ -6355,11 +9073,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/IamUserMutationResponse"
                 }
               }
             },
-            "description": "Success"
+            "description": "Product-owned browser response"
           },
           "400": {
             "content": {

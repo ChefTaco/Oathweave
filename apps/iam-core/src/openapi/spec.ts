@@ -1,4 +1,5 @@
 import { z, type ZodType } from 'zod'
+import * as browserContracts from '../schemas/browser-contracts.js'
 import { EnrollmentRequestSchema, EnrollmentLifecycleSchema, EnrollmentResultSchema, EnrollmentInventorySchema, LegacyEnrollmentReceiptSchema, EnrollmentInstallationsSchema } from '../schemas/enrollments.js'
 import {
   AuthorizeQuerySchema,
@@ -156,6 +157,7 @@ export function buildOpenApiSpec() {
   ]
 
   const componentSchemas: Record<string, unknown> = {
+    ...Object.fromEntries(Object.entries(browserContracts).map(([name,schema]) => [name.replace(/Schema$/, ''), z.toJSONSchema(schema, { target:'draft-2020-12', io:'input' })])),
     // Request schemas from Zod
     LoginRequest: zod(LoginSchema),
     ForgotPasswordRequest: zod(ForgotPasswordSchema),
@@ -1480,6 +1482,19 @@ export function buildOpenApiSpec() {
   paths['/api/v1/enrollments/{actorId}/receipt'] = Object.fromEntries(['get','delete'].map(method => [method, { tags: ['Service Accounts'], summary: method === 'get' ? 'Recover an explicitly migrated legacy enrollment receipt before its original expiry' : 'Acknowledge an owned legacy enrollment receipt', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit migrated actor ID')], responses: { ...success(method === 'get' ? ref('LegacyEnrollmentReceipt') : { type: 'object' }), 401: err401, 403: err403, 410: { description: 'Original legacy receipt expired or acknowledged' } } }]))
   paths['/api/v1/enrollments/installations'] = { get: { tags: ['Service Accounts'], summary: 'List only explicitly authorized installation namespace identifiers; no endpoint configuration is exposed', security: [{ BearerAuth: [] }], responses: { ...success(ref('EnrollmentInstallations')), 401: err401, 403: err403 } } }
   for (const [path,item] of Object.entries(paths)) if (path.startsWith('/api/v1/enrollments') && path !== '/api/v1/enrollments/installations') for (const operation of Object.values(item as Record<string,{parameters?:unknown[]}>)) operation.parameters = [...(operation.parameters ?? []), qp('installationId','Exact installation namespace; mandatory when this authority coordinates multiple installations',false,{type:'string',pattern:'^[a-z0-9][a-z0-9-]{0,63}$'})]
+  const browserResponses: Array<[string,string,string,number]> = [
+    ['/users','get','IamUsersResponse',200],['/users','post','IamUserMutationResponse',201],['/users/{id}','patch','IamUserMutationResponse',200],
+    ['/roles','get','IamRolesResponse',200],['/roles','post','IamRoleResponse',201],['/roles/{id}','patch','IamRoleResponse',200],
+    ['/clients','get','IamClientsResponse',200],['/clients','post','IamClientMutationResponse',201],['/clients/{id}','patch','IamClientMutationResponse',200],
+    ['/service-accounts','get','IamServiceAccountsResponse',200],['/service-accounts','post','IamCreatedServiceAccountResponse',201],['/service-accounts/{id}','patch','IamServiceAccountMutationResponse',200],['/service-accounts/{id}/rotate','post','IamRotatedServiceAccountResponse',200],
+    ['/system-users','get','IamSystemUsersResponse',200],['/system-users','post','IamSystemUserResponse',201],['/system-users/{id}','patch','IamSystemUserResponse',200],
+    ['/sessions','get','IamSessionsResponse',200],['/audit','get','IamAuditResponse',200],['/audit/stats','get','IamAuditStats',200],['/password-policy','get','IamPasswordPolicyResponse',200],['/password-policy','patch','IamPasswordPolicyResponse',200]
+  ];
+  for(const [path,method,schema,status] of browserResponses){
+    const operation=(paths['/api/v1'+path] as Record<string,{responses:Record<number,unknown>}>|undefined)?.[method];
+    if(!operation)throw Error('Missing owned browser operation '+method+' '+path);
+    operation.responses[status]={description:'Product-owned browser response',content:{'application/json':{schema:ref(schema)}}};
+  }
   return {
     openapi: '3.1.0',
     info: {

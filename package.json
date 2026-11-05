@@ -26,7 +26,9 @@
     "bootstrap": "npm ci --ignore-scripts && npm --prefix tooling/release ci --ignore-scripts && npm run hooks:install",
     "generate:openapi": "tsx scripts/openapi.ts --write",
     "check:openapi": "tsx scripts/openapi.ts",
-    "test:bootstrap": "npm run build && node scripts/bootstrap-rehearsal.mjs"
+    "test:bootstrap": "npm run build && node scripts/bootstrap-rehearsal.mjs",
+    "contracts:browser": "node scripts/export-browser-contracts.mjs",
+    "check:browser": "node scripts/export-browser-contracts.mjs --check"
   },
   "overrides": {
     "@hono/node-server": "2.1.5",
@@ -41,5 +43,8 @@
     "valibot": "1.4.2",
     "mysql2": "3.24.3",
     "deepmerge-ts": "8.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
   }
 }
