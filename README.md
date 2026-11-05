@@ -1,18 +1,10 @@
 # Oathweave
 
-Part of the Hive:Magnus ecosystem. This repository starts from a reviewed public
-Hive source snapshot; `provenance.json` records its revision and original hashes.
+Oathweave is the identity and access management service for the Hive:Magnus suite. It issues RS256-signed JWTs, implements OAuth 2.0 and OpenID Connect, enforces role-based access control and keeps an append-only audit trail. A companion SDK lets other services verify its tokens locally.
 
-Extraction is in progress. Existing client protocols and migration history are
-retained. The suite SSO/API cutover and production migration are not yet accepted.
-Do not replace an existing deployment using this source snapshot alone.
+It is one product in the [Hive:Magnus](https://github.com/ChefTaco/hive) suite, and it also runs on its own. The [Hive installer](https://github.com/ChefTaco/hive#readme) deploys tested combinations of the suite's products.
 
-# Hive IAM
-
-Hive IAM is the identity and access management service for the Hive control
-plane. It issues RS256-signed JWTs, implements OAuth 2.0 / OpenID Connect,
-enforces role-based access control, and keeps an append-only audit trail. A
-companion SDK lets other services verify Hive IAM tokens locally.
+This project was extracted from Hive with its migration history and client protocols intact. `provenance.json` records the source revision and original file hashes.
 
 This directory is an npm workspace containing the service, the SDK, and the
 operational scripts used to deploy and maintain them.
@@ -156,7 +148,7 @@ On the target host:
 
 ## License
 
-Apache-2.0. See the [LICENSE](../../LICENSE) file at the repository root.
+Apache-2.0. See the [LICENSE](LICENSE) file at the repository root.
 
 Container probes use a loopback `HIVE_HEALTH_URL`. Override its port/protocol for
 the selected deployment. When the service certificate uses a DNS name, set

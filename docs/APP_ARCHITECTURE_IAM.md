@@ -71,7 +71,7 @@ Additional machine clients can be given an audience, permission allowlist and to
 - `/oauth/*`
 - `/.well-known/openid-configuration`
 
-Generated OpenAPI snapshots for IAM live at [`../../../docs/openapi/iam.openapi.json`](../../../docs/openapi/iam.openapi.json). Run `npm run generate:openapi` from the repo root after intentional route/schema changes.
+Generated OpenAPI snapshots for IAM live at [`openapi.json`](openapi.json). Run `npm run generate:openapi` from the repo root after intentional route/schema changes.
 
 ## Development Commands
 
