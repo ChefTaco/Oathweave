@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.2 - 2026-11-06
+
+### Added
+
+- Installation-owned machine clients. `IAM_MACHINE_CLIENT_SECRETS` maps machine client
+  IDs from `IAM_MACHINE_CLIENT_POLICIES` to their secrets. Every start creates a listed
+  client that does not exist yet, as a confidential client limited to the client
+  credentials grant, and keeps its stored Argon2id hash equal to the configured secret,
+  so a product-to-product credential exists and rotates without manual registration.
+  Each listed client needs a policy, an administrator's deactivation is kept, and an
+  existing registration of another kind stops startup instead of being converted.
+
+### Changed
+
+- Startup validation now checks `IAM_MACHINE_CLIENT_POLICIES` together with the secrets,
+  so an invalid policy stops startup with one configuration error that names the
+  variable, instead of failing when the token service loads.
+
 ## 2.0.1 - 2026-11-05
 
 ### Security
