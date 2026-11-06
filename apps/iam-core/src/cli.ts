@@ -226,6 +226,27 @@ async function prepareData(
       )
     }
   }
+  if (process.env['IAM_MACHINE_CLIENT_SECRETS']) {
+    // Product-to-product clients the installation owns exist before serving, so
+    // their tokens never depend on a manual registration or rotation.
+    const { reconcileConfiguredMachineClients } = await import(
+      './services/machine-client-store.js'
+    )
+    const reconciled = await reconcileConfiguredMachineClients(
+      process.env,
+    ).catch((error: unknown) =>
+      fatal(
+        `Configuration error: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    )
+    for (const result of reconciled) {
+      console.log(`  ✓ Machine client ${result.id}: ${result.outcome}`)
+      if (!result.active)
+        console.warn(
+          `  ! Machine client ${result.id} is deactivated; it receives no tokens until an administrator reactivates it`,
+        )
+    }
+  }
   const { writeJson } = await import('./release/runtime.js')
   writeJson(join(defaults.dataDir, '.initialized'), { initialized: true })
   if (initialBootstrap) finishInitialBootstrap(defaults.dataDir)

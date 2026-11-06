@@ -150,7 +150,7 @@ directory; prefer absolute paths.
 
 `hive-iam-server env-schema` prints the full list as JSON. Further options
 (token lifetimes, rate limits, previous signing keys for rotation,
-`IAM_MACHINE_CLIENT_POLICIES`) are described in
+`IAM_MACHINE_CLIENT_POLICIES`, `IAM_MACHINE_CLIENT_SECRETS`) are described in
 [`.env.example`](.env.example).
 
 A missing or invalid setting, or an unreachable Redis, stops the server with a

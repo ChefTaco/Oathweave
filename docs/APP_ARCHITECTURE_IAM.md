@@ -53,6 +53,15 @@ The seed (`apps/iam-core/prisma/seed.ts`) creates these confidential clients. Ex
 
 Additional machine clients can be given an audience, permission allowlist and token lifetime through `IAM_MACHINE_CLIENT_POLICIES` (JSON). The built-in client IDs above cannot be overridden there.
 
+`IAM_MACHINE_CLIENT_SECRETS` (JSON, client ID to secret) makes such a client installation-owned. Every
+start creates a listed client that does not exist yet, as a confidential client limited to the client
+credentials grant with no redirect URIs, and keeps its stored Argon2id hash equal to the configured secret.
+The configuration is the rotation owner: change the value and restart to rotate. Each listed client needs a
+policy, so its tokens always carry an audience and an explicit permission allowlist. A client deactivated by
+an administrator stays deactivated, and an existing registration that is not a client-credentials-only client
+is never converted: startup stops with a configuration error instead. Product-to-product calls use this to
+get short-lived resource tokens on demand, with no long-lived bearer token to renew.
+
 ## API Areas
 
 - `/api/v1/auth`

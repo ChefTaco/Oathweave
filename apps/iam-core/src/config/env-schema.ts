@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { browserDiscoveryConfigurationSchema } from './browser-discovery.js'
+import { parseClientPolicies } from '../services/client-policy-schema.js'
+import { parseMachineClientSecrets } from '../services/machine-client-secrets.js'
 
 /**
  * Side-effect-free environment schema. `config/env.ts` parses `process.env`
@@ -72,7 +74,22 @@ export const envSchema = z.object({
     .transform((value) => value === 'true'),
 
   IAM_AGENT_SECRET: z.string().min(16),
+  IAM_MACHINE_CLIENT_POLICIES: z.string().optional(),
+  IAM_MACHINE_CLIENT_SECRETS: z.string().optional(),
 }).superRefine((source, context) => {
+  let policies: ReturnType<typeof parseClientPolicies> | undefined
+  try {
+    policies = parseClientPolicies(source.IAM_MACHINE_CLIENT_POLICIES)
+  } catch {
+    context.addIssue({ code: 'custom', path: ['IAM_MACHINE_CLIENT_POLICIES'], message: 'must be a JSON object of valid machine client policies' })
+  }
+  if (policies) {
+    try {
+      parseMachineClientSecrets(source.IAM_MACHINE_CLIENT_SECRETS, policies)
+    } catch (error) {
+      context.addIssue({ code: 'custom', path: ['IAM_MACHINE_CLIENT_SECRETS'], message: error instanceof Error ? error.message : 'is invalid' })
+    }
+  }
   if (source.IAM_BROWSER_AUTHORIZATION_URL === undefined && source.IAM_BROWSER_API_BASE_URL === undefined) return
   const result = browserDiscoveryConfigurationSchema.safeParse(source)
   if (!result.success) for (const issue of result.error.issues) context.addIssue({code:'custom',path:issue.path,message:issue.message})
