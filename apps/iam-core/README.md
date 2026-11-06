@@ -1,16 +1,19 @@
-# @hivemagnus/hive-iam-server
+# Oathweave server (`apps/iam-core`)
 
-Hive IAM is a self-hosted identity and access management server: OAuth 2.0 and
+Oathweave is a self-hosted identity and access management server: OAuth 2.0 and
 OpenID Connect, RS256-signed JWTs with a JWKS endpoint, role-based access
 control, MFA (TOTP and WebAuthn/FIDO2), service accounts, sessions, and an
 append-only audit trail. It is the identity service of the
-[Hive](https://github.com/ChefTaco/hive) control plane, and it also runs on its
-own.
+[Hive](https://github.com/ChefTaco/hive) suite, and it also runs on its own.
 
-> **Running the whole Hive stack?** The `@hivemagnus/hive` launcher installs,
-> configures and runs Hive Router, Hive IAM and HiveMem together, including
-> secrets and Redis. Use this package directly when you want IAM on its own or
-> manage each service yourself.
+> **How it is released.** Oathweave 2.x ships only as the container image
+> `ghcr.io/cheftaco/oathweave`, tagged with its exact version. It is normally
+> installed with the rest of the suite by `hive.sh`, the
+> [Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite),
+> which writes its configuration and secrets and runs its Redis. The npm package
+> `@hivemagnus/hive-iam-server` is the legacy Hive IAM 1.x line: `npm install` and
+> `npx` resolve it to 1.2.2, not to this release. This workspace's package,
+> `@hivemagnus/oathweave`, is not published on npm.
 
 ## Features
 
@@ -22,56 +25,61 @@ own.
 - Append-only daily JSONL audit files plus queryable audit APIs
 - Liveness and readiness endpoints; SQLite storage, no external database
 
-## Requirements
+## Run the container image
 
-- Node.js 24 (`>=24.22.1`) or 26 (`>=26.13.0`) on Linux or macOS
-- Redis 7 or later (queues, rate limiting, WebAuthn ceremonies)
-- npm must be allowed to run the install scripts of `better-sqlite3` and
-  `argon2`. `better-sqlite3` downloads a prebuilt binary during install, and
-  either one builds from source (needs `python3`, `make` and a C++ compiler)
-  when no binary matches your platform. npm 12 blocks dependency install
-  scripts unless you allow them: pass `--allow-scripts=better-sqlite3,argon2`
-  to `npx` or `npm install -g`, or, in your own project, add
-  `"allowScripts": { "better-sqlite3": true, "argon2": true }` to its
-  `package.json` (npm rejects the flag there). Without it, the install succeeds
-  but the server cannot open its database. The `@hivemagnus/hive` launcher sets
-  this up for you.
+The image is published for `linux/amd64` and `linux/arm64` with build provenance.
+It runs as the unprivileged `node` user, keeps all state in the `/data` volume
+(`/data/iam`), listens on `0.0.0.0:4200` inside the container, and has a readiness
+health check. Its entry point is the server CLI, so the commands under
+[Commands](#commands) are passed as arguments to `docker run`. It needs Redis 7 or
+later (queues, rate limiting, WebAuthn ceremonies); the database is SQLite inside
+`/data`.
 
-No Prisma CLI, database server or post-install step is needed; the database
-schema migrations require a verified backup. Set `HIVE_AUTO_MIGRATE=true` for explicit
-first provisioning or managed startup; otherwise run migrations manually.
-
-## Quick start
+This example runs Oathweave and a password-protected Redis on a private Docker
+network and publishes Oathweave on loopback only:
 
 ```bash
-# 1. Redis (loopback only)
-docker run -d --name hive-redis -p 127.0.0.1:6379:6379 redis:7.4.7-alpine
-
-# 2. Secrets
+# 1. Secrets (keep both files private)
+umask 077
+printf 'REDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" > redis.env
+. ./redis.env
 cat > iam.env <<EOF
 HIVE_AUTO_MIGRATE=true
 COOKIE_SECRET=$(openssl rand -hex 32)
 IAM_AGENT_SECRET=$(openssl rand -hex 32)
 SEED_ADMIN_PASSWORD=$(openssl rand -base64 24)
+REDIS_URL=redis://:$REDIS_PASSWORD@oathweave-redis:6379
+HIVE_HEALTH_URL=http://localhost:4200/api/v1/health/ready
 EOF
-chmod 600 iam.env
+
+# 2. Redis
+docker network create oathweave
+docker run -d --name oathweave-redis --network oathweave --env-file redis.env \
+  -v oathweave-redis:/data redis:7.4.7-alpine \
+  sh -c 'exec redis-server --requirepass "$REDIS_PASSWORD" --appendonly yes'
 
 # 3. Check, then start
-npx --allow-scripts=better-sqlite3,argon2 @hivemagnus/hive-iam-server check --env-file iam.env
-npx --allow-scripts=better-sqlite3,argon2 @hivemagnus/hive-iam-server --env-file iam.env
+docker run --rm --network oathweave --env-file iam.env ghcr.io/cheftaco/oathweave:2.0.1 check
+docker run -d --name oathweave --network oathweave -p 127.0.0.1:4200:4200 \
+  -v oathweave-data:/data --env-file iam.env ghcr.io/cheftaco/oathweave:2.0.1
 
-# 4. In another terminal
+# 4. Once it reports healthy
 curl http://127.0.0.1:4200/api/v1/health/ready
 curl http://127.0.0.1:4200/api/v1/oauth/.well-known/openid-configuration
 ```
 
-Install it permanently with
-`npm install -g --allow-scripts=better-sqlite3,argon2 @hivemagnus/hive-iam-server` and run
-`hive-iam-server --env-file iam.env`.
+This serves plain HTTP, so keep it on loopback or behind a TLS-terminating reverse
+proxy. `HIVE_HEALTH_URL` points the image's health check at that plain HTTP
+listener; its default is HTTPS. To serve HTTPS directly, mount the certificate and
+key read-only under `/config`, set `TLS_CERT_PATH` and `TLS_KEY_PATH` (see
+[TLS](#tls)) and drop the `HIVE_HEALTH_URL` override. `HIVE_AUTO_MIGRATE=true` lets
+this first start create and migrate the database; see the migration notes below
+before you keep it for later starts.
 
 On the first start the server:
 
-1. creates its data directory, `${HIVE_HOME:-~/.hive}/iam` (mode 0700), holding
+1. creates its data directory, `${HIVE_HOME:-~/.hive}/iam` (mode 0700; `/data/iam`
+   in the image), holding
    `iam.db` (SQLite), `keys/` and `audit-logs/`;
 2. generates a 4096-bit RS256 signing key pair in `keys/` unless you configured
    `JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH`;
@@ -96,7 +104,8 @@ is never reseeded automatically:
 
 If `SEED_ADMIN_PASSWORD` (or `SEED_HIVE_CLIENT_SECRET` /
 `SEED_HIVE_ROUTER_CLIENT_SECRET`) is unset, a random value is generated and
-written to `initial-credentials.env` (mode 0600) next to the database. Values
+written to `initial-credentials.env` (mode 0600) next to the database
+(`/data/iam/initial-credentials.env` in the container's volume). Values
 are never printed to the log. Store them, change the password after the first
 login, then delete the file. These variables are ignored once the account and
 clients exist; changing them later changes nothing.
@@ -142,7 +151,7 @@ directory; prefer absolute paths.
 `hive-iam-server env-schema` prints the full list as JSON. Further options
 (token lifetimes, rate limits, previous signing keys for rotation,
 `IAM_MACHINE_CLIENT_POLICIES`) are described in
-[`.env.example`](https://github.com/ChefTaco/hive/blob/main/services/hive-iam/apps/iam-core/.env.example).
+[`.env.example`](.env.example).
 
 A missing or invalid setting, or an unreachable Redis, stops the server with a
 single line naming the variable or dependency and the fix, and exit code 1.
@@ -163,6 +172,10 @@ HOST=0.0.0.0
 ```
 
 ## Commands
+
+The CLI is installed as `oathweave` and, for compatibility, `hive-iam-server`. In the
+container image it is the entry point: pass the command after the image name, for
+example `docker run --rm --network oathweave -v oathweave-data:/data --env-file iam.env ghcr.io/cheftaco/oathweave:2.0.1 migrate --plan`.
 
 ```text
 hive-iam-server [start]   Start the server; startup migration requires explicit opt-in
@@ -191,33 +204,14 @@ boolean.
 
 ## Docker
 
-Each release is published as `ghcr.io/cheftaco/hive-iam-server` for
-`linux/amd64` and `linux/arm64`, tagged with its exact version, minor and major
-(`1.2.0`, `1.2`, `1`) and carrying build provenance and an SBOM. New releases do not
-publish `latest`; the existing historical tag is retained. The image runs the
-same `hive-iam-server` entry point as an unprivileged user, keeps all state in
-the `/data` volume, listens on `0.0.0.0:4200` inside the container and has a
-readiness health check.
+Release images are described in [Run the container image](#run-the-container-image).
+To build one yourself from a clone, run `docker build -t oathweave:local .` from the
+repository root; the build uses the root [`Dockerfile`](../../Dockerfile) and this
+source, not an npm package.
 
-```bash
-docker run -d --name hive-iam -p 127.0.0.1:4200:4200 -v hive-iam-data:/data \
-  --env-file iam.env -e REDIS_URL=redis://:PASSWORD@redis-host:6379 \
-  ghcr.io/cheftaco/hive-iam-server:1
-```
-
-To build it yourself from a clone, use the
-[`Dockerfile`](https://github.com/ChefTaco/hive/blob/main/services/hive-iam/apps/iam-core/Dockerfile):
-`docker build -f services/hive-iam/apps/iam-core/Dockerfile -t hive-iam-server:local docker`
-from the repository root. This installs the exact released npm package.
-
-[`docker/compose.yml`](https://github.com/ChefTaco/hive/blob/main/services/hive-iam/apps/iam-core/docker/compose.yml)
-runs IAM with a password-protected Redis, named volumes and loopback-only
-ports. Copy `docker/.env.example` to `docker/.env`, fill in the required
-secrets, then run `docker compose up -d --build` in that directory, or set
-`IAM_IMAGE=ghcr.io/cheftaco/hive-iam-server:1` and run
-`docker compose up -d --no-build` to use the published image. Compose refuses
-to start while a required secret is missing. `npm run check:iam-compose` from
-the repository root runs this example end to end with throwaway secrets.
+[`docker/compose.yml`](docker/compose.yml) is the Compose example from the legacy 1.x
+line. It builds or pulls `ghcr.io/cheftaco/hive-iam-server` and does not run
+Oathweave 2.x.
 
 ## Health
 
@@ -243,7 +237,6 @@ Services that trust Hive IAM tokens can verify them locally with
 From a clone of the repository:
 
 ```bash
-cd services/hive-iam
 npm ci
 bash scripts/generate-keys.sh
 cd apps/iam-core

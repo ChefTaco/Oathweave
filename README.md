@@ -13,8 +13,8 @@ operational scripts used to deploy and maintain them.
 
 | Path | Purpose |
 | --- | --- |
-| [`apps/iam-core`](apps/iam-core) | [`@hivemagnus/hive-iam-server`](https://www.npmjs.com/package/@hivemagnus/hive-iam-server): the IAM server and its `hive-iam-server` CLI (Hono, SQLite via Prisma, Redis): auth, users, roles, groups, service accounts, clients, sessions, MFA/WebAuthn, OAuth/OIDC, audit |
-| [`packages/iam-sdk`](packages/iam-sdk) | [`@hivemagnus/hive-iam-sdk`](https://www.npmjs.com/package/@hivemagnus/hive-iam-sdk): JWT verification and RBAC middleware for Node.js and Hono |
+| [`apps/iam-core`](apps/iam-core) | `@hivemagnus/oathweave`: the identity server and its CLI (Hono, SQLite via Prisma, Redis): auth, users, roles, groups, service accounts, clients, sessions, MFA/WebAuthn, OAuth/OIDC, audit. Released as the container image `ghcr.io/cheftaco/oathweave` |
+| [`packages/iam-sdk`](packages/iam-sdk) | `@hivemagnus/oathweave-sdk`: JWT verification and RBAC middleware for Node.js and Hono, published on npm as [`@hivemagnus/hive-iam-sdk`](https://www.npmjs.com/package/@hivemagnus/hive-iam-sdk) |
 | [`scripts`](scripts) | Key generation, deployment, lockout reset, and end-to-end smoke tests |
 | [`docs`](docs) | [Architecture notes](docs/APP_ARCHITECTURE_IAM.md) |
 
@@ -28,28 +28,34 @@ operational scripts used to deploy and maintain them.
 - Append-only daily audit log files plus queryable audit APIs
 - Liveness, readiness, and dependency health endpoints
 
-## Requirements
+## Install
 
-- Node.js 24 (`>=24.22.1`) or 26 (`>=26.13.0`)
-- Redis (local, used for queues and rate limiting)
-- OpenSSL (key and certificate generation)
+Oathweave 2.x ships only as a container image, `ghcr.io/cheftaco/oathweave`, for
+`linux/amd64` and `linux/arm64`. Each release is tagged with its exact version (for
+example `2.0.1`; there is no `latest` tag), and its
+[GitHub release](https://github.com/ChefTaco/Oathweave/releases) records the image digest.
 
-## Run it from npm
+**With the Hive suite.** Oathweave is normally installed by `hive.sh`, the
+[Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite); every suite
+profile includes it. The controller pins the image by digest from a signed release
+manifest, writes its configuration and secrets, and runs its private Redis. Hive 2.0.1
+pins Oathweave 2.0.1.
 
-```bash
-npx @hivemagnus/hive-iam-server --env-file iam.env
-```
+**Legacy npm packages.** The npm package `@hivemagnus/hive-iam-server` and the image
+`ghcr.io/cheftaco/hive-iam-server` are the legacy Hive IAM 1.x line, which predates this
+repository. `npm install` and `npx` resolve that package to 1.2.2, not to Oathweave 2.x,
+and `@hivemagnus/oathweave` is not published on npm. The
+[Hive README](https://github.com/ChefTaco/hive#legacy-npm-packages-1x) describes the 1.x line.
 
-The package needs only Node.js and Redis: it creates its SQLite database,
-signing keys and initial admin account on first start. See the
-[package README](apps/iam-core/README.md) for the quick start, configuration,
-Docker image and Compose example. To run Hive Router, IAM and HiveMem together,
-use the `@hivemagnus/hive` launcher.
+**On its own.** Run the image with a Redis it can reach. The
+[server README](apps/iam-core/README.md#run-the-container-image) has a complete
+`docker run` example, the configuration reference and first-start behaviour.
 
 ## Getting Started (from source)
 
+Requires Node.js 24 (`>=24.22.1`) or 26 (`>=26.13.0`), Redis and OpenSSL.
+
 ```bash
-cd services/hive-iam
 npm install
 
 # Generate the RS256 signing key pair into ./certs (gitignored)
@@ -75,7 +81,7 @@ never replaces an existing client secret hash; rotate client secrets with
 
 ## Development
 
-From `services/hive-iam`:
+From the repository root:
 
 ```bash
 npm run typecheck   # all workspaces
@@ -86,9 +92,10 @@ npm run build       # all workspaces
 Workspace-specific shortcuts: `npm run iam-core:test`, `npm run iam-sdk:test`,
 `npm run iam-core:build`, `npm run iam-sdk:build`.
 
-Publishing: `npm publish --workspace @hivemagnus/hive-iam-server` (or
-`--workspace @hivemagnus/hive-iam-sdk`); `prepublishOnly` cleans, builds and
-tests the package first.
+Releases: pushing a `v*` tag runs `.github/workflows/release-image.yml`, which runs
+CI, builds the image for both architectures, publishes it to
+`ghcr.io/cheftaco/oathweave` with a build provenance attestation, and records the
+digest in a GitHub release.
 
 ## Deployment
 
@@ -155,7 +162,6 @@ the selected deployment. When the service certificate uses a DNS name, set
 `HIVE_HEALTH_TLS_NAME` to that name and `NODE_EXTRA_CA_CERTS` to the approved CA
 bundle when needed. Probes retain certificate verification. Runtime state belongs
 in `/data`; mount only product-owned protected configuration in `/config`.
-Images are local candidates until registry publication and release acceptance.
 
 Browser clients, passkeys, step-up and private recovery delivery are documented in
 [the browser authentication guide](docs/BROWSER_AUTH.md). Existing production migration gates remain required.
