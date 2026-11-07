@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `@simplewebauthn/server` 14.1.0 (from 13.3.2), which fixes GHSA-2g3p-m8c9-hhwh: certificate
+  revocation lists are now processed only for attestation certificates that chain to a trusted
+  anchor. Oathweave requests no attestation, but a registration response can still carry an
+  attestation certificate chain. SimpleWebAuthn 14 requires Node.js 22 or later; the image runs
+  Node.js 24.
+
 ## 2.0.2 - 2026-11-06
 
 ### Added
