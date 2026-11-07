@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- Pin Hono 4.13.16 and `@hono/node-server` 2.1.6 across workspace and standalone locks, addressing GHSA-46wx-v44x-9hh2 and GHSA-jpvv-r467-5p4w. Keep the SimpleWebAuthn 14.1.0 passkey fix. Test cross-origin `text/ping` rejection and raw backslash rejection at the HTTP adapter.
+
 ## 2.0.3 - 2026-11-07
 
 ### Security
