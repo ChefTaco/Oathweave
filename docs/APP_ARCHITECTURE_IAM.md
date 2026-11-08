@@ -53,6 +53,18 @@ The seed (`apps/iam-core/prisma/seed.ts`) creates these confidential clients. Ex
 
 Additional machine clients can be given an audience, permission allowlist and token lifetime through `IAM_MACHINE_CLIENT_POLICIES` (JSON). The built-in client IDs above cannot be overridden there.
 
+A client_credentials token carries the native `JWT_ISSUER`. A policy with `"issuer":"browser"` issues
+that client's tokens on `IAM_BROWSER_ISSUER` instead (startup requires it to be an HTTPS issuer). Use it
+for a service whose resource also verifies people on the browser issuer and relates the two, such as a
+service that acts for a person by naming their subject. The token is still a `SERVICE_ACCOUNT` token
+without a session, with the policy's audience and permissions, and Oathweave refuses a token of that
+client on any other issuer. Oathweave grants only the permissions the request's `scope` names, so such
+a service requests them explicitly.
+
+```json
+{"ardentstudio-magnus":{"audience":"magnus","permissions":["magnus:ardent"],"lifetimeSeconds":300,"rotationOwner":"hive-suite","issuer":"browser"}}
+```
+
 `IAM_MACHINE_CLIENT_SECRETS` (JSON, client ID to secret) makes such a client installation-owned. Every
 start creates a listed client that does not exist yet, as a confidential client limited to the client
 credentials grant with no redirect URIs, and keeps its stored Argon2id hash equal to the configured secret.
