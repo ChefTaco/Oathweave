@@ -8,7 +8,6 @@
 
 import { validateBrowserAuthorization } from './browser-policies.js'
 import { createHash, randomBytes } from 'node:crypto'
-import { nanoid } from 'nanoid'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
 import { ApiError } from '../types/index.js'

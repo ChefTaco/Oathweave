@@ -9,7 +9,7 @@ import { sqlitePathFromUrl } from '../cli/paths.js'
 import { ApiError, type Principal } from '../types/index.js'
 import { enrollmentCipher } from './enrollment-cipher.js'
 import { enrollmentDelegation } from './enrollment-delegation.js'
-import { EnrollmentStore, enrollmentDigest, type Action, type Lease, type Operation, type Policy } from './enrollment-store.js'
+import { EnrollmentStore, enrollmentDigest, type Action, type Policy } from './enrollment-store.js'
 
 const endpoint = z.object({ url: z.url().refine(value => { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash && !url.pathname.includes('..') }), caFile: z.string().regex(/^\//).optional() }).strict()
 export const enrollmentProductsSchema = z.object({ emberpath: endpoint, hivemem: endpoint }).strict()

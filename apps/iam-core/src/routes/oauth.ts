@@ -23,7 +23,6 @@ import {
 import { Hono } from 'hono'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
-import { clientAuthMiddleware } from '../middleware/client-auth.js'
 import { parseBody } from '../utils/validate.js'
 import { getClientIp } from '../utils/ip.js'
 import { ApiError } from '../types/index.js'
@@ -41,7 +40,6 @@ import {
   getJwks,
 } from '../services/oauth-service.js'
 import { rotateRefreshToken, issueIdToken } from '../services/token-service.js'
-import { logAuditEvent } from '../services/audit-service.js'
 import { env } from '../config/env.js'
 import argon2 from 'argon2'
 

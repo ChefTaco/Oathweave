@@ -10,7 +10,6 @@ import {
   issueTokenPair,
   rotateRefreshToken,
   revokeRefreshToken,
-  introspectToken,
 } from '../services/token-service.js'
 import { createSession, revokeSession } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
@@ -47,7 +46,6 @@ import {
 import { eventBus } from '../services/event-bus.js'
 import { checkBreachedPassword } from '../services/breach-check-service.js'
 
-import { computeSessionRisk } from '../services/session-risk-service.js'
 import { completeStepUp } from '../middleware/step-up.js'
 import {
   recoveryOutbox,

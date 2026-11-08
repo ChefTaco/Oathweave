@@ -1,6 +1,5 @@
 import argon2 from 'argon2'
 import { prisma } from '../db/client.js'
-import { ApiError } from '../types/index.js'
 
 const ARGON2_OPTIONS: argon2.Options = {
   type: argon2.argon2id,

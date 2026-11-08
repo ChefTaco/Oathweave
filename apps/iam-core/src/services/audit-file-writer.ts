@@ -1,4 +1,4 @@
-import { mkdir, appendFile, readdir, unlink, stat } from 'node:fs/promises'
+import { mkdir, appendFile, readdir, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { env } from '../config/env.js'
 import type { AuditEventInput } from '../types/index.js'
