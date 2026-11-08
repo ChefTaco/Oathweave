@@ -119,6 +119,23 @@ describe('machine client secrets configuration', () => {
     const badPolicies = validateEnv({ ...base, IAM_MACHINE_CLIENT_POLICIES: '{"hive-router":{}}' })
     expect(badPolicies.ok).toBe(false)
   })
+
+  it('needs an HTTPS browser issuer before a policy may select it', () => {
+    const base = {
+      DATABASE_URL: 'file:/tmp/fake.db',
+      JWT_PRIVATE_KEY_PATH: '/tmp/fake-private.pem',
+      JWT_PUBLIC_KEY_PATH: '/tmp/fake-public.pem',
+      COOKIE_SECRET: 'c'.repeat(32),
+      IAM_AGENT_SECRET: 'a'.repeat(16),
+      IAM_MACHINE_CLIENT_POLICIES: JSON.stringify({ 'fake-service': { audience: 'fake-api', permissions: ['fake-api:act'], rotationOwner: 'fake-owner', issuer: 'browser' } }),
+    }
+    for (const issuer of [undefined, 'native-identity', 'http://identity.example.com', 'https://identity.example.com/?next=x']) {
+      const result = validateEnv({ ...base, ...(issuer ? { IAM_BROWSER_ISSUER: issuer } : {}) })
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.errors.join('\n')).toMatch(/IAM_BROWSER_ISSUER/u)
+    }
+    expect(validateEnv({ ...base, IAM_BROWSER_ISSUER: 'https://identity.example.com' }).ok).toBe(true)
+  })
 })
 
 describe('machine client reconciliation', () => {

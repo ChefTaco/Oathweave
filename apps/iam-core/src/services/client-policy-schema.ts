@@ -5,6 +5,9 @@ const policySchema = z.object({
   permissions: z.array(z.string().regex(/^[a-z0-9-]+(?::[a-z0-9-]+)+$/)).max(100).default([]),
   lifetimeSeconds: z.number().int().min(60).max(3600).default(900),
   rotationOwner: z.string().min(1).max(200),
+  // native: tokens carry JWT_ISSUER. browser: tokens carry IAM_BROWSER_ISSUER, for a resource that
+  // also verifies people on that issuer and relates the two (a service acting for a person).
+  issuer: z.enum(['native', 'browser']).default('native'),
 }).strict();
 export type ClientPolicy = z.infer<typeof policySchema>;
 const reserved = new Set(['hive-router', 'security-exporter', 'example-portal']);

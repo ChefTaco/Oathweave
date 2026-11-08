@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { machineClientPolicies } from './client-policies.js'
 
 const browserPolicy = z
   .object({
@@ -62,12 +63,25 @@ export function browserAccessLifetime(
     : configured
 }
 
+/** Machine clients whose policy selects the browser issuer for their client_credentials tokens. */
+export function browserIssuedMachineClients(): string[] {
+  return Object.keys(machineClientPolicies).filter(
+    (id) => machineClientPolicies[id]!.issuer === 'browser',
+  )
+}
+
 /** Keep native issuers stable while adding an HTTPS browser issuer. */
 export function issuerForClient(
   clientId: string | undefined,
   nativeIssuer: string,
 ): string {
-  if (!clientId || !browserClientPolicies[clientId] && clientId !== 'oathweave-enrollment') return nativeIssuer
+  if (
+    !clientId ||
+    (!browserClientPolicies[clientId] &&
+      clientId !== 'oathweave-enrollment' &&
+      machineClientPolicies[clientId]?.issuer !== 'browser')
+  )
+    return nativeIssuer
   const issuer = process.env.IAM_BROWSER_ISSUER || nativeIssuer
   const url = new URL(issuer)
   if (

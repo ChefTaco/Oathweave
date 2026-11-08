@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `IAM_MACHINE_CLIENT_POLICIES` takes an optional `"issuer":"browser"` per client. That client's
+  client_credentials tokens then carry `IAM_BROWSER_ISSUER` instead of `JWT_ISSUER`, so a resource
+  that verifies people on the browser issuer can verify the service on the same issuer. Startup
+  requires an HTTPS `IAM_BROWSER_ISSUER` for such a policy, and a token of that client on any other
+  issuer is refused. Policies without it are unchanged.
+- The suite bootstrap accepts the Ardent Project Studio browser client (audience `ardentstudio`,
+  `ardentstudio:` permissions).
+
 ## 2.0.4 - 2026-11-07
 
 ### Security

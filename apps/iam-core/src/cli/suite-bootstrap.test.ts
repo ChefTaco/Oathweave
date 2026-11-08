@@ -44,6 +44,21 @@ it('derives explicit resource grants with no wildcard administrator credential',
     'router:providers:read',
   ])
 })
+it('accepts the Ardent Project Studio browser client only with its own resource grants', () => {
+  const value = fixture()
+  value.clients.push({
+    id: 'hivexui-ardentstudio',
+    audience: 'ardentstudio',
+    permissions: ['ardentstudio:projects:read', 'ardentstudio:agents:admin'],
+    redirectUris: ['https://console.example.com/auth/callback'],
+    firstParty: true,
+  })
+  expect(suiteAdminPermissions(suiteBootstrapSchema.parse(value))).toContain(
+    'ardentstudio:agents:admin',
+  )
+  value.clients[2]!.permissions = ['magnus:ardent']
+  expect(() => suiteBootstrapSchema.parse(value)).toThrow()
+})
 it('rejects mixed audiences, duplicate clients and unsafe redirects before seeding', () => {
   const mutations = [
     (value: ReturnType<typeof fixture>) => {

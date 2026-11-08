@@ -83,6 +83,12 @@ export const envSchema = z.object({
   } catch {
     context.addIssue({ code: 'custom', path: ['IAM_MACHINE_CLIENT_POLICIES'], message: 'must be a JSON object of valid machine client policies' })
   }
+  if (policies && Object.values(policies).some((policy) => policy.issuer === 'browser')) {
+    let browserIssuer: URL | undefined
+    try { browserIssuer = new URL(source.IAM_BROWSER_ISSUER ?? '') } catch { browserIssuer = undefined }
+    if (browserIssuer?.protocol !== 'https:' || browserIssuer.username || browserIssuer.password || browserIssuer.hash || browserIssuer.search)
+      context.addIssue({ code: 'custom', path: ['IAM_MACHINE_CLIENT_POLICIES'], message: 'a policy with "issuer":"browser" needs IAM_BROWSER_ISSUER set to an HTTPS issuer URL' })
+  }
   if (policies) {
     try {
       parseMachineClientSecrets(source.IAM_MACHINE_CLIENT_SECRETS, policies)

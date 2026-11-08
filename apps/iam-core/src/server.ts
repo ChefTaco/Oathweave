@@ -1,4 +1,4 @@
-import { browserClientPolicies, issuerForClient } from './services/browser-policies.js'
+import { browserClientPolicies, browserIssuedMachineClients, issuerForClient } from './services/browser-policies.js'
 import { establishBrowserSession, browserPrincipal, clearBrowserSession } from './middleware/browser-session.js'
 import { maintenanceActive } from './release/runtime.js'
 import { Hono } from 'hono'
@@ -29,7 +29,7 @@ import { enrollmentConfigurations } from './services/enrollment-runtime.js'
 
 export function createApp(): Hono {
   if (Object.keys(enrollmentConfigurations()).length) issuerForClient('oathweave-enrollment', env.JWT_ISSUER)
-  for (const clientId of Object.keys(browserClientPolicies)) issuerForClient(clientId, env.JWT_ISSUER)
+  for (const clientId of [...Object.keys(browserClientPolicies), ...browserIssuedMachineClients()]) issuerForClient(clientId, env.JWT_ISSUER)
   const app = new Hono()
   app.use('*',async(c,next)=>{if(maintenanceActive(new URL(c.req.url).pathname))return c.json({error:'Hive is undergoing maintenance'},503);await next();return undefined})
 

@@ -1,4 +1,4 @@
-import { browserAccessLifetime, issuerForClient, browserClientPolicies, browserPermissions } from './browser-policies.js'
+import { browserAccessLifetime, issuerForClient, browserClientPolicies, browserIssuedMachineClients, browserPermissions } from './browser-policies.js'
 import { machineClientPolicies } from './client-policies.js';
 import { createLocalJWKSet, SignJWT, jwtVerify, type JWTPayload } from 'jose'
 import { nanoid } from 'nanoid'
@@ -80,6 +80,11 @@ export function audienceForClient(clientId?: string): string | undefined {
   if (clientId === SECURITY_EXPORTER_CLIENT_ID) return HIVE_ROUTER_AUDIENCE
   if (clientId === EXAMPLE_PORTAL_CLIENT_ID) return EXAMPLE_PORTAL_AUDIENCE
   return clientId ? machineClientPolicies[clientId]?.audience : undefined
+}
+
+/** Native unless the client's machine policy selects the browser issuer. */
+export function issuerForClientCredentials(clientId: string): string {
+  return machineClientPolicies[clientId]?.issuer === 'browser' ? issuerForClient(clientId, env.JWT_ISSUER) : env.JWT_ISSUER
 }
 
 export function lifetimeForClientCredentials(clientId: string): number {
@@ -211,7 +216,7 @@ export async function issueClientCredentialsToken(
   const token = new SignJWT(profile.claims)
     .setProtectedHeader({ alg: 'RS256', kid: signingKeyId })
     .setSubject(clientId)
-    .setIssuer(env.JWT_ISSUER)
+    .setIssuer(issuerForClientCredentials(clientId))
     .setIssuedAt(now)
     .setExpirationTime(now + lifetimeForClientCredentials(clientId))
     .setJti(nanoid())
@@ -267,7 +272,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
   const verificationKeys = createLocalJWKSet(await getPublishedSigningJwks())
   try {
     const { payload } = await jwtVerify(token, verificationKeys, {
-      issuer: [...new Set([env.JWT_ISSUER, ...Object.keys(browserClientPolicies).map(id=>issuerForClient(id,env.JWT_ISSUER)), ...((process.env.IAM_ENROLLMENT_PRODUCTS_JSON || process.env.IAM_ENROLLMENT_INSTALLATIONS_JSON) ? [issuerForClient('oathweave-enrollment', env.JWT_ISSUER)] : [])])],
+      issuer: [...new Set([env.JWT_ISSUER, ...[...Object.keys(browserClientPolicies), ...browserIssuedMachineClients()].map(id=>issuerForClient(id,env.JWT_ISSUER)), ...((process.env.IAM_ENROLLMENT_PRODUCTS_JSON || process.env.IAM_ENROLLMENT_INSTALLATIONS_JSON) ? [issuerForClient('oathweave-enrollment', env.JWT_ISSUER)] : [])])],
     })
     const access = payload as AccessTokenPayload
     if (payload.iss !== issuerForClient(access.clientId, env.JWT_ISSUER)) throw new Error('Access-token issuer does not match its client')
