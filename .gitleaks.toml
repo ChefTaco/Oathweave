@@ -1,0 +1,11 @@
+title = "Repository secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public scrypt domain-separation salt, not a credential."
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^apps/iam\-core/src/services/enrollment\-cipher\.ts$''']
+regexes = ['''^oathweave\-enrollment\-receipt\-v1$''']
