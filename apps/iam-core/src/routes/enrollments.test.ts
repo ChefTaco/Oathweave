@@ -1,6 +1,6 @@
 import { beforeEach,expect,it,vi } from 'vitest'
 import { Hono } from 'hono'
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 import { readdirSync,readFileSync } from 'node:fs'
 import { EnrollmentStore } from '../services/enrollment-store.js'
 import { enrollmentCipher } from '../services/enrollment-cipher.js'

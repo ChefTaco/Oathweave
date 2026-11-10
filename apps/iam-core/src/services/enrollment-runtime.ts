@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 import argon2 from 'argon2'
 import { nanoid } from 'nanoid'
 import { readFileSync } from 'node:fs'

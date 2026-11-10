@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import * as argon2 from 'argon2'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
+import { PrismaSqlite } from '../db/prisma-sqlite/index.js'
 import { PrismaClient } from '../db/generated/index.js'
 
 const username = process.env['IAM_RESET_USERNAME'] ?? process.env['SEED_ADMIN_USERNAME'] ?? 'admin'
@@ -13,7 +13,7 @@ if (!passwordInput || passwordInput.length < 8) {
 }
 const password: string = passwordInput
 
-const adapter = new PrismaBetterSqlite3({
+const adapter = new PrismaSqlite({
   url: process.env['DATABASE_URL'] ?? 'file:./prisma/iam.db',
 })
 const prisma = new PrismaClient({ adapter })
