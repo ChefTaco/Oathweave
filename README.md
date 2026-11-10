@@ -32,14 +32,13 @@ operational scripts used to deploy and maintain them.
 
 Oathweave 2.x ships only as a container image, `ghcr.io/cheftaco/oathweave`, for
 `linux/amd64` and `linux/arm64`. Each release is tagged with its exact version (for
-example `2.0.1`; there is no `latest` tag), and its
+example `2.1.1`; there is no `latest` tag), and its
 [GitHub release](https://github.com/ChefTaco/Oathweave/releases) records the image digest.
 
 **With the Hive suite.** Oathweave is normally installed by `hive.sh`, the
 [Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite); every suite
 profile includes it. The controller pins the image by digest from a signed release
-manifest, writes its configuration and secrets, and runs its private Redis. Hive 2.0.1
-pins Oathweave 2.0.1.
+manifest, writes its configuration and secrets, and runs its private Redis. Use a current signed suite release for the reviewed product and datastore pins.
 
 **Legacy npm packages.** The npm package `@hivemagnus/hive-iam-server` and the image
 `ghcr.io/cheftaco/hive-iam-server` are the legacy Hive IAM 1.x line, which predates this
