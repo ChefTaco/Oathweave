@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 
 /**
  * Applies the bundled Prisma migrations without the Prisma CLI, so npm and
@@ -70,21 +70,21 @@ export function readLocalMigrations(migrationsDir: string): LocalMigration[] {
     })
 }
 
-function hasMigrationsTable(db: Database.Database): boolean {
+function hasMigrationsTable(db: Database): boolean {
   return db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_prisma_migrations'`).get() !== undefined
 }
 
-function userTables(db: Database.Database): string[] {
+function userTables(db: Database): string[] {
   return (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_prisma_migrations'`).all() as { name: string }[])
     .map((row) => row.name)
 }
 
-function appliedRows(db: Database.Database): AppliedRow[] {
+function appliedRows(db: Database): AppliedRow[] {
   if (!hasMigrationsTable(db)) return []
   return db.prepare(`SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" WHERE rolled_back_at IS NULL ORDER BY started_at, migration_name`).all() as AppliedRow[]
 }
 
-function analyse(db: Database.Database, local: LocalMigration[]): { applied: string[]; pending: LocalMigration[]; warnings: string[] } {
+function analyse(db: Database, local: LocalMigration[]): { applied: string[]; pending: LocalMigration[]; warnings: string[] } {
   const warnings: string[] = []
   if (!hasMigrationsTable(db)) {
     const tables = userTables(db)

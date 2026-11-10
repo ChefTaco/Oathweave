@@ -7,7 +7,7 @@ const database = vi.hoisted(() => ({
   $disconnect: vi.fn(),
 }))
 vi.mock('argon2', () => ({ argon2id: 2, hash: vi.fn().mockResolvedValue('synthetic-argon2id-hash') }))
-vi.mock('@prisma/adapter-better-sqlite3', () => ({ PrismaBetterSqlite3: class {} }))
+vi.mock('../db/prisma-sqlite/index.js', () => ({ PrismaSqlite: class {} }))
 vi.mock('../db/generated/index.js', () => ({ PrismaClient: class { constructor() { return database } } }))
 
 afterEach(() => {

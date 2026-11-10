@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 import { createDecipheriv, scryptSync } from 'node:crypto'
 import { z } from 'zod'
 import { EnrollmentRequestSchema } from '../schemas/enrollments.js'
@@ -33,7 +33,7 @@ function legacyDecrypt(value: string, secret: string): string {
 /** Offline, source-preserving adoption. One logical source snapshot and one exact
  * reviewed mapping are bound to one destination installation. No network calls,
  * product account changes, credential rotations or email matching take place. */
-export function migrateEnrollments(source: Database.Database, target: Database.Database, config: EnrollmentMigrationConfig, secrets: { source: string; target: string }, apply = false, now = Date.now()) {
+export function migrateEnrollments(source: Database, target: Database, config: EnrollmentMigrationConfig, secrets: { source: string; target: string }, apply = false, now = Date.now()) {
   if (source === target) throw new Error('Source and destination must be separate snapshots')
   source.pragma('query_only = ON'); target.pragma('foreign_keys = ON'); target.pragma('busy_timeout = 0')
   if (source.prepare('PRAGMA integrity_check').get() && JSON.stringify(source.prepare('PRAGMA integrity_check').all()) !== '[{"integrity_check":"ok"}]') throw new Error('Source enrollment snapshot failed integrity checking')

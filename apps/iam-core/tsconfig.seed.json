@@ -1,14 +1,18 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./prisma",
-    "outDir": "./dist/prisma",
+    "rootDir": ".",
+    "outDir": "./dist/.seed-build",
     "composite": false,
     "incremental": false,
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["prisma/seed.ts", "prisma/seed-client-secret.ts", "prisma/suite-bootstrap.ts"],
+  "include": [
+    "prisma/seed.ts",
+    "prisma/seed-client-secret.ts",
+    "prisma/suite-bootstrap.ts"
+  ],
   "exclude": []
 }

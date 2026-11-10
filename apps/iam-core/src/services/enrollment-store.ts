@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 import { nanoid } from 'nanoid'
 import type { z } from 'zod'
 import type { EnrollmentRequestSchema } from '../schemas/enrollments.js'
@@ -24,7 +24,7 @@ function visibleReceipt(value: string): Record<string, string> {
 
 /** A lease fences every checkpoint. No database transaction is held over HTTP. */
 export class EnrollmentStore {
-  constructor(readonly database: Database.Database, private readonly cipher: ReturnType<typeof enrollmentCipher>, readonly installationId: string, private readonly now: () => number = Date.now) { database.pragma('busy_timeout = 0'); database.pragma('foreign_keys = ON') }
+  constructor(readonly database: Database, private readonly cipher: ReturnType<typeof enrollmentCipher>, readonly installationId: string, private readonly now: () => number = Date.now) { database.pragma('busy_timeout = 0'); database.pragma('foreign_keys = ON') }
   private key(value: string): string { return this.installationId + ':' + value }
   private readonly enrollmentColumns = 'nativeActorId AS actorId,ownerId,installationId,requestHash,requestJson,credentialExpiresAt,iamId,routerKeyId,memoryId,status,encryptedSecrets,receiptExpiresAt'
   private readonly operationColumns = 'operationId AS id,bindingKey,actorId,ownerId,action,identifiersJson,stepsJson,encryptedSecrets,receiptExpiresAt,status'

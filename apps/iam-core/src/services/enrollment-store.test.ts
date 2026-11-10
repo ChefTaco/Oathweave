@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 import { readdirSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { EnrollmentStore } from './enrollment-store.js'

@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { PrismaClient, type Prisma } from '../src/db/generated/index.js'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
+import { PrismaSqlite } from '../src/db/prisma-sqlite/index.js'
 import * as argon2 from 'argon2'
 import { planSeedClientSecret } from './seed-client-secret.js'
 import {
@@ -16,7 +16,7 @@ const ARGON2_OPTIONS: argon2.Options = {
   parallelism: 4,
 }
 
-const adapter = new PrismaBetterSqlite3({
+const adapter = new PrismaSqlite({
   url: process.env['DATABASE_URL'] ?? 'file:./prisma/iam.db',
 })
 const prisma = new PrismaClient({ adapter })

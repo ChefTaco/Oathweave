@@ -2,7 +2,6 @@
 // Product-local, disposable SQLite proof. Never selects an operator store.
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
-import { createRequire } from 'node:module'
 import {
   mkdtempSync,
   mkdirSync,
@@ -18,8 +17,7 @@ import { createServer } from 'node:net'
 import { randomBytes } from 'node:crypto'
 const root = resolve(import.meta.dirname, '..')
 const temporary = mkdtempSync(join(tmpdir(), 'oathweave-bootstrap-rehearsal-'))
-const require = createRequire(join(root, 'apps/iam-core/package.json'))
-const Database = require('better-sqlite3')
+const { default: Database } = await import('../apps/iam-core/dist/db/sqlite.js')
 const home = join(temporary, 'data'),
   data = join(home, 'iam')
 mkdirSync(home, { mode: 0o700 })

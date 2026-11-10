@@ -1,17 +1,21 @@
-// The seed (prisma/seed.ts) imports the generated Prisma client from
-// ../src/db/generated. The build ships that client at dist/db/generated, so
-// point the compiled seed (dist/prisma/seed.js) at it. Fails the build if the
-// import is not found exactly once.
-import { readFileSync, writeFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+// Compile seed imports with their normal source roots, then retain only the
+// three seed entry modules and point them at the primary compiled database code.
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const seedPath = fileURLToPath(new URL('../dist/prisma/seed.js', import.meta.url))
-const from = "from '../src/db/generated/index.js'"
-const to = "from '../db/generated/index.js'"
-const source = readFileSync(seedPath, 'utf8')
-const occurrences = source.split(from).length - 1
-if (occurrences !== 1) {
-  console.error(`finalize-seed-build: expected one "${from}" in ${seedPath}, found ${occurrences}`)
-  process.exit(1)
+const staging = fileURLToPath(new URL('../dist/.seed-build/', import.meta.url));
+const destination = fileURLToPath(new URL('../dist/prisma/', import.meta.url));
+mkdirSync(destination, { recursive: true });
+for (const name of ['seed', 'seed-client-secret', 'suite-bootstrap']) {
+  let source = readFileSync(`${staging}prisma/${name}.js`, 'utf8');
+  if (name === 'seed') {
+    for (const module of ['generated', 'prisma-sqlite']) {
+      const from = `from '../src/db/${module}/index.js'`;
+      const to = `from '../db/${module}/index.js'`;
+      if (source.split(from).length - 1 !== 1) throw new Error(`Compiled seed import differs: ${module}`);
+      source = source.replace(from, to);
+    }
+  }
+  writeFileSync(`${destination}${name}.js`, source);
 }
-writeFileSync(seedPath, source.replace(from, to))
+rmSync(staging, { recursive: true });

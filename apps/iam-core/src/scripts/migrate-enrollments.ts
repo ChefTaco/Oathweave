@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { lstatSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import Database from 'better-sqlite3'
+import Database from '../db/sqlite.js'
 import { enrollmentMigrationSchema, migrateEnrollments } from '../services/enrollment-migration.js'
 function protectedFile(path: string): string {
  const stat=lstatSync(path)
