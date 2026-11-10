@@ -69,3 +69,17 @@ the public response remains generic. Monitor the failure audit outcome and the
 trusted delivery consumer independently; a successful request is not a delivery
 receipt. Shared console ingress must keep the SSO and native refresh cookies
 exclusive to Oathweave and prevent resource APIs from setting identity cookies.
+
+## Embermend resource registration
+
+Fresh suite bootstrap accepts the `embermend` audience and the public
+`hivexui-embermend` client. Its explicit permissions use the `embermend:` prefix
+and must match the operator-owned `IAM_BROWSER_CLIENT_POLICIES` ceiling. Grants
+for another product or wildcard permissions are rejected. This does not change
+existing client registrations or infer new authority for existing accounts.
+
+Embermend separately maps each authenticated subject to its installation,
+application and target scope. Preparation, provider writing, approval, merge and
+deployment are separate product permissions. Coordinator machine clients should
+receive only their configured coordination permissions; they cannot approve
+their own work or edit standing policy.

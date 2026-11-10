@@ -53,7 +53,7 @@ clientsRouter.post('/', requirePermission('iam:clients:write'), async (c) => {
     data: {
       ...(browserId ? { id: browserId } : {}),
       name: body.name,
-      description: body.description,
+      description: body.description ?? null,
       secretHash,
       clientType: body.clientType,
       allowedIps: JSON.stringify(body.allowedIps),

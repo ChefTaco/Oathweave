@@ -8,7 +8,7 @@ import { ApiError } from '../types/index.js'
 
 // ── List groups ──
 
-export async function listGroups(opts?: { search?: string }) {
+export async function listGroups(opts?: { search?: string | undefined }) {
   const where = opts?.search
     ? { name: { contains: opts.search } }
     : {}
@@ -60,7 +60,7 @@ export async function getGroupById(id: string) {
 
 export async function createGroup(data: {
   name: string
-  description?: string
+  description?: string | undefined
 }) {
   const existing = await prisma.group.findUnique({ where: { name: data.name } })
   if (existing) throw new ApiError(409, 'CONFLICT', 'Group name already exists')
@@ -69,14 +69,14 @@ export async function createGroup(data: {
     data: {
       id: nanoid(),
       name: data.name,
-      description: data.description,
+      description: data.description ?? null,
     },
   })
 }
 
 // ── Update group ──
 
-export async function updateGroup(id: string, data: { name?: string; description?: string }) {
+export async function updateGroup(id: string, data: { name?: string | undefined; description?: string | undefined }) {
   const group = await prisma.group.findUnique({ where: { id } })
   if (!group) throw new ApiError(404, 'NOT_FOUND', 'Group not found')
   if (group.system) throw new ApiError(403, 'FORBIDDEN', 'Cannot modify system groups')

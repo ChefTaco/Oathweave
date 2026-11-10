@@ -27,7 +27,7 @@ rolesRouter.post('/', requirePermission('iam:roles:write'), async (c) => {
   const existing = await prisma.role.findUnique({ where: { name: body.name } })
   if (existing) throw new ApiError(409, 'CONFLICT', 'Role name already exists')
 
-  const role = await prisma.role.create({ data: { ...body, permissions: JSON.stringify(body.permissions) } })
+  const role = await prisma.role.create({ data: { ...body, description: body.description ?? null, permissions: JSON.stringify(body.permissions) } })
 
   await logAuditEvent({
     eventType: 'role.created',

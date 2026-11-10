@@ -56,7 +56,7 @@ systemUsersRouter.post('/', authMiddleware, requirePermission('iam:users:write')
       userId: body.userId,
       linuxUsername: body.linuxUsername,
       sudoEnabled: body.sudoEnabled,
-      sshPublicKey: body.sshPublicKey,
+      sshPublicKey: body.sshPublicKey ?? null,
       authorizedHosts: JSON.stringify(body.authorizedHosts ?? []),
     },
   })

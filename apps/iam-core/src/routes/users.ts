@@ -98,9 +98,7 @@ usersRouter.post('/', requirePermission('iam:users:write'), async (c) => {
       encryptedPassword: null,
       passwordChangedAt: new Date(),
       active: body.active,
-      roles: body.roleIds.length > 0
-        ? { create: body.roleIds.map((roleId) => ({ roleId, grantedBy: principal.sub })) }
-        : undefined,
+      ...(body.roleIds.length > 0 ? { roles: { create: body.roleIds.map((roleId) => ({ roleId, grantedBy: principal.sub })) } } : {}),
     },
     include: { roles: { include: { role: { select: { name: true } } } } },
   })

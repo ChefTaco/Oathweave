@@ -40,23 +40,24 @@ export interface TokenPair {
   expiresIn: number
 }
 
+// Optional collection fields may be explicitly unavailable before queue JSON serialization.
 export interface AuditEventInput {
   eventType: string
   category: AuditCategory
-  actorId?: string
-  actorType?: ActorType
-  actorEmail?: string
-  clientId?: string
-  serviceAccountId?: string
-  ipAddress?: string
-  userAgent?: string
-  resourceType?: string
-  resourceId?: string
+  actorId?: string | undefined
+  actorType?: ActorType | undefined
+  actorEmail?: string | undefined
+  clientId?: string | undefined
+  serviceAccountId?: string | undefined
+  ipAddress?: string | undefined
+  userAgent?: string | undefined
+  resourceType?: string | undefined
+  resourceId?: string | undefined
   action: string
-  outcome?: AuditOutcome
-  detail?: Record<string, unknown>
-  source?: string
-  hostName?: string
+  outcome?: AuditOutcome | undefined
+  detail?: Record<string, unknown> | undefined
+  source?: string | undefined
+  hostName?: string | undefined
 }
 
 export class ApiError extends Error {

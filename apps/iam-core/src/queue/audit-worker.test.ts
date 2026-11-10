@@ -47,4 +47,9 @@ describe('auditEventRecord', () => {
       unlinked: { actorId: 'machine-client', clientId: 'deleted-client' },
     })
   })
+  it('omits unavailable optional metadata before constructing the persistence record', async () => {
+    const record = await auditEventRecord({ eventType: 'READ', category: 'ADMIN', action: 'read', actorId: undefined, actorEmail: undefined, ipAddress: undefined, userAgent: undefined }, lookup([]))
+    for (const field of ['actorId', 'actorEmail', 'ipAddress', 'userAgent']) expect(Object.hasOwn(record, field)).toBe(false)
+  })
+
 })

@@ -5,6 +5,7 @@ import { ApiError } from '../types/index.js'
 
 const mocks = vi.hoisted(() => ({
   active: true,
+  permissionsJson: '[]',
   deleted: vi.fn(),
   revoked: vi.fn(),
   keys: null as unknown as Awaited<ReturnType<typeof generateKeyPair>>,
@@ -48,7 +49,7 @@ vi.mock('../db/client.js', () => ({
               user: {
                 email: 'alice@example.com',
                 username: 'alice',
-                roles: [],
+                roles: [{ role: { name: 'viewer', permissions: mocks.permissionsJson } }],
               },
             }
           : null,
@@ -98,6 +99,7 @@ describe('browser SSO session transport', () => {
   })
   beforeEach(() => {
     mocks.active = true
+    mocks.permissionsJson = '[]'
     mocks.deleted.mockClear()
     mocks.revoked.mockClear()
   })
@@ -160,6 +162,15 @@ describe('browser SSO session transport', () => {
       (await app().request('/authorize', { headers: { Cookie: cookie } }))
         .status,
     ).toBe(401)
+  })
+  it('rejects malformed stored role permissions instead of trusting a typed JSON assertion', async () => {
+    const response = await login()
+    const cookie = response.headers.get('set-cookie')?.split(';')[0]
+    if (!cookie) throw new Error('Missing fixture SSO cookie')
+    mocks.permissionsJson = '["embermend:read"]'
+    expect((await app().request('/authorize', { headers: { Cookie: cookie } })).status).toBe(200)
+    mocks.permissionsJson = '[{"permission":"embermend:approve"}]'
+    expect((await app().request('/authorize', { headers: { Cookie: cookie } })).status).toBe(401)
   })
   it('requires an allowed origin for logout and revokes the exact session', async () => {
     const response = await login()
