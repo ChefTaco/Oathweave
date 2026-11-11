@@ -1,6 +1,6 @@
 {
   "name": "@hivemagnus/oathweave",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Hive IAM server: OAuth 2.0 / OpenID Connect identity service with RS256 JWTs, RBAC, MFA/WebAuthn, service accounts and audit logging",
   "keywords": [
     "hive",
