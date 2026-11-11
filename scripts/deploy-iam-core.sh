@@ -135,6 +135,16 @@ remote_scp() {
   fi
 }
 
+# Check the package policy before key handling, upload or service changes.
+node "$SCRIPT_DIR/check-node-runtime.mjs"
+NODE_RUNTIME_RANGE="$(node "$SCRIPT_DIR/check-node-runtime.mjs" --print-range)"
+if [[ "$DRY_RUN" != "true" ]]; then
+  [[ -n "$REMOTE_HOST" ]] || { err "HIVE_IAM_DEPLOY_HOST is required"; exit 1; }
+  [[ "$REMOTE_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { err "unsafe HIVE_IAM_DEPLOY_HOST"; exit 1; }
+  remote_exec "node --input-type=module - --engines '$NODE_RUNTIME_RANGE'" < "$SCRIPT_DIR/check-node-runtime.mjs"
+  remote_exec "/usr/bin/node --input-type=module - --engines '$NODE_RUNTIME_RANGE'" < "$SCRIPT_DIR/check-node-runtime.mjs"
+fi
+
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 if [[ ! -f "$CERTS_DIR/iam-private.pem" ]] || [[ ! -f "$CERTS_DIR/iam-public.pem" ]]; then
   err "Missing IAM RS256 keys in $CERTS_DIR/. Run: bash scripts/generate-keys.sh"
