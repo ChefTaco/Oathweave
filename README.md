@@ -52,7 +52,7 @@ and `@hivemagnus/oathweave` is not published on npm. The
 
 ## Getting Started (from source)
 
-Requires Node.js 24 (`>=24.22.1`) or 26 (`>=26.13.0`), Redis and OpenSSL.
+Requires Node.js 24 (`>=24.22.3`) or 26 (`>=26.13.1`), Redis and OpenSSL.
 
 ```bash
 npm install
@@ -173,3 +173,10 @@ refinements, defaults and bounds that cannot be recovered from OpenAPI alone.
 `docs/openapi.json` also describes the actual browser administration envelopes,
 including existing native client mutation serialization. Publication remains a
 separate release action; consumers pin reviewed immutable snapshots until then.
+
+## Native deployment runtime checks
+
+Source deployment checks the Node.js used by npm and `/usr/bin/node`, which the
+installed systemd service uses, against the current package `engines.node` policy.
+An unsupported runtime stops deployment before remote writes or service restarts.
+Update the system interpreter as well as any shell-specific Node.js installation.
