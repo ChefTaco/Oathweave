@@ -290,5 +290,5 @@ Use `hive upgrade --dry-run`, then `hive upgrade` for the enrolled release bundl
 is read-only; migration requires a verified backup. Set `HIVE_AUTO_MIGRATE=true` explicitly for
 startup migrations outside a managed install. Slow or one-way automatic migrations are refused.
 `check --json` reports configuration without initializing state. No upgrade rotates signing keys
-or reseeds existing accounts. See [UPGRADING.md](https://github.com/ChefTaco/hive/blob/main/UPGRADING.md)
+or reseeds existing accounts. See [UPGRADING.md](https://github.com/ChefTaco/hive/blob/v1.2.2/UPGRADING.md)
 for adoption, compatibility, recovery, update notices and container controls.
