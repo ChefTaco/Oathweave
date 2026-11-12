@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2.2.0] - 2026-11-12
 
 - Admit the explicit Embermend browser audience in fresh suite bootstrap with resource-specific permission ceilings.
 - Pin TypeScript 6.0.3 across identity, SDK and release tooling; enable exact optional typing and explicit Node types. Omit unavailable persistence/output fields while preserving existing values on partial updates.
