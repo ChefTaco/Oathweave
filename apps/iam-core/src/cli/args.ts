@@ -47,7 +47,7 @@ Options:
   -h, --help         Show this help.
   -v, --version      Print the version.
 
-Data defaults to \${HIVE_HOME:-~/.hive}/iam. See https://github.com/ChefTaco/hive/tree/main/services/hive-iam/apps/iam-core#readme
+Data defaults to \${HIVE_HOME:-~/.hive}/iam. See https://github.com/ChefTaco/Oathweave/tree/main/apps/iam-core#readme
 `
 
 export function parseArgs(argv: readonly string[]): CliOptions {

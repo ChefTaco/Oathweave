@@ -44,7 +44,7 @@ manifest, writes its configuration and secrets, and runs its private Redis. Use 
 `ghcr.io/cheftaco/hive-iam-server` are the legacy Hive IAM 1.x line, which predates this
 repository. `npm install` and `npx` resolve that package to 1.2.2, not to Oathweave 2.x,
 and `@hivemagnus/oathweave` is not published on npm. The
-[Hive README](https://github.com/ChefTaco/hive#legacy-npm-packages-1x) describes the 1.x line.
+[Hive README](https://github.com/ChefTaco/hive#the-retired-npm-packages) describes the 1.x line.
 
 **On its own.** Run the image with a Redis it can reach. The
 [server README](apps/iam-core/README.md#run-the-container-image) has a complete
