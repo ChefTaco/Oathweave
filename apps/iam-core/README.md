@@ -59,9 +59,9 @@ docker run -d --name oathweave-redis --network oathweave --env-file redis.env \
   sh -c 'exec redis-server --requirepass "$REDIS_PASSWORD" --appendonly yes'
 
 # 3. Check, then start
-docker run --rm --network oathweave --env-file iam.env ghcr.io/cheftaco/oathweave:2.1.1 check
+docker run --rm --network oathweave --env-file iam.env ghcr.io/cheftaco/oathweave:2.1.2 check
 docker run -d --name oathweave --network oathweave -p 127.0.0.1:4200:4200 \
-  -v oathweave-data:/data --env-file iam.env ghcr.io/cheftaco/oathweave:2.1.1
+  -v oathweave-data:/data --env-file iam.env ghcr.io/cheftaco/oathweave:2.1.2
 
 # 4. Once it reports healthy
 curl http://127.0.0.1:4200/api/v1/health/ready
@@ -175,7 +175,7 @@ HOST=0.0.0.0
 
 The CLI is installed as `oathweave` and, for compatibility, `hive-iam-server`. In the
 container image it is the entry point: pass the command after the image name, for
-example `docker run --rm --network oathweave -v oathweave-data:/data --env-file iam.env ghcr.io/cheftaco/oathweave:2.1.1 migrate --plan`.
+example `docker run --rm --network oathweave -v oathweave-data:/data --env-file iam.env ghcr.io/cheftaco/oathweave:2.1.2 migrate --plan`.
 
 ```text
 hive-iam-server [start]   Start the server; startup migration requires explicit opt-in
@@ -290,5 +290,5 @@ Use `hive upgrade --dry-run`, then `hive upgrade` for the enrolled release bundl
 is read-only; migration requires a verified backup. Set `HIVE_AUTO_MIGRATE=true` explicitly for
 startup migrations outside a managed install. Slow or one-way automatic migrations are refused.
 `check --json` reports configuration without initializing state. No upgrade rotates signing keys
-or reseeds existing accounts. See [UPGRADING.md](https://github.com/ChefTaco/hive/blob/main/UPGRADING.md)
+or reseeds existing accounts. See [UPGRADING.md](https://github.com/ChefTaco/hive/blob/v1.2.2/UPGRADING.md)
 for adoption, compatibility, recovery, update notices and container controls.

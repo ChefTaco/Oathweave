@@ -32,7 +32,7 @@ operational scripts used to deploy and maintain them.
 
 Oathweave 2.x ships only as a container image, `ghcr.io/cheftaco/oathweave`, for
 `linux/amd64` and `linux/arm64`. Each release is tagged with its exact version (for
-example `2.1.1`; there is no `latest` tag), and its
+example `2.1.2`; there is no `latest` tag), and its
 [GitHub release](https://github.com/ChefTaco/Oathweave/releases) records the image digest.
 
 **With the Hive suite.** Oathweave is normally installed by `hive.sh`, the
@@ -44,7 +44,7 @@ manifest, writes its configuration and secrets, and runs its private Redis. Use 
 `ghcr.io/cheftaco/hive-iam-server` are the legacy Hive IAM 1.x line, which predates this
 repository. `npm install` and `npx` resolve that package to 1.2.2, not to Oathweave 2.x,
 and `@hivemagnus/oathweave` is not published on npm. The
-[Hive README](https://github.com/ChefTaco/hive#legacy-npm-packages-1x) describes the 1.x line.
+[Hive README](https://github.com/ChefTaco/hive#the-retired-npm-packages) describes the 1.x line.
 
 **On its own.** Run the image with a Redis it can reach. The
 [server README](apps/iam-core/README.md#run-the-container-image) has a complete
@@ -52,7 +52,7 @@ and `@hivemagnus/oathweave` is not published on npm. The
 
 ## Getting Started (from source)
 
-Requires Node.js 24 (`>=24.22.1`) or 26 (`>=26.13.0`), Redis and OpenSSL.
+Requires Node.js 24 (`>=24.22.3`) or 26 (`>=26.13.1`), Redis and OpenSSL.
 
 ```bash
 npm install
@@ -173,3 +173,10 @@ refinements, defaults and bounds that cannot be recovered from OpenAPI alone.
 `docs/openapi.json` also describes the actual browser administration envelopes,
 including existing native client mutation serialization. Publication remains a
 separate release action; consumers pin reviewed immutable snapshots until then.
+
+## Native deployment runtime checks
+
+Source deployment checks the Node.js used by npm and `/usr/bin/node`, which the
+installed systemd service uses, against the current package `engines.node` policy.
+An unsupported runtime stops deployment before remote writes or service restarts.
+Update the system interpreter as well as any shell-specific Node.js installation.

@@ -16,14 +16,14 @@
   ],
   "author": "ChefTaco",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/ChefTaco/hive/tree/main/services/hive-iam/packages/iam-sdk#readme",
+  "homepage": "https://github.com/ChefTaco/Oathweave/tree/main/packages/iam-sdk#readme",
   "bugs": {
-    "url": "https://github.com/ChefTaco/hive/issues"
+    "url": "https://github.com/ChefTaco/Oathweave/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ChefTaco/hive.git",
-    "directory": "services/hive-iam/packages/iam-sdk"
+    "url": "git+https://github.com/ChefTaco/Oathweave.git",
+    "directory": "packages/iam-sdk"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -77,7 +77,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "hono": "^4.13.16",
+    "hono": "^4.13.18",
     "typescript": "6.0.3",
     "vitest": "^5.0.5"
   }

@@ -1,11 +1,11 @@
 {
   "name": "oathweave-workspace",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "description": "Oathweave identity API and middleware SDK",
   "type": "module",
   "engines": {
-    "node": "^24.22.1 || ^26.13.0"
+    "node": "^24.22.3 || ^26.13.1"
   },
   "workspaces": [
     "apps/*",
@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && node --test scripts/check-node-runtime.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "iam-core:build": "npm --workspace @hivemagnus/oathweave run build",
     "iam-core:test": "npm --workspace @hivemagnus/oathweave test",
@@ -33,7 +33,7 @@
   "overrides": {
     "@hono/node-server": "2.1.6",
     "fast-uri": "3.1.9",
-    "hono": "4.13.16",
+    "hono": "4.13.18",
     "npm": {
       "brace-expansion": "5.0.9",
       "ip-address": "10.4.0",
