@@ -1,6 +1,6 @@
 {
   "name": "oathweave-workspace",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "private": true,
   "description": "Oathweave identity API and middleware SDK",
   "type": "module",
@@ -42,9 +42,11 @@
     },
     "valibot": "1.4.2",
     "mysql2": "3.24.3",
-    "deepmerge-ts": "8.0.0"
+    "deepmerge-ts": "8.0.0",
+    "typescript": "6.0.3"
   },
   "devDependencies": {
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.1",
+    "typescript": "6.0.3"
   }
 }

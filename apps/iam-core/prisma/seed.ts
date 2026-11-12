@@ -16,6 +16,11 @@ const ARGON2_OPTIONS: argon2.Options = {
   parallelism: 4,
 }
 
+async function hashRequiredSeedSecret(secret: string | undefined): Promise<string> {
+  if (!secret) throw new Error('Validated confidential client seed secret required')
+  return argon2.hash(secret, ARGON2_OPTIONS)
+}
+
 const adapter = new PrismaSqlite({
   url: process.env['DATABASE_URL'] ?? 'file:./prisma/iam.db',
 })
@@ -197,7 +202,7 @@ async function seedRecords(
   const hiveClientSecretHash =
     hiveSecretPlan === 'preserve'
       ? undefined
-      : await argon2.hash(hiveClientSecretFromEnv!, ARGON2_OPTIONS)
+      : await hashRequiredSeedSecret(hiveClientSecretFromEnv)
 
   const configuredHivePublicUrl = process.env['SEED_HIVE_PUBLIC_URL']?.replace(
     /\/+$/,
@@ -213,14 +218,14 @@ async function seedRecords(
         ? { redirectUris: JSON.stringify([configuredHivePublicUrl]) }
         : {}),
       grantTypes: '["authorization_code","refresh_token","client_credentials"]',
-      ...(hiveSecretPlan === 'provision'
+      ...(hiveSecretPlan === 'provision' && hiveClientSecretHash !== undefined
         ? { secretHash: hiveClientSecretHash }
         : {}),
     },
     create: {
       name: 'hive',
       description: 'Hive Control Plane',
-      secretHash: hiveClientSecretHash!,
+      secretHash: hiveClientSecretHash ?? null,
       active: true,
       clientType: 'confidential',
       firstParty: true,
@@ -257,7 +262,7 @@ async function seedRecords(
   const routerClientSecretHash =
     routerSecretPlan === 'preserve'
       ? undefined
-      : await argon2.hash(routerClientSecretFromEnv!, ARGON2_OPTIONS)
+      : await hashRequiredSeedSecret(routerClientSecretFromEnv)
 
   await database.client.upsert({
     where: { id: 'hive-router' },
@@ -271,7 +276,7 @@ async function seedRecords(
         ? { redirectUris: JSON.stringify([configuredRouterRedirectUri]) }
         : {}),
       grantTypes: '["authorization_code","refresh_token","client_credentials"]',
-      ...(routerSecretPlan === 'provision'
+      ...(routerSecretPlan === 'provision' && routerClientSecretHash !== undefined
         ? { secretHash: routerClientSecretHash }
         : {}),
     },
@@ -279,7 +284,7 @@ async function seedRecords(
       id: 'hive-router',
       name: 'hive-router',
       description: 'Hive Router Admin UI OIDC Client',
-      secretHash: routerClientSecretHash!,
+      secretHash: routerClientSecretHash ?? null,
       active: true,
       clientType: 'confidential',
       firstParty: true,
@@ -321,7 +326,7 @@ async function seedRecords(
         clientType: 'confidential',
         redirectUris: '[]',
         grantTypes: '["client_credentials"]',
-        ...(securityExporterSecretPlan === 'provision'
+        ...(securityExporterSecretPlan === 'provision' && securityExporterSecretHash !== undefined
           ? { secretHash: securityExporterSecretHash }
           : {}),
       },
@@ -329,7 +334,7 @@ async function seedRecords(
         id: 'security-exporter',
         name: 'security-exporter',
         description: 'Read-only IAM audit and security event exporter',
-        secretHash: securityExporterSecretHash!,
+        secretHash: securityExporterSecretHash ?? null,
         active: true,
         clientType: 'confidential',
         firstParty: true,
@@ -375,7 +380,7 @@ async function seedRecords(
         redirectUris: JSON.stringify([examplePortalRedirectUri]),
         grantTypes:
           '["authorization_code","refresh_token","client_credentials"]',
-        ...(examplePortalSecretPlan === 'provision'
+        ...(examplePortalSecretPlan === 'provision' && examplePortalSecretHash !== undefined
           ? { secretHash: examplePortalSecretHash }
           : {}),
       },
@@ -383,7 +388,7 @@ async function seedRecords(
         id: 'example-portal',
         name: 'example-portal',
         description: 'Example Portal read-only OIDC client',
-        secretHash: examplePortalSecretHash!,
+        secretHash: examplePortalSecretHash ?? null,
         active: true,
         clientType: 'confidential',
         firstParty: true,

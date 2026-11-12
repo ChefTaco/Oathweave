@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.2.0] - 2026-11-12
+
+- Admit the explicit Embermend browser audience in fresh suite bootstrap with resource-specific permission ceilings.
+- Pin TypeScript 6.0.3 across identity, SDK and release tooling; enable exact optional typing and explicit Node types. Omit unavailable persistence/output fields while preserving existing values on partial updates.
+
 ## [2.1.2] - 2026-11-11
 
 - Refuse native deployments and service restarts on Node.js below the package security minimum before changing remote state.

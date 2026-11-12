@@ -29,7 +29,7 @@ export async function isDeviceTrusted(userId: string, fingerprint: string): Prom
 export async function registerTrustedDevice(
   userId: string,
   fingerprint: string,
-  opts?: { name?: string; userAgent?: string; ipAddress?: string },
+  opts?: { name?: string | undefined; userAgent?: string | undefined; ipAddress?: string | undefined },
 ): Promise<{ id: string; isNew: boolean }> {
   const existing = await prisma.trustedDevice.findUnique({
     where: { userId_fingerprint: { userId, fingerprint } },
@@ -38,7 +38,7 @@ export async function registerTrustedDevice(
   if (existing) {
     await prisma.trustedDevice.update({
       where: { id: existing.id },
-      data: { lastSeenAt: new Date(), ipAddress: opts?.ipAddress },
+      data: { lastSeenAt: new Date(), ...(opts?.ipAddress !== undefined ? { ipAddress: opts.ipAddress } : {}) },
     })
     return { id: existing.id, isNew: false }
   }
@@ -47,9 +47,9 @@ export async function registerTrustedDevice(
     data: {
       userId,
       fingerprint,
-      name: opts?.name,
-      userAgent: opts?.userAgent,
-      ipAddress: opts?.ipAddress,
+      name: opts?.name ?? null,
+      userAgent: opts?.userAgent ?? null,
+      ipAddress: opts?.ipAddress ?? null,
     },
   })
   return { id: device.id, isNew: true }
@@ -101,7 +101,7 @@ export async function deleteTrustedDevice(userId: string, deviceId: string): Pro
 export async function assessDevicePosture(
   userId: string,
   fingerprint: string,
-  context: { ipAddress?: string; userAgent?: string },
+  context: { ipAddress?: string | undefined; userAgent?: string | undefined },
 ): Promise<{
   score: number
   trusted: boolean

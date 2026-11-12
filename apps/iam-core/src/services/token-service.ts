@@ -99,6 +99,7 @@ export function clientCredentialsTokenProfile(
   claims: Record<string, unknown>
   audience?: string
 } {
+  const audience = audienceForClient(clientId)
   return {
     claims: {
       actorType: 'SERVICE_ACCOUNT',
@@ -109,7 +110,7 @@ export function clientCredentialsTokenProfile(
       roles: [],
       permissions: permissionsForClientCredentials(clientId, scope),
     },
-    audience: audienceForClient(clientId),
+    ...(audience !== undefined ? { audience } : {}),
   }
 }
 
@@ -160,9 +161,9 @@ export async function issueTokenPair(
       userId,
       sessionId,
       tokenHash: refreshTokenHash,
-      ipAddress,
-      clientId,
-      userAgent,
+      ipAddress: ipAddress ?? null,
+      clientId: clientId ?? null,
+      userAgent: userAgent ?? null,
       expiresAt: new Date(Date.now() + env.JWT_REFRESH_TTL * 1000),
     },
   })

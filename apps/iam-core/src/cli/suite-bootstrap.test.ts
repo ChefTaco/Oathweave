@@ -123,3 +123,19 @@ it('requires protected product-owned configuration matching the runtime permissi
     }),
   ).toThrow(/mode-0600/)
 })
+it('admits an explicit Embermend browser audience with its own finite permission ceiling', () => {
+  const value = fixture()
+  value.clients.push({
+    id: 'hivexui-embermend', audience: 'embermend',
+    permissions: ['embermend:read', 'embermend:assess', 'embermend:prepare', 'embermend:approve'],
+    redirectUris: ['https://console.example.com/auth/callback'], firstParty: true,
+  })
+  const parsed = suiteBootstrapSchema.parse(value)
+  expect(suiteAdminPermissions(parsed)).toEqual(expect.arrayContaining(['embermend:read', 'embermend:approve']))
+  const product = value.clients.find(client => client.id === 'hivexui-embermend')
+  if (!product) throw new Error('Missing fixture client')
+  for (const permissions of [['magnus:admin'], ['iam:users:write'], ['embermend:*']]) {
+    product.permissions = permissions
+    expect(() => suiteBootstrapSchema.parse(value)).toThrow()
+  }
+})

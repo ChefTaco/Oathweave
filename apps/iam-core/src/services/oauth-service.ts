@@ -27,12 +27,12 @@ export interface AuthorizeParams {
   clientId: string
   redirectUri: string
   responseType: string
-  codeChallenge?: string
-  codeChallengeMethod?: string
-  scope?: string
-  state?: string
-  nonce?: string
-  browserSessionId?: string
+  codeChallenge?: string | undefined
+  codeChallengeMethod?: string | undefined
+  scope?: string | undefined
+  state?: string | undefined
+  nonce?: string | undefined
+  browserSessionId?: string | undefined
 }
 
 export interface TokenExchangeParams {
@@ -40,7 +40,7 @@ export interface TokenExchangeParams {
   code: string
   redirectUri: string
   clientId: string
-  codeVerifier?: string
+  codeVerifier?: string | undefined
 }
 
 export interface AuthorizeResult {
@@ -135,11 +135,11 @@ export async function createAuthorizationCode(
 
   return {
     code,
-    state: params.state,
+    ...(params.state !== undefined ? { state: params.state } : {}),
     redirectUri: params.redirectUri,
     skipConsent: client.firstParty,
     clientName: client.name,
-    scope: params.scope,
+    ...(params.scope !== undefined ? { scope: params.scope } : {}),
   }
 }
 
@@ -339,12 +339,12 @@ export async function exchangeAuthorizationCode(
     refreshToken: tokenPair.refreshToken,
     expiresIn: tokenPair.expiresIn,
     tokenType: 'Bearer',
-    scope: authCode.scope ?? undefined,
+    ...(authCode.scope !== null ? { scope: authCode.scope } : {}),
     userId: authCode.userId,
     email: authCode.user.email,
     username: authCode.user.username,
     displayName: authCode.user.displayName,
-    nonce: authCode.nonce ?? undefined,
+    ...(authCode.nonce !== null ? { nonce: authCode.nonce } : {}),
   }
 }
 
@@ -397,7 +397,7 @@ export async function exchangeClientCredentials(
     accessToken,
     expiresIn: lifetimeForClientCredentials(clientId),
     tokenType: 'Bearer',
-    scope,
+    ...(scope !== undefined ? { scope } : {}),
   }
 }
 

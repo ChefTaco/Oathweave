@@ -11,7 +11,7 @@ function remoteAddress(c: Context): string | undefined {
 }
 
 export function resolveClientIp(
-  headers: { forwarded?: string; realIp?: string },
+  headers: { forwarded?: string | undefined; realIp?: string | undefined },
   remote: string | undefined,
   trustedProxies: readonly string[],
 ): string {

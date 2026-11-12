@@ -23,11 +23,11 @@ export async function createServiceAccount(
   clientId: string,
   roleIds: string[],
   opts: {
-    operationId?: string
-    description?: string
-    expiresAt?: Date
-    allowedIps?: string[]
-    createdBy?: string
+    operationId?: string | undefined
+    description?: string | undefined
+    expiresAt?: Date | undefined
+    allowedIps?: string[] | undefined
+    createdBy?: string | undefined
   },
 ): Promise<{ id: string; apiKey: string }> {
   const provisionId = opts.operationId ? createHash('sha256').update((opts.createdBy ?? '') + ':' + opts.operationId).digest('hex') : undefined;
@@ -57,15 +57,15 @@ export async function createServiceAccount(
   const sa = await prisma.serviceAccount.create({
     data: {
       name,
-      provisionId,
-      provisionDigest,
-      description: opts.description,
+      provisionId: provisionId ?? null,
+      provisionDigest: provisionDigest ?? null,
+      description: opts.description ?? null,
       clientId,
       apiKeyHash,
       apiKeyPrefix: prefix,
-      expiresAt: opts.expiresAt,
+      expiresAt: opts.expiresAt ?? null,
       allowedIps: JSON.stringify(opts.allowedIps ?? []),
-      createdBy: opts.createdBy,
+      createdBy: opts.createdBy ?? null,
       roles: {
         create: roleIds.map((roleId) => ({ roleId })),
       },

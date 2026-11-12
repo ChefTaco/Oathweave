@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { SignJWT, jwtVerify, createLocalJWKSet } from 'jose'
@@ -99,6 +100,7 @@ export async function browserPrincipal(c: Context): Promise<Principal | null> {
     )
     if (
       payload.purpose !== 'browser_sso' ||
+      typeof payload.sub !== 'string' || !payload.sub ||
       typeof payload.sessionId !== 'string'
     )
       return null
@@ -120,7 +122,7 @@ export async function browserPrincipal(c: Context): Promise<Principal | null> {
       username: session.user.username,
       roles: session.user.roles.map((value) => value.role.name),
       permissions: session.user.roles.flatMap(
-        (value) => JSON.parse(value.role.permissions) as string[],
+        (value) => z.array(z.string()).parse(JSON.parse(value.role.permissions) as unknown),
       ),
       sessionId: session.id,
       clientId: undefined,

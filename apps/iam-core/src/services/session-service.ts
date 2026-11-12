@@ -11,7 +11,7 @@ export async function createSession(
 ): Promise<{ sessionId: string; riskScore: number; riskFactors: string[] }> {
   // Network/browser metadata is shared by independent clients behind NAT.
   // Retain it for risk analysis, never as authority to revoke another session.
-  const { score, factors } = await computeSessionRisk({ userId, ipAddress, userAgent })
+  const { score, factors } = await computeSessionRisk({ userId, ...(ipAddress !== undefined ? { ipAddress } : {}), ...(userAgent !== undefined ? { userAgent } : {}) })
   const fingerprint = deriveDeviceFingerprint(userAgent, ipAddress)
 
   const sessionId = nanoid()
@@ -19,11 +19,11 @@ export async function createSession(
     data: {
       id: sessionId,
       userId,
-      ipAddress,
-      userAgent,
+      ipAddress: ipAddress ?? null,
+      userAgent: userAgent ?? null,
       riskScore: score,
       riskFactors: factors.length > 0 ? JSON.stringify(factors) : null,
-      deviceFingerprint: fingerprint,
+      deviceFingerprint: fingerprint ?? null,
       expiresAt: new Date(Date.now() + env.JWT_REFRESH_TTL * 1000),
     },
   })
@@ -33,7 +33,7 @@ export async function createSession(
 export async function revokeSession(sessionId: string, revokedBy?: string): Promise<void> {
   await prisma.session.update({
     where: { id: sessionId },
-    data: { revokedAt: new Date(), revokedBy },
+    data: { revokedAt: new Date(), ...(revokedBy !== undefined ? { revokedBy } : {}) },
   })
   // Also revoke all refresh tokens tied to this session
   await prisma.refreshToken.updateMany({

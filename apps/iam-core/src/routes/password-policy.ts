@@ -67,7 +67,19 @@ passwordPolicyRouter.patch('/', authMiddleware, async (c, next) => {
 
   const updated = await prisma.passwordPolicy.update({
     where: { id: policy.id },
-    data,
+    data: {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.minLength !== undefined ? { minLength: data.minLength } : {}),
+      ...(data.maxLength !== undefined ? { maxLength: data.maxLength } : {}),
+      ...(data.requireUppercase !== undefined ? { requireUppercase: data.requireUppercase } : {}),
+      ...(data.requireLowercase !== undefined ? { requireLowercase: data.requireLowercase } : {}),
+      ...(data.requireNumbers !== undefined ? { requireNumbers: data.requireNumbers } : {}),
+      ...(data.requireSpecial !== undefined ? { requireSpecial: data.requireSpecial } : {}),
+      ...(data.maxAgeDays !== undefined ? { maxAgeDays: data.maxAgeDays } : {}),
+      ...(data.historyCount !== undefined ? { historyCount: data.historyCount } : {}),
+      ...(data.lockoutAttempts !== undefined ? { lockoutAttempts: data.lockoutAttempts } : {}),
+      ...(data.lockoutDurationMin !== undefined ? { lockoutDurationMin: data.lockoutDurationMin } : {}),
+    },
   })
 
   return c.json({ policy: updated })

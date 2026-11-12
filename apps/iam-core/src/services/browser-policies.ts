@@ -37,8 +37,8 @@ export function validateBrowserAuthorization(
   client: { clientType: string; redirectUris: string },
   params: {
     redirectUri: string
-    codeChallenge?: string
-    codeChallengeMethod?: string
+    codeChallenge?: string | undefined
+    codeChallengeMethod?: string | undefined
   },
 ): void {
   const uris: unknown = JSON.parse(client.redirectUris)
