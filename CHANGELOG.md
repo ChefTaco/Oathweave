@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- A refresh token no longer rotates once its session is revoked, and an administrator password reset
+  (`PATCH /users/{id}` with a password, `POST /users/{id}/rotate-password`) now revokes the account's
+  refresh tokens together with its sessions.
+- A refresh token that was not issued to a client never takes a `client_id` from the refresh request,
+  so the request cannot choose the `clientId`, audience or issuer of the new access token.
+- Creating a sign-in (`authorization_code`) client, like changing one, requires `SUPER_ADMIN`.
+- SDK: `IamVerifier.hasPermission` evaluates each principal's own permissions; results are no longer
+  cached by subject across tokens.
+
+### Fixed
+
+- `DELETE /sessions/{id}` answers 404 for an unknown session instead of 500, and revoking a session
+  again keeps its original revocation record.
+- `POST /oauth/token` answers a malformed JSON body with `invalid_request` instead of 500.
+
 ## [2.2.0] - 2026-11-12
 
 - Admit the explicit Embermend browser audience in fresh suite bootstrap with resource-specific permission ceilings.
