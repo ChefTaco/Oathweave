@@ -4,6 +4,35 @@
 
 ### Security
 
+- **Authorization-code exchange is bound to the client.** `POST /oauth/token` with
+  `grant_type=authorization_code` now requires a confidential client to authenticate with its
+  client secret (`client_secret` in the body, or HTTP Basic). Before this the secret was optional,
+  and a code issued without a PKCE challenge could be redeemed by anyone who obtained it. A
+  confidential client that used PKCE must send both its secret and the `code_verifier`. A public
+  client must have started the flow with an S256 `code_challenge` (already required by
+  `/oauth/authorize`) and a code without one is refused. Missing or wrong client credentials, and an
+  unknown or inactive `client_id`, answer `401 invalid_client`; PKCE failures stay
+  `400 invalid_grant`. A refused exchange does not consume the code.
+
+  **Upgrade note.** Suite browser clients (`hivexui-*`, public, S256 PKCE) and callers that
+  already send their secret (Emberpath's `hive-router` sign-in) are unaffected. A confidential
+  client that exchanged codes without sending its secret must now send it: for the Magnus dashboard
+  set `HIVE_OAUTH_CLIENT_SECRET`, or register that application as a public client instead. A
+  confidential client that has no secret hash can no longer exchange codes; give it one with
+  `POST /clients/{id}/rotate-secret`. To find the clients concerned, list the clients with
+  `clientType: "confidential"` and the `authorization_code` grant and check that each application
+  is configured with its secret.
+- **The client address can no longer be chosen by the caller.** With `TRUSTED_PROXY_IPS` set, the
+  leftmost `X-Forwarded-For` entry was used. A reverse proxy appends to that header, so a caller
+  who sent its own `X-Forwarded-For` was rate limited, matched against IP allowlists and audited
+  under the address it chose. The header is now read from the right, skipping trusted proxies, and
+  the first address that is not a trusted proxy is the client; values that are not IP addresses are
+  never returned. `TRUSTED_PROXY_IPS` keeps its name and format.
+
+  **Upgrade note.** A deployment with one proxy that sends a single address (the suite ingress)
+  sees no change. A deployment with several proxy tiers must list every tier in
+  `TRUSTED_PROXY_IPS`: an unlisted outer proxy is now taken to be the client, where before the
+  leftmost (spoofable) entry was.
 - A refresh token no longer rotates once its session is revoked, and an administrator password reset
   (`PATCH /users/{id}` with a password, `POST /users/{id}/rotate-password`) now revokes the account's
   refresh tokens together with its sessions.

@@ -51,6 +51,8 @@ The seed (`apps/iam-core/prisma/seed.ts`) creates these confidential clients. Ex
 | `security-exporter` | `SEED_SECURITY_EXPORTER_CLIENT_SECRET` is set | client credentials | Audience `hive-router`; limited to `iam:audit:read` and `router:security-events:read`. |
 | `example-portal` | `SEED_EXAMPLE_PORTAL_CLIENT_SECRET` is set | authorization code, refresh, client credentials | Example third-party OIDC client; audience `example-portal`, limited to `example-portal:read`. |
 
+An authorization-code exchange (`POST /api/v1/oauth/token`) is always bound to its client. A confidential client, which every client in the table is, must send its secret (`client_secret` or HTTP Basic); without it the exchange answers `401 invalid_client`, also when the code carries a PKCE challenge. If the client started the flow with `code_challenge` it must send the matching `code_verifier` as well. A public client has no secret: `/oauth/authorize` refuses it without an S256 `code_challenge`, and the exchange requires the matching `code_verifier`. A confidential client that has no secret hash cannot exchange codes until one is set with `POST /api/v1/clients/:id/rotate-secret`.
+
 Additional machine clients can be given an audience, permission allowlist and token lifetime through `IAM_MACHINE_CLIENT_POLICIES` (JSON). The built-in client IDs above cannot be overridden there.
 
 A client_credentials token carries the native `JWT_ISSUER`. A policy with `"issuer":"browser"` issues

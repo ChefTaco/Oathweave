@@ -15,6 +15,7 @@ import { getPublishedSigningJwks } from '../utils/keys.js'
 import { issueTokenPair } from './token-service.js'
 import { createSession } from './session-service.js'
 import { logAuditEvent } from './audit-service.js'
+import argon2 from 'argon2'
 
 // ── Constants ──
 
@@ -41,6 +42,11 @@ export interface TokenExchangeParams {
   redirectUri: string
   clientId: string
   codeVerifier?: string | undefined
+  /**
+   * True only when the caller verified this client's secret for this request. A confidential
+   * client's code is never exchanged without it.
+   */
+  clientAuthenticated?: boolean | undefined
 }
 
 export interface AuthorizeResult {
@@ -197,9 +203,57 @@ export async function validateAuthorizeRequest(params: AuthorizeParams): Promise
 
 // ── Token Exchange ──
 
+/** A client as the token endpoint knows it once its credentials have been checked. */
+export interface CodeExchangeClient {
+  clientType: string
+  /** True when the request carried this client's secret and it verified. */
+  authenticated: boolean
+}
+
+/**
+ * Identify the client of an authorization-code exchange and check the credentials it presented.
+ *
+ * A confidential client must authenticate: without its secret the exchange is refused, whether or
+ * not the code carries a PKCE challenge. A public client has no secret and is bound to its code by
+ * PKCE alone, which `exchangeAuthorizationCode` requires. Every refusal is `invalid_client` (401).
+ */
+export async function authenticateCodeExchangeClient(
+  clientId: string,
+  presentedSecret: string | undefined,
+): Promise<CodeExchangeClient> {
+  const client = await prisma.client.findUnique({ where: { id: clientId } })
+  if (!client || !client.active) {
+    throw new ApiError(401, 'INVALID_CLIENT', 'Unknown or inactive client')
+  }
+  const confidential = client.clientType !== 'public'
+  if (presentedSecret === undefined || presentedSecret === '') {
+    if (confidential) {
+      throw new ApiError(401, 'INVALID_CLIENT', 'Client authentication required: this confidential client must send its client secret')
+    }
+    return { clientType: client.clientType, authenticated: false }
+  }
+  if (!client.secretHash) {
+    throw new ApiError(
+      401,
+      'INVALID_CLIENT',
+      confidential
+        ? 'This confidential client has no secret; set one before it exchanges authorization codes'
+        : 'Public clients cannot authenticate with a secret',
+    )
+  }
+  if (!(await argon2.verify(client.secretHash, presentedSecret))) {
+    throw new ApiError(401, 'INVALID_CLIENT', 'Invalid client secret')
+  }
+  return { clientType: client.clientType, authenticated: true }
+}
+
 /**
  * Exchange an authorization code for access + refresh tokens.
- * Validates PKCE code_verifier if a challenge was provided.
+ *
+ * Every exchange is bound to the client the code was issued to, so a stolen code alone is never
+ * enough: a confidential client must have authenticated (`clientAuthenticated`), a public client
+ * must have started the flow with an S256 PKCE challenge, and whenever the code carries a challenge
+ * the matching `code_verifier` is required, for either client type.
  */
 export async function exchangeAuthorizationCode(
   params: TokenExchangeParams,
@@ -242,7 +296,8 @@ export async function exchangeAuthorizationCode(
 
   // Code must not be already used (RFC 6749 §4.1.2: MUST invalidate after use)
   if (authCode.usedAt) {
-    // Potential replay attack — revoke all tokens from this code's session
+    // Potential replay attack. The attempt is refused and audited; tokens issued by the first
+    // exchange are not revoked, because a code does not record the session it produced.
     await logAuditEvent({
       eventType: 'oauth.code_reuse',
       category: 'AUTHENTICATION',
@@ -265,6 +320,16 @@ export async function exchangeAuthorizationCode(
   // Validate redirect_uri matches exactly
   if (authCode.redirectUri !== params.redirectUri) {
     throw new ApiError(400, 'INVALID_GRANT', 'Redirect URI does not match')
+  }
+
+  // Client binding. A confidential client proves itself with its secret; a public client has
+  // none, so its code must carry the PKCE challenge it started the flow with.
+  if (authCode.client.clientType !== 'public') {
+    if (params.clientAuthenticated !== true) {
+      throw new ApiError(401, 'INVALID_CLIENT', 'Client authentication required: this confidential client must send its client secret')
+    }
+  } else if (!authCode.codeChallenge) {
+    throw new ApiError(400, 'INVALID_GRANT', 'Authorization code was issued to a public client without PKCE')
   }
 
   // Validate PKCE code_verifier
