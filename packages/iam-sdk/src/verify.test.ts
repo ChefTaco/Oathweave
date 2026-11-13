@@ -202,6 +202,15 @@ describe('IamVerifier', () => {
     it('returns true with no required permissions', () => {
       expect(verifier.hasPermission(base)).toBe(true)
     })
+
+    it('does not carry a result from one token of a subject to another', () => {
+      expect(verifier.hasPermission(base, 'iam:users:write')).toBe(true)
+      const scoped: Principal = { ...base, permissions: ['iam:users:read'] }
+      expect(verifier.hasPermission(scoped, 'iam:users:write')).toBe(false)
+      const widened: Principal = { ...base, permissions: [...base.permissions, 'iam:users:delete'] }
+      expect(verifier.hasPermission(base, 'iam:users:delete')).toBe(false)
+      expect(verifier.hasPermission(widened, 'iam:users:delete')).toBe(true)
+    })
   })
 
   describe('hasRole', () => {
