@@ -28,6 +28,7 @@ vi.mock('../db/client.js', () => ({ prisma: {
       mock.sessions.filter(row => (!where.userId || row.userId === where.userId) &&
         (where.revokedAt !== null || row.revokedAt === null) &&
         (!where.expiresAt || row.expiresAt > where.expiresAt.gt)),
+    findUnique: async ({ where }: { where: { id: string } }) => mock.sessions.find(row => row.id === where.id) ?? null,
     update: mock.updated,
     updateMany: vi.fn(() => { throw Error('Unexpected bulk session mutation') }),
   },
@@ -76,4 +77,16 @@ it('explicit revoke-all remains confined to the selected user', async () => {
   const other = await createSession('synthetic-other')
   await revokeAllUserSessions('synthetic-user', 'synthetic-operator')
   expect((await listActiveSessions()).map(row => row.id)).toEqual([other.sessionId])
+})
+it('reports an unknown session instead of failing, and leaves every credential untouched', async () => {
+  await expect(revokeSession('synthetic-missing', 'synthetic-operator')).resolves.toBe(false)
+  expect(mock.updated).not.toHaveBeenCalled(); expect(mock.refreshUpdated).not.toHaveBeenCalled()
+})
+it('keeps the original revocation record when a session is revoked again', async () => {
+  const first = await createSession('synthetic-user')
+  await expect(revokeSession(first.sessionId, 'synthetic-operator')).resolves.toBe(true)
+  const revokedAt = mock.sessions[0]?.revokedAt
+  await expect(revokeSession(first.sessionId, 'synthetic-other')).resolves.toBe(true)
+  expect(mock.sessions[0]).toMatchObject({ revokedAt, revokedBy: 'synthetic-operator' })
+  expect(mock.updated).toHaveBeenCalledTimes(1)
 })

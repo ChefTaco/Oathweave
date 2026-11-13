@@ -4,6 +4,7 @@ import { requirePermission } from '../middleware/rbac.js'
 import { revokeSession, revokeAllUserSessions, listActiveSessions, deduplicateSessions } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
 import { getClientIp } from '../utils/ip.js'
+import { ApiError } from '../types/index.js'
 
 export const sessionsRouter = new Hono()
 
@@ -17,7 +18,9 @@ sessionsRouter.get('/', requirePermission('iam:sessions:revoke'), async (c) => {
 sessionsRouter.delete('/:id', requirePermission('iam:sessions:revoke'), async (c) => {
   const principal = c.get('principal')
   const sessionId = c.req.param('id')
-  await revokeSession(sessionId, principal.sub)
+  if (!(await revokeSession(sessionId, principal.sub))) {
+    throw new ApiError(404, 'NOT_FOUND', 'Session not found')
+  }
 
   await logAuditEvent({
     eventType: 'session.revoked',

@@ -331,6 +331,19 @@ export async function rotateRefreshToken(
     throw new ApiError(401, 'TOKEN_BINDING_MISMATCH', 'Refresh token was issued to a different client')
   }
 
+  // A refresh token dies with its session. Paths that revoke only the session row
+  // (administrator password resets, browser sign-out) must not leave a token that
+  // keeps minting access tokens which offline verifiers still accept.
+  if (existing.sessionId) {
+    const session = await prisma.session.findUnique({
+      where: { id: existing.sessionId },
+      select: { userId: true, revokedAt: true },
+    })
+    if (!session || session.userId !== existing.userId || session.revokedAt) {
+      throw new ApiError(401, 'INVALID_REFRESH_TOKEN', 'Refresh token session has been revoked')
+    }
+  }
+
   // Fetch user + roles
   const user = await prisma.user.findUnique({
     where: { id: existing.userId },
@@ -364,7 +377,10 @@ export async function rotateRefreshToken(
     permissions,
     sessionId,
     ipAddress,
-    clientId ?? existing.clientId ?? undefined,
+    // The binding recorded at issuance decides the client. A token that was not
+    // issued to a client never takes one from the request: the caller would
+    // otherwise choose the clientId, audience and issuer of the new access token.
+    existing.clientId ?? undefined,
     userAgent,
   )
 }

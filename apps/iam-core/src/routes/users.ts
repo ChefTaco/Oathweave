@@ -3,6 +3,7 @@ import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { requirePermission } from '../middleware/rbac.js'
 import { hashPassword } from '../services/password-service.js'
+import { revokeAllUserSessions } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
 import { getClientIp } from '../utils/ip.js'
 import { parseBody } from '../utils/validate.js'
@@ -158,7 +159,8 @@ usersRouter.patch('/:id', requirePermission('iam:users:write'), async (c) => {
 
   const user = await prisma.user.update({ where: { id: userId }, data })
   if (body.password !== undefined) {
-    await prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } })
+    // Sessions and their refresh tokens: a reset must end every existing sign-in.
+    await revokeAllUserSessions(userId, principal.sub)
   }
 
   await logAuditEvent({
@@ -361,10 +363,8 @@ usersRouter.post('/:id/rotate-password', requirePermission('iam:users:write'), a
     },
   })
 
-  await prisma.session.updateMany({
-    where: { userId, revokedAt: null },
-    data: { revokedAt: new Date(), revokedBy: principal.sub },
-  })
+  // Sessions and their refresh tokens: a reset must end every existing sign-in.
+  await revokeAllUserSessions(userId, principal.sub)
 
   await logAuditEvent({
     eventType: 'user.password_rotated',

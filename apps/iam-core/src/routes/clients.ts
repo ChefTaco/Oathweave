@@ -8,8 +8,7 @@ import { getClientIp } from '../utils/ip.js'
 import { parseBody } from '../utils/validate.js'
 import { CreateClientSchema, RotateClientSecretSchema, UpdateClientSchema } from '../schemas/clients.js'
 import { ApiError } from '../types/index.js'
-import { assertMayGrantPermissions, assertMayManageClient, resolveActor } from '../services/privilege-guard.js'
-import { clientCredentialsPermissionCeiling } from '../services/token-service.js'
+import { assertMayManageClient, resolveActor } from '../services/privilege-guard.js'
 import { parseJsonFields, parseJsonFieldsArray } from '../utils/serialize.js'
 import { browserClientPolicies } from '../services/browser-policies.js'
 
@@ -35,7 +34,8 @@ clientsRouter.get('/', requirePermission('iam:clients:read'), async (c) => {
 clientsRouter.post('/', requirePermission('iam:clients:write'), async (c) => {
   const principal = c.get('principal')
   const body = await parseBody(c, CreateClientSchema)
-  assertMayGrantPermissions(await resolveActor(c), clientCredentialsPermissionCeiling(body.name), 'create this client')
+  // Same standing as changing one: a new sign-in client controls other people's sign-ins.
+  assertMayManageClient(await resolveActor(c), { name: body.name, grantTypes: body.grantTypes }, 'create this client')
 
   const existing = await prisma.client.findUnique({ where: { name: body.name } })
   if (existing) throw new ApiError(409, 'CONFLICT', 'Client name already exists')
