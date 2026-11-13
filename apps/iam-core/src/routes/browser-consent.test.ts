@@ -99,3 +99,12 @@ it('declining allocates no code; explicit approval creates one bound to the brow
   })
   expect(response.headers.get('cache-control')).toBe('no-store')
 })
+it('answers a malformed JSON token request with an OAuth error instead of a server fault', async () => {
+  const response = await app.request('/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{"grant_type":',
+  })
+  expect(response.status).toBe(400)
+  expect(await response.json()).toMatchObject({ error: 'invalid_request' })
+})

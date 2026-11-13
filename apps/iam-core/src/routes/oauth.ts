@@ -216,7 +216,17 @@ oauthRouter.post('/token', async (c) => {
       Object.entries(formData).map(([k, v]) => [k, String(v)]),
     )
   } else {
-    body = (await c.req.json()) as Record<string, string>
+    try {
+      body = (await c.req.json()) as Record<string, string>
+    } catch {
+      return c.json(
+        {
+          error: 'invalid_request',
+          error_description: 'Request body is not valid JSON',
+        },
+        400,
+      )
+    }
   }
 
   const parsed = TokenExchangeSchema.safeParse(body)
