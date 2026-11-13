@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## [2.3.0] - 2026-11-13
+
+**Upgrade notes.** Two changes can need configuration before upgrading; both are described under
+Security below. Confidential clients must now send their client secret when exchanging an
+authorization code, and deployments behind several proxy tiers must list every tier in
+`TRUSTED_PROXY_IPS`. Suite browser clients and single-proxy deployments need no change.
 
 ### Security
 

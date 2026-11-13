@@ -32,7 +32,7 @@ operational scripts used to deploy and maintain them.
 
 Oathweave 2.x ships only as a container image, `ghcr.io/cheftaco/oathweave`, for
 `linux/amd64` and `linux/arm64`. Each release is tagged with its exact version (for
-example `2.1.2`; there is no `latest` tag), and its
+example `2.3.0`; there is no `latest` tag), and its
 [GitHub release](https://github.com/ChefTaco/Oathweave/releases) records the image digest.
 
 **With the Hive suite.** Oathweave is normally installed by `hive.sh`, the
