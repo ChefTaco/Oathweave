@@ -146,7 +146,7 @@ directory; prefer absolute paths.
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | | `$IAM_DATA_DIR/keys/iam-*.pem` | RS256 signing key pair |
 | `AUDIT_LOG_DIR` | | `$IAM_DATA_DIR/audit-logs` | Daily JSONL audit files |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_RP_ORIGIN` | | `localhost` / `https://localhost` | WebAuthn relying party, e.g. `hive.example.com` / `https://hive.example.com` |
-| `TRUSTED_PROXY_IPS` | | | Socket peers allowed to send `X-Forwarded-For` (your reverse proxy) |
+| `TRUSTED_PROXY_IPS` | | | Reverse proxies whose `X-Forwarded-For` is believed: comma-separated addresses, CIDR ranges or IPv4 wildcards. See [Client addresses](#client-addresses) |
 
 `hive-iam-server env-schema` prints the full list as JSON. Further options
 (token lifetimes, rate limits, previous signing keys for rotation,
@@ -155,6 +155,20 @@ directory; prefer absolute paths.
 
 A missing or invalid setting, or an unreachable Redis, stops the server with a
 single line naming the variable or dependency and the fix, and exit code 1.
+
+## Client addresses
+
+Rate limits, client and account IP allowlists, session risk and the audit trail all use the
+client address. Without `TRUSTED_PROXY_IPS` that is the socket peer and forwarding headers are
+ignored. Behind a reverse proxy, list the proxy's address in `TRUSTED_PROXY_IPS`; otherwise every
+request appears to come from the proxy.
+
+When the socket peer is a trusted proxy, `X-Forwarded-For` is read from the right: entries that are
+themselves trusted proxies are skipped, and the first one that is not is the client. Entries to
+its left were sent by that client and are never used, so a caller cannot choose its own address by
+sending the header. List **every** proxy tier the request passes through (for example a load
+balancer in front of the reverse proxy): a tier that is not listed is taken to be the client.
+`X-Real-IP` is read only when a trusted proxy sends no `X-Forwarded-For`.
 
 ## TLS
 
