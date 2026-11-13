@@ -413,6 +413,8 @@ export function buildOpenApiSpec() {
         operationId: 'oauthToken',
         summary:
           'Exchange a one-use authorization code with PKCE. Suite browser clients receive no refresh token.',
+        description:
+          'An authorization_code exchange is always bound to the client the code was issued to. A confidential client must authenticate with its client secret (client_secret in the body, or HTTP Basic) and, when it started the flow with a PKCE challenge, also send the code_verifier. A public client has no secret: it must have started the flow with an S256 code_challenge and must send the matching code_verifier. A missing, unknown or wrong client credential answers 401 invalid_client; a missing or wrong code_verifier, a code issued to another client and a used or expired code answer 400 invalid_grant.',
         security: [],
         requestBody: {
           required: true,

@@ -14,7 +14,8 @@ import {
  * Implements:
  *   GET  /oauth/authorize       — Authorization request (returns client info for consent)
  *   POST /oauth/authorize       — Authorization approval (generates code, redirects)
- *   POST /oauth/token           — Token exchange (code → tokens)
+ *   POST /oauth/token           — Token exchange (code → tokens). A confidential client must
+ *                                 authenticate; a public client must have used S256 PKCE.
  *   GET  /oauth/userinfo        — OIDC UserInfo
  *   GET  /oauth/.well-known/openid-configuration — OIDC Discovery
  *   GET  /oauth/jwks            — JSON Web Key Set
@@ -34,6 +35,7 @@ import {
 import {
   validateAuthorizeRequest,
   createAuthorizationCode,
+  authenticateCodeExchangeClient,
   exchangeAuthorizationCode,
   exchangeClientCredentials,
   getOpenIdConfiguration,
@@ -364,39 +366,25 @@ oauthRouter.post('/token', async (c) => {
     )
   }
 
-  // Authenticate the client (client_secret in body or Basic auth)
-  const clientSecret = params.client_secret ?? extractBasicAuthSecret(c)
-  if (clientSecret) {
-    const client = await prisma.client.findUnique({
-      where: { id: params.client_id },
-    })
-    if (!client || !client.active) {
-      return c.json(
-        {
-          error: 'invalid_client',
-          error_description: 'Unknown or inactive client',
-        },
-        401,
+  // Bind the exchange to the client: a confidential client must authenticate with its secret
+  // (body or Basic auth); a public client is bound by PKCE, enforced with the code below.
+  let clientAuthenticated: boolean
+  try {
+    clientAuthenticated = (
+      await authenticateCodeExchangeClient(
+        params.client_id,
+        params.client_secret ?? extractBasicAuthSecret(c),
       )
-    }
-    if (!client.secretHash) {
-      return c.json(
-        {
-          error: 'invalid_client',
-          error_description: 'Public clients cannot authenticate with a secret',
-        },
-        401,
-      )
-    }
-    const validSecret = await argon2.verify(client.secretHash, clientSecret)
-    if (!validSecret) {
-      return c.json(
-        { error: 'invalid_client', error_description: 'Invalid client secret' },
-        401,
-      )
-    }
+    ).authenticated
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err
+    if (c.req.header('authorization')?.startsWith('Basic '))
+      c.header('WWW-Authenticate', 'Basic realm="oauth"')
+    return c.json(
+      { error: err.code.toLowerCase(), error_description: err.message },
+      err.status as 401,
+    )
   }
-  // Note: Public clients (PKCE-only, no secret) are allowed — PKCE provides the proof
 
   try {
     const result = await exchangeAuthorizationCode(
@@ -406,6 +394,7 @@ oauthRouter.post('/token', async (c) => {
         redirectUri: params.redirect_uri,
         clientId: params.client_id,
         codeVerifier: params.code_verifier,
+        clientAuthenticated,
       },
       ip,
     )
