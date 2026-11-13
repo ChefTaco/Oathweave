@@ -30,16 +30,25 @@ export async function createSession(
   return { sessionId, riskScore: score, riskFactors: factors }
 }
 
-export async function revokeSession(sessionId: string, revokedBy?: string): Promise<void> {
-  await prisma.session.update({
-    where: { id: sessionId },
-    data: { revokedAt: new Date(), ...(revokedBy !== undefined ? { revokedBy } : {}) },
-  })
+/**
+ * Revokes a session and its refresh tokens. Returns false when no such session
+ * exists. An already revoked session keeps its original revocation record.
+ */
+export async function revokeSession(sessionId: string, revokedBy?: string): Promise<boolean> {
+  const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { revokedAt: true } })
+  if (!session) return false
+  if (!session.revokedAt) {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date(), ...(revokedBy !== undefined ? { revokedBy } : {}) },
+    })
+  }
   // Also revoke all refresh tokens tied to this session
   await prisma.refreshToken.updateMany({
     where: { sessionId, revokedAt: null },
     data: { revokedAt: new Date() },
   })
+  return true
 }
 
 export async function revokeAllUserSessions(userId: string, revokedBy?: string): Promise<void> {
