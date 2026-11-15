@@ -126,16 +126,11 @@ npm run scan:secrets
 
 ## Deployment
 
-Use the root deploy when updating a full Hive host:
+Deploy a native systemd installation from the repository root (see the
+[README](../README.md#deployment) for the variables it reads):
 
 ```bash
-npm run deploy
-```
-
-For IAM-only work:
-
-```bash
-npm run deploy:iam
+npm run deploy:iam-core
 ```
 
 The deploy script contains no literal secret defaults. On first install it takes `COOKIE_SECRET`, `IAM_AGENT_SECRET`, `SEED_ADMIN_PASSWORD`, `SEED_HIVE_CLIENT_SECRET` and `SEED_HIVE_ROUTER_CLIENT_SECRET` from the environment or generates them with `openssl rand`, writing them only to the root-protected target `.env`. It preserves an existing target `.env` unless a value is explicitly provisioned or a required Router client secret is missing. On first install it stores the initial admin credentials in a root-only file on the target rather than printing them in logs.
