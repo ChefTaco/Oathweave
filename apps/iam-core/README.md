@@ -136,8 +136,8 @@ directory; prefer absolute paths.
 | `HOST` | | `127.0.0.1` | Listen address; `0.0.0.0` for remote access |
 | `REDIS_URL` | | `redis://localhost:6379` | `redis://:PASSWORD@host:6379` for an authenticated Redis |
 | `JWT_ISSUER` | | `hive-iam` | Token issuer; Hive Router expects `hive-iam` |
-| `CORS_ORIGIN` | | `https://localhost` | Comma-separated browser origins, usually the Hive console URL |
-| `SEED_HIVE_PUBLIC_URL` | | | Public Hive console URL, e.g. `https://hive.example.com`; sets the built-in clients' redirect URIs on first start |
+| `CORS_ORIGIN` | | `https://localhost` | Comma-separated browser origins, usually the URL of the UI (HiveXUI) |
+| `SEED_HIVE_PUBLIC_URL` | | | Public URL of the UI, e.g. `https://hive.example.com`; sets the built-in clients' redirect URIs on first start |
 | `SEED_HIVE_ROUTER_CLIENT_SECRET` | | generated | `hive-router` client secret; give Hive Router the same value as `HIVE_ROUTER_IAM_CLIENT_SECRET` |
 | `TLS_CERT_PATH` / `TLS_KEY_PATH` | | | Serve HTTPS with these PEM files |
 | `HIVE_HOME` | | `~/.hive` | Hive base directory |
@@ -278,9 +278,8 @@ bash scripts/deploy-iam-core.sh
 
 It installs to `/opt/hive-iam`, runs `node dist/index.js` under the `hive-iam`
 unit with an explicit `.env`, migrates with `prisma migrate deploy` and seeds
-through `scripts/run-db-release-gate.sh`. In the consolidated Hive deploy, use
-the root `npm run deploy` whenever possible so Memory, IAM, and Router are
-updated in order. IAM deploys preserve existing secrets and bootstrap
+through `scripts/run-db-release-gate.sh`. `npm run deploy:iam-core` is a shortcut for
+the deploy script. IAM deploys preserve existing secrets and bootstrap
 `SEED_HIVE_ROUTER_CLIENT_SECRET` only on first install. An existing host with no
 recoverable Router secret fails deployment instead of silently replacing the
 credential hash.
@@ -299,7 +298,10 @@ Apache-2.0. See [LICENSE](LICENSE).
 
 ## Managed upgrades
 
-Use `hive upgrade --dry-run`, then `hive upgrade` for the enrolled release bundle. This server's
+A Hive suite installation upgrades Oathweave with the suite controller (`./hive.sh upgrade`; see
+the [Hive README](https://github.com/ChefTaco/hive#upgrading)). The rest of this section is for
+installations enrolled with the retired npm `hive` launcher: use `hive upgrade --dry-run`, then
+`hive upgrade` for the enrolled release bundle. This server's
 `upgrade` and `rollback` commands delegate to the same owner-run launcher. `migrate --plan --json`
 is read-only; migration requires a verified backup. Set `HIVE_AUTO_MIGRATE=true` explicitly for
 startup migrations outside a managed install. Slow or one-way automatic migrations are refused.

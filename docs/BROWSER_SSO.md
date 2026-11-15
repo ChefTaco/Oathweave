@@ -26,7 +26,7 @@ the same explicit browser issuer, exact product audience and verified HTTPS
 JWKS/userinfo endpoints. Resource tokens are rejected on unrelated IAM APIs.
 
 Browser login uses the server-owned Secure/HttpOnly/SameSite=Strict
-`__Host-oathweave_sso` cookie. Set `CORS_ORIGIN` to exact approved console origins.
+`__Host-oathweave_sso` cookie. Set `CORS_ORIGIN` to exact approved UI origins.
 The browser opt-in header requires a matching Origin. Login, existing MFA and
 WebAuthn completion pass through this boundary. Logout revokes the server session,
 which resources validate online. Bearer credentials remain in browser memory.
