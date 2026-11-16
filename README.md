@@ -16,7 +16,8 @@ operational scripts used to deploy and maintain them.
 | [`apps/iam-core`](apps/iam-core) | `@hivemagnus/oathweave`: the identity server and its CLI (Hono, SQLite via Prisma, Redis): auth, users, roles, groups, service accounts, clients, sessions, MFA/WebAuthn, OAuth/OIDC, audit. Released as the container image `ghcr.io/cheftaco/oathweave` |
 | [`packages/iam-sdk`](packages/iam-sdk) | `@hivemagnus/oathweave-sdk`: JWT verification and RBAC middleware for Node.js and Hono, published on npm as [`@hivemagnus/hive-iam-sdk`](https://www.npmjs.com/package/@hivemagnus/hive-iam-sdk) |
 | [`scripts`](scripts) | Key generation, deployment, lockout reset, and end-to-end smoke tests |
-| [`docs`](docs) | [Architecture notes](docs/APP_ARCHITECTURE_IAM.md) |
+| [`docs`](docs) | [Architecture](docs/APP_ARCHITECTURE_IAM.md), [browser authentication](docs/BROWSER_AUTH.md), [browser SSO](docs/BROWSER_SSO.md), [technical identity enrollment](docs/IDENTITY_ENROLLMENT.md), `openapi.json` and the browser contract export |
+| [`tooling/release`](tooling/release) | Vendored release and migration runtime |
 
 ## Features
 
@@ -83,10 +84,16 @@ never replaces an existing client secret hash; rotate client secrets with
 From the repository root:
 
 ```bash
-npm run typecheck   # all workspaces
-npm test            # all workspaces
-npm run build       # all workspaces
+npm run bootstrap       # npm ci for every workspace and tooling/release, plus the git hooks
+npm run typecheck       # all workspaces
+npm test                # all workspaces
+npm run build           # all workspaces
+npm run check:openapi   # docs/openapi.json matches the routes (generate:openapi rewrites it)
+npm run check:browser   # docs/browser-contracts.ts matches the source (contracts:browser rewrites it)
+npm run scan:secrets && npm run check:private
 ```
+
+These are the gates CI runs. [CONTRIBUTING.md](CONTRIBUTING.md) covers the hooks and secret scanning.
 
 Workspace-specific shortcuts: `npm run iam-core:test`, `npm run iam-sdk:test`,
 `npm run iam-core:build`, `npm run iam-sdk:build`.
@@ -146,15 +153,20 @@ On the target host:
 | Clear account lockouts and rate limits | `bash scripts/reset-iam-locks.sh <host>` |
 | End-to-end smoke test through the Hive UI proxy | `bash scripts/test-iam-api.sh https://hive.example.com` |
 
+### Native deployment runtime checks
+
+Source deployment checks the Node.js used by npm and `/usr/bin/node`, which the
+installed systemd service uses, against the current package `engines.node` policy.
+An unsupported runtime stops deployment before remote writes or service restarts.
+Update the system interpreter as well as any shell-specific Node.js installation.
+
 ## Health
 
 - `GET /api/v1/health/live`: dependency-free liveness
 - `GET /api/v1/health/ready`: SQLite and Redis readiness (used by deploy and key rotation)
 - `GET /api/v1/health/dependencies`: per-dependency detail
 
-## License
-
-Apache-2.0. See the [LICENSE](LICENSE) file at the repository root.
+### Container health probes
 
 Container probes use a loopback `HIVE_HEALTH_URL`. Override its port/protocol for
 the selected deployment. When the service certificate uses a DNS name, set
@@ -162,8 +174,13 @@ the selected deployment. When the service certificate uses a DNS name, set
 bundle when needed. Probes retain certificate verification. Runtime state belongs
 in `/data`; mount only product-owned protected configuration in `/config`.
 
+## Browser clients
+
 Browser clients, passkeys, step-up and private recovery delivery are documented in
-[the browser authentication guide](docs/BROWSER_AUTH.md). Existing production migration gates remain required.
+[the browser authentication guide](docs/BROWSER_AUTH.md), and HiveXUI single sign-on and
+browser discovery in [the browser SSO guide](docs/BROWSER_SSO.md). Technical identity enrollment
+for Emberpath and HiveMem is in [the enrollment guide](docs/IDENTITY_ENROLLMENT.md). Existing
+production migration gates remain required.
 
 Browser consumers use the product-owned `docs/browser-contracts.ts` candidate
 artifact with its exact SHA256 and version. `npm run contracts:browser` exports
@@ -174,9 +191,6 @@ refinements, defaults and bounds that cannot be recovered from OpenAPI alone.
 including existing native client mutation serialization. Publication remains a
 separate release action; consumers pin reviewed immutable snapshots until then.
 
-## Native deployment runtime checks
+## License
 
-Source deployment checks the Node.js used by npm and `/usr/bin/node`, which the
-installed systemd service uses, against the current package `engines.node` policy.
-An unsupported runtime stops deployment before remote writes or service restarts.
-Update the system interpreter as well as any shell-specific Node.js installation.
+Apache-2.0. See the [LICENSE](LICENSE) file at the repository root.

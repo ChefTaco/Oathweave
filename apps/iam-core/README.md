@@ -197,8 +197,12 @@ hive-iam-server migrate   Back up and apply schema migrations; --plan is read-on
 hive-iam-server check     Validate config, TLS, data directory, signing keys and Redis
 hive-iam-server env-schema  Print the environment variables as JSON
 hive-iam-server reset-admin Reset the admin password from IAM_RESET_PASSWORD
+hive-iam-server issue-reset-token  Issue a one-use recovery token for one account (digest only)
+hive-iam-server upgrade|rollback   Delegate to the owner-run Hive launcher (see Managed upgrades)
 Options: --env-file <path> (repeatable), --no-migrate, --relax-auth-limits, --help, --version
 ```
+
+`hive-iam-server --help` prints the full usage, including the `issue-reset-token` flags.
 
 `check` writes nothing and starts no listeners; it exits 0 when everything is
 usable and 1 otherwise, so it works as a pre-start gate. `start --no-migrate`
@@ -239,11 +243,11 @@ Oathweave 2.x.
 `/api/v1/groups`, `/api/v1/service-accounts`, `/api/v1/clients`,
 `/api/v1/tokens`, `/api/v1/sessions`, `/api/v1/system-users`,
 `/api/v1/devices`, `/api/v1/password-policy`, `/api/v1/audit`,
-`/api/v1/oauth/*` (including `/.well-known/openid-configuration` and `/jwks`).
+`/api/v1/enrollments`, `/api/v1/browser`, `/api/v1/oauth/*` (including `/.well-known/openid-configuration` and `/jwks`).
 The OpenAPI document is served at `/api/docs/openapi.json`, with Swagger UI at
 `/api/docs`.
 
-Services that trust Hive IAM tokens can verify them locally with
+Services that trust Oathweave tokens can verify them locally with
 [`@hivemagnus/hive-iam-sdk`](https://www.npmjs.com/package/@hivemagnus/hive-iam-sdk).
 
 ## Development
@@ -286,15 +290,11 @@ credential hash.
 
 The seed itself never invents a confidential-client credential and never
 rotates an existing Argon2 hash; first-install values come from the deploy
-script (or, for npm installs, from the CLI's first-start bootstrap described
-above). Rotate an existing client only with authenticated
+script (or, for the container image and CLI, from the first-start bootstrap
+described above). Rotate an existing client only with authenticated
 `POST /api/v1/clients/:id/rotate-secret`; this produces a
 `client.secret_rotated` audit event and requires a replacement secret of at
 least 32 characters.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE).
 
 ## Managed upgrades
 
@@ -308,3 +308,7 @@ startup migrations outside a managed install. Slow or one-way automatic migratio
 `check --json` reports configuration without initializing state. No upgrade rotates signing keys
 or reseeds existing accounts. See [UPGRADING.md](https://github.com/ChefTaco/hive/blob/v1.2.2/UPGRADING.md)
 for adoption, compatibility, recovery, update notices and container controls.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

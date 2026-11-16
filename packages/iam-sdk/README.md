@@ -14,7 +14,7 @@ RS256 JWT verification and RBAC middleware for Node.js backends. Ships a **Hono 
 ## Requirements
 
 - Node.js 20 or later
-- A running Hive IAM Core instance that exposes its RS256 public key at `/api/v1/auth/public-key`
+- A running [Oathweave](https://github.com/ChefTaco/Oathweave) (formerly Hive IAM) server, which exposes its RS256 public key at `/api/v1/auth/public-key`
 
 ## Installation
 
@@ -36,7 +36,7 @@ import { createIamMiddleware } from '@hivemagnus/hive-iam-sdk/hono'
 
 const iam = createIamMiddleware({
   publicKeyUrl: 'https://iam.example.com/api/v1/auth/public-key',
-  issuer: 'iam-core',          // must match the IAM Core JWT issuer (default: "iam-core")
+  issuer: 'hive-iam',          // the server's JWT_ISSUER (Oathweave image/CLI default: "hive-iam"; SDK default: "iam-core")
   cacheTtlMs: 3_600_000,       // public key cache TTL in ms (default: 1 hour)
 })
 
@@ -81,7 +81,7 @@ import { IamVerifier } from '@hivemagnus/hive-iam-sdk'
 
 const verifier = new IamVerifier({
   publicKeyUrl: 'https://iam.example.com/api/v1/auth/public-key',
-  issuer: 'iam-core',
+  issuer: 'hive-iam',
   audience: 'my-service',
   cacheTtlMs: 3_600_000,
 })
@@ -143,7 +143,7 @@ Configuration shared by both `IamVerifier` and the Hono middleware.
 | Property       | Type     | Default       | Description                              |
 | -------------- | -------- | ------------- | ---------------------------------------- |
 | `publicKeyUrl` | `string` | **(required)** | Full URL to the IAM Core public key endpoint |
-| `issuer`       | `string` | `"iam-core"`  | Expected `iss` claim in JWTs              |
+| `issuer`       | `string` | `"iam-core"`  | Expected `iss` claim; set it to the server's `JWT_ISSUER` (Oathweave defaults to `hive-iam`) |
 | `audience`     | `string \| string[]` | — | Expected `aud` claim; required by policy for machine consumers |
 | `cacheTtlMs`   | `number` | `3600000`     | How long to cache the public key (ms)     |
 
