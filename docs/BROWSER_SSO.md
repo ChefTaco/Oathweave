@@ -36,7 +36,8 @@ The added authorization-code binding migration is additive, but legacy binaries
 do not recognize its migration history. Rehearse storage recovery before applying
 it; binary rollback alone is not accepted. Preserve existing passkey RP/origin
 configuration and registrations. Full browser passkey, consent, recovery and
-step-up workflow acceptance is still pending; legacy frontends remain available.
+step-up workflow acceptance is still pending. HiveXUI is the only browser UI;
+native API clients are unaffected.
 
 A disposable real-service acceptance test lives in Hive's
 `scripts/suite/sso-roundtrip.mjs`. It starts independent local TLS/Redis/SQLite

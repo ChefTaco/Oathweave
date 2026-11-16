@@ -1,15 +1,15 @@
-# Hive IAM Architecture
+# Oathweave architecture
 
-Hive IAM is the identity service for the Hive control plane. It runs as the strict TypeScript `hive-iam.service` under `/opt/hive-iam`, exposes HTTPS on port `4200`, stores operational data in SQLite, and uses local Redis for audit queues and rate-limit support.
+Oathweave (formerly Hive IAM) is the identity service of the Hive:Magnus suite. In a suite installation it runs as the container image `ghcr.io/cheftaco/oathweave` with its own private Redis. The native systemd deployment described here runs it as the strict TypeScript `hive-iam.service` under `/opt/hive-iam`, exposes HTTPS on port `4200`, stores operational data in SQLite, and uses local Redis for audit queues and rate-limit support.
 
 ## Components
 
 | Component | Location | Purpose |
 | --- | --- | --- |
-| IAM Core API | `apps/iam-core` | Hono HTTPS API for auth, users, roles, service accounts, clients, sessions, system users, audit, OAuth/OIDC, and health. |
+| IAM Core API | `apps/iam-core` | Hono HTTPS API for auth, users, roles, service accounts, clients, sessions, system users, audit, OAuth/OIDC, enrollments, browser sessions and health. |
 | IAM SDK | `packages/iam-sdk` | Node/Hono helpers for local JWT verification and RBAC middleware. |
 | Deploy script | `scripts/deploy-iam-core.sh` | Builds, packages, uploads, migrates, seeds when needed, and restarts `hive-iam.service`. |
-| Generated UI contracts | `services/hive-router/src/contracts` from repo root | Zod/OpenAPI-derived request body schemas consumed by the Hive Router UI proxy. |
+| Browser contracts | `docs/browser-contracts.ts` | Zod request validators exported by `npm run contracts:browser` for browser consumers such as HiveXUI; `npm run check:browser` rejects drift. |
 
 ## Runtime
 
@@ -26,7 +26,7 @@ Readiness is `GET /api/v1/health/ready`; dependency detail is `GET /api/v1/healt
 
 ## Router Integration
 
-The unified Hive UI does not expose IAM access tokens to the browser. Browser requests call Router endpoints under `/api/iam/*`. Router strips browser credentials, uses the first-party `hive-router` OAuth client secret to request a short-lived client-credentials token from IAM, and forwards the API call to IAM with that server-side token.
+In a native Hive Router deployment, the UI does not receive IAM access tokens from Router. Browser requests call Router endpoints under `/api/iam/*`. Router strips browser credentials, uses the first-party `hive-router` OAuth client secret to request a short-lived client-credentials token from IAM, and forwards the API call to IAM with that server-side token.
 
 The shared secret for this flow is stored in IAM env as `SEED_HIVE_ROUTER_CLIENT_SECRET` and in Router env as `HIVE_ROUTER_IAM_CLIENT_SECRET`. Current deploy behavior:
 
@@ -91,14 +91,17 @@ get short-lived resource tokens on demand, with no long-lived bearer token to re
 - `/api/v1/devices`
 - `/api/v1/password-policy`
 - `/api/v1/audit`
-- `/oauth/*`
-- `/.well-known/openid-configuration`
+- `/api/v1/enrollments`
+- `/api/v1/browser` (browser session and logout)
+- `/api/v1/oauth/*`, including `/api/v1/oauth/.well-known/openid-configuration` and `/api/v1/oauth/jwks`
+- `/api/v1/health`
+- `/api/docs` (Swagger UI and `/api/docs/openapi.json`)
 
 Generated OpenAPI snapshots for IAM live at [`openapi.json`](openapi.json). Run `npm run generate:openapi` from the repo root after intentional route/schema changes.
 
 ## Development Commands
 
-From `services/hive-iam`:
+From the repository root:
 
 ```bash
 npm run typecheck
@@ -106,7 +109,7 @@ npm run build
 npm test
 ```
 
-From `services/hive-iam/apps/iam-core`:
+From `apps/iam-core`:
 
 ```bash
 npm run db:generate
@@ -115,13 +118,13 @@ npm run db:seed
 npm run reset:admin
 ```
 
-From the repo root, prefer the consolidated gates before deploy:
+Before a deploy also run the remaining CI gates from the repository root:
 
 ```bash
-npm run typecheck
-npm run build
-npm run test
+npm run check:openapi
+npm run check:browser
 npm run scan:secrets
+npm run check:private
 ```
 
 ## Deployment
