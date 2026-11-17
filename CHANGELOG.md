@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **SDK: the default issuer now matches the server default.** `packages/iam-sdk`
+  (`@hivemagnus/oathweave-sdk` 1.0.4) expects `iss: "hive-iam"` when `issuer` is not set, the
+  `JWT_ISSUER` that the Oathweave container image and CLI sign with by default. Before this the SDK
+  defaulted to `"iam-core"`, so a verifier left unconfigured refused every token from a
+  default-configured server. The default is exported as `DEFAULT_IAM_ISSUER`. An explicit `issuer`
+  still overrides it; a deployment whose server signs with `iam-core` sets `issuer: 'iam-core'`.
+  The npm package `@hivemagnus/hive-iam-sdk` 1.0.3 is retired and keeps the old default. The
+  development `apps/iam-core/.env.example` now sets `JWT_ISSUER=hive-iam` to match.
+
 ## [2.3.0] - 2026-11-13
 
 **Upgrade notes.** Two changes can need configuration before upgrading; both are described under

@@ -36,7 +36,7 @@ import { createIamMiddleware } from '@hivemagnus/hive-iam-sdk/hono'
 
 const iam = createIamMiddleware({
   publicKeyUrl: 'https://iam.example.com/api/v1/auth/public-key',
-  issuer: 'hive-iam',          // the server's JWT_ISSUER (Oathweave image/CLI default: "hive-iam"; SDK default: "iam-core")
+  issuer: 'hive-iam',          // the server's JWT_ISSUER (default: "hive-iam", which matches the Oathweave image/CLI default)
   cacheTtlMs: 3_600_000,       // public key cache TTL in ms (default: 1 hour)
 })
 
@@ -143,7 +143,7 @@ Configuration shared by both `IamVerifier` and the Hono middleware.
 | Property       | Type     | Default       | Description                              |
 | -------------- | -------- | ------------- | ---------------------------------------- |
 | `publicKeyUrl` | `string` | **(required)** | Full URL to the IAM Core public key endpoint |
-| `issuer`       | `string` | `"iam-core"`  | Expected `iss` claim; set it to the server's `JWT_ISSUER` (Oathweave defaults to `hive-iam`) |
+| `issuer`       | `string` | `"hive-iam"`  | Expected `iss` claim: the server's `JWT_ISSUER`. The default matches an Oathweave server left at its default; set it when the server configures another issuer. Exported as `DEFAULT_IAM_ISSUER`. Before 1.0.4 the default was `"iam-core"` |
 | `audience`     | `string \| string[]` | — | Expected `aud` claim; required by policy for machine consumers |
 | `cacheTtlMs`   | `number` | `3600000`     | How long to cache the public key (ms)     |
 
@@ -197,6 +197,9 @@ import {
   // Classes
   IamVerifier,
   PublicKeyCache,
+
+  // The issuer expected when `issuer` is not set ("hive-iam")
+  DEFAULT_IAM_ISSUER,
 
   // Types
   type Principal,

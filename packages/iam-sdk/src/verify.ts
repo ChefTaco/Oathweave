@@ -26,6 +26,12 @@ function permissionMatches(granted: string, required: string): boolean {
   return grantedParts.length === requiredParts.length
 }
 
+/**
+ * The issuer an `IamVerifier` expects when `issuer` is not set. It matches the `JWT_ISSUER`
+ * an Oathweave server signs with when left unconfigured (the container image and CLI default).
+ */
+export const DEFAULT_IAM_ISSUER = 'hive-iam'
+
 export class IamVerifier {
   private readonly cache: PublicKeyCache
   private readonly issuer: string
@@ -33,7 +39,7 @@ export class IamVerifier {
 
   constructor(opts: IamMiddlewareOptions) {
     this.cache = new PublicKeyCache(opts.publicKeyUrl, opts.cacheTtlMs)
-    this.issuer = opts.issuer ?? 'iam-core'
+    this.issuer = opts.issuer ?? DEFAULT_IAM_ISSUER
     this.audience = opts.audience
   }
 

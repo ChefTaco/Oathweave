@@ -42,7 +42,7 @@ vi.mock('./cache.js', () => {
 })
 
 // Import after mock
-import { IamVerifier } from './verify.js'
+import { IamVerifier, DEFAULT_IAM_ISSUER } from './verify.js'
 import { PublicKeyCache } from './cache.js'
 
 describe('IamVerifier', () => {
@@ -131,6 +131,34 @@ describe('IamVerifier', () => {
         .sign(privateKey)
 
       await expect(verifier.verify(token)).rejects.toThrow('IAM token verification failed')
+    })
+
+    async function signWithIssuer(issuer: string): Promise<string> {
+      return new SignJWT({ actorType: 'USER', roles: [], permissions: [] })
+        .setProtectedHeader({ alg: 'RS256' })
+        .setSubject('user-1')
+        .setIssuer(issuer)
+        .setIssuedAt()
+        .setExpirationTime('1h')
+        .setJti(`iss-${issuer}`)
+        .sign(privateKey)
+    }
+
+    it('expects the Oathweave server default issuer when none is configured', async () => {
+      expect(DEFAULT_IAM_ISSUER).toBe('hive-iam')
+      const unconfigured = new IamVerifier({ publicKeyUrl: 'https://test/public-key' })
+      await expect(unconfigured.verify(await signWithIssuer('hive-iam'))).resolves.toMatchObject({ sub: 'user-1' })
+      // The pre-1.0.4 default is no longer accepted without configuration.
+      await expect(unconfigured.verify(await signWithIssuer('iam-core'))).rejects.toThrow('IAM token verification failed')
+    })
+
+    it('lets an explicit issuer override the default', async () => {
+      const explicit = new IamVerifier({ publicKeyUrl: 'https://test/public-key', issuer: 'https://identity.example.com' })
+      await expect(explicit.verify(await signWithIssuer('https://identity.example.com'))).resolves.toMatchObject({ sub: 'user-1' })
+      await expect(explicit.verify(await signWithIssuer('hive-iam'))).rejects.toThrow('IAM token verification failed')
+      const legacy = new IamVerifier({ publicKeyUrl: 'https://test/public-key', issuer: 'iam-core' })
+      await expect(legacy.verify(await signWithIssuer('iam-core'))).resolves.toMatchObject({ sub: 'user-1' })
+      await expect(legacy.verify(await signWithIssuer('hive-iam'))).rejects.toThrow('IAM token verification failed')
     })
 
     it('enforces the configured audience for a disposable machine consumer', async () => {
