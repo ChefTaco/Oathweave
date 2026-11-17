@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## [2.3.1] - 2026-11-17
+
+**Upgrade notes.** The server is unchanged. A service that uses the in-repo SDK
+(`packages/iam-sdk`, now 1.0.4) without setting `issuer` now expects `hive-iam`; one whose server
+signs with another `JWT_ISSUER` (for example `iam-core`) must set `issuer` to it.
 
 ### Fixed
 
