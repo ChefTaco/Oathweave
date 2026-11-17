@@ -14,7 +14,7 @@ operational scripts used to deploy and maintain them.
 | Path | Purpose |
 | --- | --- |
 | [`apps/iam-core`](apps/iam-core) | `@hivemagnus/oathweave`: the identity server and its CLI (Hono, SQLite via Prisma, Redis): auth, users, roles, groups, service accounts, clients, sessions, MFA/WebAuthn, OAuth/OIDC, audit. Released as the container image `ghcr.io/cheftaco/oathweave` |
-| [`packages/iam-sdk`](packages/iam-sdk) | `@hivemagnus/oathweave-sdk`: JWT verification and RBAC middleware for Node.js and Hono, published on npm as [`@hivemagnus/hive-iam-sdk`](https://www.npmjs.com/package/@hivemagnus/hive-iam-sdk) |
+| [`packages/iam-sdk`](packages/iam-sdk) | `@hivemagnus/oathweave-sdk`: JWT verification and RBAC middleware for Node.js and Hono, a workspace package (the npm `@hivemagnus/hive-iam-sdk` is retired; services use `@hivemagnus/hive-common`) |
 | [`scripts`](scripts) | Key generation, deployment, lockout reset, and end-to-end smoke tests |
 | [`docs`](docs) | [Architecture](docs/APP_ARCHITECTURE_IAM.md), [browser authentication](docs/BROWSER_AUTH.md), [browser SSO](docs/BROWSER_SSO.md), [technical identity enrollment](docs/IDENTITY_ENROLLMENT.md), `openapi.json` and the browser contract export |
 | [`tooling/release`](tooling/release) | Vendored release and migration runtime |

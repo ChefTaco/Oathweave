@@ -1,4 +1,4 @@
-# @hivemagnus/hive-iam-sdk
+# @hivemagnus/oathweave-sdk
 
 RS256 JWT verification and RBAC middleware for Node.js backends. Ships a **Hono v4 middleware** out of the box and a framework-agnostic **`IamVerifier`** class you can use anywhere.
 
@@ -18,8 +18,15 @@ RS256 JWT verification and RBAC middleware for Node.js backends. Ships a **Hono 
 
 ## Installation
 
+This package lives in the Oathweave workspace and is not published to npm. The npm package
+`@hivemagnus/hive-iam-sdk` (last version 1.0.3, with the old `iam-core` default issuer) is retired:
+new services verify Oathweave tokens with the Oathweave verifier in
+[`@hivemagnus/hive-common`](https://github.com/ChefTaco/HiveCommon). Use this package from the
+workspace (`npm ci` at the repository root), or build and pack it there:
+
 ```bash
-npm install @hivemagnus/hive-iam-sdk
+npm run build -w @hivemagnus/oathweave-sdk
+npm pack -w @hivemagnus/oathweave-sdk
 ```
 
 `hono ^4.0.0` is an optional peer dependency, needed only if you use the Hono middleware:
@@ -32,7 +39,7 @@ npm install hono
 
 ```typescript
 import { Hono } from 'hono'
-import { createIamMiddleware } from '@hivemagnus/hive-iam-sdk/hono'
+import { createIamMiddleware } from '@hivemagnus/oathweave-sdk/hono'
 
 const iam = createIamMiddleware({
   publicKeyUrl: 'https://iam.example.com/api/v1/auth/public-key',
@@ -77,7 +84,7 @@ const iam = createIamMiddleware({
 Use `IamVerifier` directly when you are not on Hono (Express, Fastify, plain Node.js, etc.):
 
 ```typescript
-import { IamVerifier } from '@hivemagnus/hive-iam-sdk'
+import { IamVerifier } from '@hivemagnus/oathweave-sdk'
 
 const verifier = new IamVerifier({
   publicKeyUrl: 'https://iam.example.com/api/v1/auth/public-key',
@@ -210,13 +217,13 @@ import {
 
   // Token refresh helper
   refreshAccessToken,
-} from '@hivemagnus/hive-iam-sdk'
+} from '@hivemagnus/oathweave-sdk'
 
 // Hono middleware (requires the optional `hono` peer dependency)
-import { createIamMiddleware, type IamHonoMiddleware } from '@hivemagnus/hive-iam-sdk/hono'
+import { createIamMiddleware, type IamHonoMiddleware } from '@hivemagnus/oathweave-sdk/hono'
 ```
 
-The main entry point has no framework dependency. Only `@hivemagnus/hive-iam-sdk/hono` needs `hono`
+The main entry point has no framework dependency. Only `@hivemagnus/oathweave-sdk/hono` needs `hono`
 installed.
 
 ## Error Responses

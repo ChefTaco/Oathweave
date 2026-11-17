@@ -247,8 +247,8 @@ Oathweave 2.x.
 The OpenAPI document is served at `/api/docs/openapi.json`, with Swagger UI at
 `/api/docs`.
 
-Services that trust Oathweave tokens can verify them locally with
-[`@hivemagnus/hive-iam-sdk`](https://www.npmjs.com/package/@hivemagnus/hive-iam-sdk).
+Services that trust Oathweave tokens verify them locally with the Oathweave verifier in
+[`@hivemagnus/hive-common`](https://github.com/ChefTaco/HiveCommon).
 
 ## Development
 
