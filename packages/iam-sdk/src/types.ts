@@ -29,7 +29,7 @@ export interface IamToken {
 export interface IamMiddlewareOptions {
   /** Full URL to the IAM Core API public-key endpoint */
   publicKeyUrl: string
-  /** Expected JWT issuer (default: "iam-core") */
+  /** Expected JWT issuer: the server's `JWT_ISSUER` (default: "hive-iam", the Oathweave server default) */
   issuer?: string
   /** Expected JWT audience. Machine consumers should always configure this. */
   audience?: string | string[]
