@@ -14,7 +14,7 @@ npm run build
 | Path | Workspace |
 |---|---|
 | `apps/iam-core` | Oathweave server |
-| `packages/iam-sdk` | `@hivemagnus/oathweave-sdk`, published on npm as `@hivemagnus/hive-iam-sdk` |
+| `packages/iam-sdk` | `@hivemagnus/oathweave-sdk`, workspace only (the npm `@hivemagnus/hive-iam-sdk` is retired) |
 | `tooling/release` | Release and migration runtime |
 
 ## Before opening a pull request

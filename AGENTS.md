@@ -13,8 +13,8 @@ Read AGENTS.local.md when present; never copy it into tracked content.
 - `apps/iam-core`: the server and its CLI (`@hivemagnus/oathweave`; Hono, Prisma/SQLite,
   Redis). Routes in `src/routes`, config schema in `src/config/env-schema.ts`, CLI in
   `src/cli.ts` and `src/cli/`, migrations in `prisma/migrations`.
-- `packages/iam-sdk`: `@hivemagnus/oathweave-sdk`, published on npm as
-  `@hivemagnus/hive-iam-sdk`.
+- `packages/iam-sdk`: `@hivemagnus/oathweave-sdk`, a workspace package that is not published. The
+  old npm package `@hivemagnus/hive-iam-sdk` is retired in favour of `@hivemagnus/hive-common`.
 - `tooling/release`: vendored release and recovery engine. It is build tooling, not an
   import from a sibling repository. Keep existing compatibility paths until replacement
   workflow and recovery acceptance passes.
