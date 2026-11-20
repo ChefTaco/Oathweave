@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.2] - 2026-11-20
+
+**Upgrade notes.** No database migration and no settings change. Replace the image with
+`ghcr.io/cheftaco/oathweave:2.3.2`.
+
+### Security
+
+- **The container image no longer carries `effect` 3.20.0 (CVE-2026-121707).** The workspace now
+  overrides the npm package `effect` to 3.22.1, which fixes a regular-expression denial of service
+  in `Schema.TemplateLiteral`. Prisma 7.8.0 (through `@prisma/config`, which pins `effect` 3.20.0
+  exactly, as does the latest stable Prisma) is its only consumer: the Prisma CLI's config loader
+  used for migrations, not request handling. The image no longer ships the vulnerable version.
+
 ## [2.3.1] - 2026-11-17
 
 **Upgrade notes.** The server is unchanged. A service that uses the in-repo SDK
