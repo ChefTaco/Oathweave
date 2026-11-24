@@ -139,3 +139,29 @@ it('admits an explicit Embermend browser audience with its own finite permission
     expect(() => suiteBootstrapSchema.parse(value)).toThrow()
   }
 })
+it('admits the full suite bootstrap, including the Hive Registry inventory client', () => {
+  // The client list a full suite install writes on first start: one client per resource audience.
+  const redirect = 'https://console.example.com/auth/callback'
+  const value = {
+    schema: 1,
+    adminId: 'synthetic-initial-identity',
+    clients: [
+      ['hivexui-oathweave', 'oathweave', ['iam:users:read']],
+      ['hivexui-emberpath', 'emberpath', ['router:providers:read']],
+      ['hivexui-hivemem', 'hivemem', ['hivemem:admin:all']],
+      ['hivexui-hiveskills', 'hiveskills', ['hiveskills:admin']],
+      ['hivexui-registry', 'hive-registry', ['registry:inventory']],
+      ['hivexui-cindertrace', 'cindertrace', ['cindertrace:view']],
+      ['hivexui-chattermost', 'chattermost', ['chattermost:session']],
+      ['hivexui-magnus', 'magnus', ['magnus:view']],
+      ['hivexui-embermend', 'embermend', ['embermend:read']],
+      ['hivexui-ardentstudio', 'ardentstudio', ['ardentstudio:projects:read']],
+    ].map(([id, audience, permissions]) => ({ id, audience, permissions, redirectUris: [redirect], firstParty: true })),
+  }
+  expect(suiteAdminPermissions(suiteBootstrapSchema.parse(value))).toContain('registry:inventory')
+  const registry = value.clients.find((client) => client.id === 'hivexui-registry')!
+  for (const permissions of [['iam:users:read'], ['hive-registry:inventory'], ['registry:*']]) {
+    registry.permissions = permissions
+    expect(() => suiteBootstrapSchema.parse(value)).toThrow()
+  }
+})

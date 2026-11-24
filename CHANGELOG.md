@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.3.3] - 2026-11-24
+
+**Upgrade notes.** No database migration and no settings change. Replace the image with
+`ghcr.io/cheftaco/oathweave:2.3.3`. Only a first start with a suite bootstrap file behaves
+differently; existing installations are unaffected.
+
+### Fixed
+
+- **A full suite's first start no longer fails on the Hive Registry browser client.** The suite
+  bootstrap file now admits the `hive-registry` resource audience, whose browser grants must use the
+  `registry:` prefix (`registry:inventory`), and so one client per audience, ten in all. Before
+  this, a fresh suite installation that included the Registry inventory client stopped at
+  `Bootstrap error: ZodError` and never created its initial administrator.
+
 ## [2.3.2] - 2026-11-20
 
 **Upgrade notes.** No database migration and no settings change. Replace the image with
