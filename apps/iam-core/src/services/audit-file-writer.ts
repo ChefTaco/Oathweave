@@ -73,7 +73,7 @@ export async function pruneOldAuditFiles(): Promise<number> {
   } catch (err) {
     // Directory may not exist yet — that's fine
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      console.error('[audit-retention] Error pruning files:', err)
+      console.error('[audit-retention] Error pruning files. Check AUDIT_LOG_DIR and its permissions.')
     }
   }
 
@@ -99,7 +99,7 @@ export function startAuditRetention(): void {
     const deleted = await pruneOldAuditFiles()
     lastPrunedDate = today
     if (deleted > 0) {
-      console.log(`[audit-retention] Pruned ${deleted} file(s) older than ${env.AUDIT_MAX_AGE_DAYS} days`)
+      console.log(`[audit-retention] Pruned ${deleted} expired file(s)`)
     }
   }
 
