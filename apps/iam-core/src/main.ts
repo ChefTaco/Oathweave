@@ -24,7 +24,7 @@ export async function startServer(): Promise<void> {
 
   // Start audit file retention (prunes files older than AUDIT_MAX_AGE_DAYS)
   startAuditRetention()
-  console.log(`  ✓ Audit retention started (max age: ${env.AUDIT_MAX_AGE_DAYS} days)`)
+  console.log('  ✓ Audit retention started')
 
   const app = createApp()
 
@@ -53,19 +53,18 @@ export async function startServer(): Promise<void> {
         : {}),
     },
     (info) => {
-      const protocol = useTls ? 'https' : 'http'
-      console.log(`  ✓ Listening on ${protocol}://${env.HOST}:${info.port}`)
-      console.log(`  ✓ Public key: ${protocol}://${env.HOST}:${info.port}/api/v1/auth/public-key`)
+      console.log(`  ✓ Listening on port ${info.port}`)
+      console.log('  ✓ Public key endpoint: /api/v1/auth/public-key')
     },
   )
 
   server.once('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
-      console.error(`Startup error: ${env.HOST}:${env.PORT} is already in use. Fix: stop the other process or set PORT to a free port.`)
+      console.error('Startup error: the configured port is already in use. Stop the other process or set PORT to a free port.')
     } else if (error.code === 'EACCES') {
-      console.error(`Startup error: not permitted to listen on ${env.HOST}:${env.PORT}. Fix: set PORT to a port above 1024 or grant the capability.`)
+      console.error('Startup error: permission denied. Set PORT to a port of 1024 or above or grant the required capability.')
     } else {
-      console.error(`Startup error: cannot listen on ${env.HOST}:${env.PORT}: ${error.message}`)
+      console.error('Startup error: cannot open the listener. Check HOST, PORT and the TLS settings.')
     }
     process.exit(1)
   })
