@@ -281,6 +281,49 @@ outlives the subject token, has no refresh token and cannot be exchanged again.
 Services that trust Oathweave tokens verify them locally with the Oathweave verifier in
 [`@hivemagnus/hive-common`](https://github.com/ChefTaco/HiveCommon).
 
+### Re-authentication: `prompt`, `max_age` and `auth_time`
+
+The authorization endpoint (`GET` and `POST /api/v1/oauth/authorize`, which the browser sign-in
+portal uses) honours these OpenID Connect parameters. Discovery lists them in
+`prompt_values_supported`.
+
+| Parameter | Behaviour |
+| --- | --- |
+| `prompt=login` (or `select_account`) | Always needs a sign-in completed for this request. A live SSO session is not enough. |
+| `max_age=N` (seconds) | Reuses the session only if its last authentication is at most N seconds old; otherwise asks for a sign-in. `max_age=0` works like `prompt=login`. |
+| `prompt=consent` | Shows the consent step even for a first-party client. |
+| `prompt=none` | Never asks the user for anything. When a sign-in or consent would be needed, it returns `login_required` or `consent_required` to the client's callback. |
+
+When a sign-in is needed, the endpoint answers `401` with `error: "LOGIN_REQUIRED"`, a `reason`
+(`no_session`, `prompt_login` or `max_age`) and a signed `loginTicket`. The ticket is bound to
+this exact request (client, redirect URI, state, nonce and PKCE challenge) and is valid for 10
+minutes. The person signs in with any method: password, password and TOTP, a recovery code,
+password and passkey, or a passwordless passkey. The caller then repeats the same request with
+the ticket (`loginTicket` in the POST body, `login_ticket` in the GET query). Only a session
+authenticated after the ticket was issued satisfies `prompt=login`: a new sign-in, or a step-up
+verification of the same session. Repeating the request with the old session's cookie gets
+`LOGIN_REQUIRED` again.
+
+Claims a relying party checks in the ID token:
+
+- `auth_time` is in seconds since the epoch: the session's latest interactive authentication.
+  That is its sign-in, or its last step-up verification (`POST /api/v1/auth/step-up`) if later.
+  After a forced sign-in it is the time of that sign-in, not of the earlier session. Enforce
+  recency on the server: for `prompt=login`, require `auth_time` no earlier than when you started
+  the request; for `max_age`, require `now - auth_time <= max_age`.
+- `nonce` is echoed exactly. `sid` is the session the code was issued for; after a forced sign-in
+  it is the new session.
+- `sub` is whoever signed in. A different account can sign in during a forced sign-in, so check
+  that `sub` is the user you expected.
+- Oathweave does not issue `amr` or `acr`.
+
+Error responses for the client's callback carry `error`, `error_description`, `state` and `iss`
+(RFC 9207). `prompt=none` returns `login_required` or `consent_required`. A cancelled sign-in
+(`POST /api/v1/oauth/authorize/cancel`, browser only, no sign-in needed) returns
+`access_denied`, and so does a declined consent. The browser API returns these as JSON with
+`redirectTo`, the registered callback with the error added. A `GET` with `prompt=none`
+redirects there directly.
+
 ### Session revocation feed
 
 `GET /api/v1/hive/events?after=<cursor>&limit=<n>` serves every session that ended as a

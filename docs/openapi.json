@@ -72,8 +72,8 @@
         },
         "type": "object"
       },
-      "AuthorizeConsentRequest": {
-        "additionalProperties": false,
+      "AuthorizeCancelRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
           "clientId": {
             "minLength": 1,
@@ -85,13 +85,6 @@
           "codeChallengeMethod": {
             "enum": [
               "S256"
-            ],
-            "type": "string"
-          },
-          "consent": {
-            "enum": [
-              "approve",
-              "deny"
             ],
             "type": "string"
           },
@@ -119,6 +112,104 @@
           "clientId",
           "redirectUri",
           "responseType"
+        ],
+        "type": "object"
+      },
+      "AuthorizeConsentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "clientId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "codeChallenge": {
+            "type": "string"
+          },
+          "codeChallengeMethod": {
+            "enum": [
+              "S256"
+            ],
+            "type": "string"
+          },
+          "consent": {
+            "enum": [
+              "approve",
+              "deny"
+            ],
+            "type": "string"
+          },
+          "loginTicket": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxAge": {
+            "maximum": 31536000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "nonce": {
+            "maxLength": 256,
+            "minLength": 16,
+            "type": "string"
+          },
+          "prompt": {
+            "maxLength": 100,
+            "pattern": "^(?:none|login|consent|select_account)(?: (?:none|login|consent|select_account))*$",
+            "type": "string"
+          },
+          "redirectUri": {
+            "format": "uri",
+            "type": "string"
+          },
+          "responseType": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "redirectUri",
+          "responseType"
+        ],
+        "type": "object"
+      },
+      "BrowserAuthorizationErrorResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "error": {
+            "enum": [
+              "access_denied",
+              "login_required",
+              "consent_required"
+            ],
+            "type": "string"
+          },
+          "error_description": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "redirectTo": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "error_description",
+          "iss",
+          "redirectTo"
         ],
         "type": "object"
       },
@@ -184,6 +275,43 @@
           "audience",
           "scope",
           "permissions"
+        ],
+        "type": "object"
+      },
+      "BrowserLoginRequiredResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "error": {
+            "const": "LOGIN_REQUIRED",
+            "type": "string"
+          },
+          "loginTicket": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "loginTicketExpiresIn": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "no_session",
+              "prompt_login",
+              "max_age"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "message",
+          "reason",
+          "loginTicket",
+          "loginTicketExpiresIn"
         ],
         "type": "object"
       },
@@ -374,6 +502,18 @@
           "jwks_uri": {
             "format": "uri",
             "type": "string"
+          },
+          "prompt_values_supported": {
+            "items": {
+              "enum": [
+                "none",
+                "login",
+                "consent",
+                "select_account"
+              ],
+              "type": "string"
+            },
+            "type": "array"
           },
           "response_types_supported": {
             "items": {
@@ -8096,6 +8236,32 @@
               "minLength": 16,
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "prompt",
+            "schema": {
+              "maxLength": 100,
+              "pattern": "^(?:none|login|consent|select_account)(?: (?:none|login|consent|select_account))*$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_age",
+            "schema": {
+              "pattern": "^\\d{1,9}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "login_ticket",
+            "schema": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -8103,7 +8269,7 @@
             "description": "Consent request"
           },
           "302": {
-            "description": "Authorization response"
+            "description": "Authorization response; with prompt=none, an OAuth error (login_required or consent_required) with state and iss at the registered callback"
           },
           "400": {
             "content": {
@@ -8116,14 +8282,7 @@
             "description": "Validation error"
           },
           "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Unauthorized"
+            "description": "LOGIN_REQUIRED: no sign-in, prompt=login, or a sign-in older than max_age. Sign in, then repeat the request with login_ticket."
           }
         },
         "summary": "Authorize an exact registered redirect and S256 PKCE challenge",
@@ -8159,9 +8318,24 @@
                     ],
                     "type": "string"
                   },
+                  "loginTicket": {
+                    "maxLength": 4096,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxAge": {
+                    "maximum": 31536000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "nonce": {
                     "maxLength": 256,
                     "minLength": 16,
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "maxLength": 100,
+                    "pattern": "^(?:none|login|consent|select_account)(?: (?:none|login|consent|select_account))*$",
                     "type": "string"
                   },
                   "redirectUri": {
@@ -8198,13 +8372,194 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiError"
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "access_denied",
+                        "login_required",
+                        "consent_required"
+                      ],
+                      "type": "string"
+                    },
+                    "error_description": {
+                      "type": "string"
+                    },
+                    "iss": {
+                      "type": "string"
+                    },
+                    "redirectTo": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "error_description",
+                    "iss",
+                    "redirectTo"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Invalid request; or, with prompt=none, an OAuth error (login_required or consent_required) whose redirectTo is the registered callback carrying it"
           },
           "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "LOGIN_REQUIRED"
+                      ],
+                      "type": "string"
+                    },
+                    "loginTicket": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "loginTicketExpiresIn": {
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "enum": [
+                        "no_session",
+                        "prompt_login",
+                        "max_age"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message",
+                    "reason",
+                    "loginTicket",
+                    "loginTicketExpiresIn"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "LOGIN_REQUIRED: no sign-in, prompt=login, or a sign-in older than max_age. Sign in, then repeat the same request with loginTicket."
+          },
+          "403": {
+            "description": "CONSENT_REQUIRED, or ACCESS_DENIED after a declined consent (with redirectTo, the callback carrying error=access_denied)"
+          }
+        },
+        "summary": "Approve authorization; registered first-party browser clients receive a session-bound code, state and issuer",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/authorize/cancel": {
+      "post": {
+        "operationId": "oauthCancelAuthorization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "clientId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "codeChallenge": {
+                    "type": "string"
+                  },
+                  "codeChallengeMethod": {
+                    "enum": [
+                      "S256"
+                    ],
+                    "type": "string"
+                  },
+                  "nonce": {
+                    "maxLength": 256,
+                    "minLength": 16,
+                    "type": "string"
+                  },
+                  "redirectUri": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "responseType": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "clientId",
+                  "redirectUri",
+                  "responseType"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "access_denied",
+                        "login_required",
+                        "consent_required"
+                      ],
+                      "type": "string"
+                    },
+                    "error_description": {
+                      "type": "string"
+                    },
+                    "iss": {
+                      "type": "string"
+                    },
+                    "redirectTo": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "error_description",
+                    "iss",
+                    "redirectTo"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The OAuth error and redirectTo, the registered callback carrying it"
+          },
+          "400": {
             "content": {
               "application/json": {
                 "schema": {
@@ -8212,7 +8567,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Validation error"
           },
           "403": {
             "content": {
@@ -8225,7 +8580,7 @@
             "description": "Forbidden"
           }
         },
-        "summary": "Approve authorization; registered first-party browser clients receive a session-bound code, state and issuer",
+        "summary": "The user cancelled browser sign-in: return error=access_denied with the state and issuer to the registered callback. Needs no sign-in and creates nothing.",
         "tags": [
           "Auth"
         ]

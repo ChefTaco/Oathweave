@@ -1,5 +1,15 @@
 import { z } from 'zod'
 
+/** OpenID Connect `prompt`: space-delimited none, login, consent, select_account. */
+const prompt = z
+  .string()
+  .max(100)
+  .regex(/^(?:none|login|consent|select_account)(?: (?:none|login|consent|select_account))*$/, 'prompt supports only none, login, consent and select_account')
+/** OpenID Connect `max_age` in seconds; at most one year. */
+const MAX_AGE_LIMIT = 31_536_000
+/** The signed ticket a LOGIN_REQUIRED answer returned, repeated after signing in. */
+const loginTicket = z.string().min(1).max(4096)
+
 /** GET /oauth/authorize query parameters */
 export const AuthorizeQuerySchema = z.object({
   client_id: z.string().min(1),
@@ -10,6 +20,9 @@ export const AuthorizeQuerySchema = z.object({
   scope: z.string().optional(),
   state: z.string().optional(),
   nonce: z.string().min(16).max(256).optional(),
+  prompt: prompt.optional(),
+  max_age: z.string().regex(/^\d{1,9}$/).transform(Number).pipe(z.number().int().max(MAX_AGE_LIMIT)).optional(),
+  login_ticket: loginTicket.optional(),
 })
 
 /** POST /oauth/authorize — user consent approval */
@@ -23,9 +36,22 @@ export const AuthorizeConsentSchema = z.object({
   scope: z.string().optional(),
   state: z.string().optional(),
   nonce: z.string().min(16).max(256).optional(),
+  prompt: prompt.optional(),
+  maxAge: z.number().int().min(0).max(MAX_AGE_LIMIT).optional(),
+  loginTicket: loginTicket.optional(),
 })
 
-/** POST /oauth/token */
+/** POST /oauth/authorize/cancel — the user abandoned sign-in or consent */
+export const AuthorizeCancelSchema = AuthorizeConsentSchema.pick({
+  clientId: true,
+  redirectUri: true,
+  responseType: true,
+  codeChallenge: true,
+  codeChallengeMethod: true,
+  scope: true,
+  state: true,
+  nonce: true,
+})
 export const TokenExchangeSchema = z.object({
   grant_type: z.enum([
     'authorization_code',

@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+**Upgrade notes.** No migration and no new settings. Existing sign-in and authorization requests
+are unchanged when they carry no `prompt` or `max_age`. Two behaviour notes:
+`POST /api/v1/oauth/authorize` now validates the client and redirect URI before checking the
+sign-in, so an invalid request without a session answers `400` where it answered `401`. Its `401
+LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`.
+
+### Added
+
+- **`prompt` and `max_age` on the authorization endpoint** (GET, and the POST the browser
+  sign-in portal uses). `prompt=login` (and `select_account`, and `max_age=0`) needs a sign-in
+  completed for the request, so a live SSO session is not enough. `max_age=N` reuses the session
+  only if its last authentication is at most N seconds old. `prompt=consent` forces the consent
+  step. `prompt=none` returns `login_required` or `consent_required` to the client's callback.
+  A needed sign-in answers `LOGIN_REQUIRED` with a `loginTicket` bound to the request. After a
+  sign-in by any method (password, TOTP, recovery code, passkey or passwordless passkey), the
+  same request with the ticket gets a code whose ID token's `auth_time` is that sign-in.
+  Discovery lists `prompt_values_supported`.
+- **Cancelled sign-in returns to the client.** `POST /api/v1/oauth/authorize/cancel` (browser,
+  no sign-in needed) returns `error=access_denied` with the state and `iss` for the registered
+  callback as `redirectTo`. A declined consent's `ACCESS_DENIED` also carries `redirectTo`.
+- Browser contracts `BrowserLoginRequiredResponse`, `BrowserAuthorizationErrorResponse` and
+  `AuthorizeCancelRequest`. The README documents the re-authentication parameters and the ID
+  token claims a relying party checks.
+
+### Changed
+
 - **The HiveXUI proxy smoke test no longer takes a password.** `scripts/test-iam-api.sh` used to
   read `DEPLOY_USER`/`DEPLOY_PASSWORD` and post them to the console's password sign-in, which
   relayed them to Oathweave. It now uses an existing admin session: sign in to HiveXUI in a

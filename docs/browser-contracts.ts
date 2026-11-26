@@ -232,6 +232,9 @@ var RecoveryCodesSchema = z9.object({
 
 // apps/iam-core/src/schemas/oauth.ts
 import { z as z10 } from "zod";
+var prompt = z10.string().max(100).regex(/^(?:none|login|consent|select_account)(?: (?:none|login|consent|select_account))*$/, "prompt supports only none, login, consent and select_account");
+var MAX_AGE_LIMIT = 31536e3;
+var loginTicket = z10.string().min(1).max(4096);
 var AuthorizeQuerySchema = z10.object({
   client_id: z10.string().min(1),
   redirect_uri: z10.url(),
@@ -240,7 +243,10 @@ var AuthorizeQuerySchema = z10.object({
   code_challenge_method: z10.enum(["S256"]).optional(),
   scope: z10.string().optional(),
   state: z10.string().optional(),
-  nonce: z10.string().min(16).max(256).optional()
+  nonce: z10.string().min(16).max(256).optional(),
+  prompt: prompt.optional(),
+  max_age: z10.string().regex(/^\d{1,9}$/).transform(Number).pipe(z10.number().int().max(MAX_AGE_LIMIT)).optional(),
+  login_ticket: loginTicket.optional()
 });
 var AuthorizeConsentSchema = z10.object({
   consent: z10.enum(["approve", "deny"]).optional(),
@@ -251,7 +257,20 @@ var AuthorizeConsentSchema = z10.object({
   codeChallengeMethod: z10.enum(["S256"]).optional(),
   scope: z10.string().optional(),
   state: z10.string().optional(),
-  nonce: z10.string().min(16).max(256).optional()
+  nonce: z10.string().min(16).max(256).optional(),
+  prompt: prompt.optional(),
+  maxAge: z10.number().int().min(0).max(MAX_AGE_LIMIT).optional(),
+  loginTicket: loginTicket.optional()
+});
+var AuthorizeCancelSchema = AuthorizeConsentSchema.pick({
+  clientId: true,
+  redirectUri: true,
+  responseType: true,
+  codeChallenge: true,
+  codeChallengeMethod: true,
+  scope: true,
+  state: true,
+  nonce: true
 });
 var TokenExchangeSchema = z10.object({
   grant_type: z10.enum([
@@ -477,6 +496,9 @@ var PasswordlessOptionsResponseSchema2 = PasswordlessOptionsResponseSchema;
 var MfaStatusSchema2 = MfaStatusSchema;
 var RecoveryCodesSchema2 = RecoveryCodesSchema;
 var AuthorizeConsentRequestSchema = AuthorizeConsentSchema;
+var AuthorizeCancelRequestSchema = AuthorizeCancelSchema;
+var BrowserLoginRequiredResponseSchema = z12.object({ error: z12.literal("LOGIN_REQUIRED"), message: string, reason: z12.enum(["no_session", "prompt_login", "max_age"]), loginTicket: string.min(1), loginTicketExpiresIn: z12.number().int().positive() });
+var BrowserAuthorizationErrorResponseSchema = z12.object({ error: z12.enum(["access_denied", "login_required", "consent_required"]), error_description: string, state: string.optional(), iss: string, redirectTo: string.min(1) });
 var TokenExchangeRequestSchema = TokenExchangeSchema;
 var EnrollmentRequestSchema2 = EnrollmentRequestSchema;
 var EnrollmentLifecycleRequestSchema = EnrollmentLifecycleSchema;
@@ -496,9 +518,12 @@ var PasskeyCredentialsResponseSchema = z12.object({ data: z12.array(PasskeyCrede
 var BrowserMessageResponseSchema = z12.object({ message: string });
 var BrowserOkResponseSchema = z12.object({ ok: z12.literal(true) });
 export {
+  AuthorizeCancelRequestSchema,
   AuthorizeConsentRequestSchema,
+  BrowserAuthorizationErrorResponseSchema,
   BrowserAuthorizationResponseSchema,
   BrowserConsentDetailsSchema,
+  BrowserLoginRequiredResponseSchema,
   BrowserLoginResponseSchema,
   BrowserMessageResponseSchema,
   BrowserOkResponseSchema,
@@ -573,9 +598,12 @@ export {
   UpdateIamSystemUserRequestSchema,
   UpdateIamUserRequestSchema
 };
+export type AuthorizeCancelRequest = ZodTypes.input<typeof AuthorizeCancelRequestSchema>;
 export type AuthorizeConsentRequest = ZodTypes.input<typeof AuthorizeConsentRequestSchema>;
+export type BrowserAuthorizationErrorResponse = ZodTypes.infer<typeof BrowserAuthorizationErrorResponseSchema>;
 export type BrowserAuthorizationResponse = ZodTypes.infer<typeof BrowserAuthorizationResponseSchema>;
 export type BrowserConsentDetails = ZodTypes.infer<typeof BrowserConsentDetailsSchema>;
+export type BrowserLoginRequiredResponse = ZodTypes.infer<typeof BrowserLoginRequiredResponseSchema>;
 export type BrowserLoginResponse = ZodTypes.infer<typeof BrowserLoginResponseSchema>;
 export type BrowserMessageResponse = ZodTypes.infer<typeof BrowserMessageResponseSchema>;
 export type BrowserOkResponse = ZodTypes.infer<typeof BrowserOkResponseSchema>;

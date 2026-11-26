@@ -98,7 +98,7 @@ vi.mock('../utils/keys.js', () => ({ getPublishedSigningJwks: async () => ({ key
 vi.mock('../middleware/auth.js', () => ({ authMiddleware: async () => undefined }))
 vi.mock('../middleware/browser-session.js', () => ({
   requireBrowserOrigin: vi.fn(),
-  browserAuthorization: async () => undefined,
+  optionalBrowserAuthorization: async () => undefined,
 }))
 vi.mock('../services/browser-discovery.js', () => ({ getBrowserOpenIdConfiguration: vi.fn() }))
 vi.mock('../services/session-service.js', () => ({
