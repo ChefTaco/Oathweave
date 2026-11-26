@@ -32,6 +32,8 @@ export const builtinClientPolicies: Readonly<Record<string, ClientCredentialsPol
       'iam:users:delete',
       'iam:roles:read',
       'iam:roles:write',
+      'iam:groups:read',
+      'iam:groups:write',
       'iam:sa:read',
       'iam:sa:write',
       'iam:sa:delete',
