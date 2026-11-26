@@ -32,6 +32,8 @@ const harness = await startRealApp({
   WEBAUTHN_RP_ID: RP.rpId,
   WEBAUTHN_RP_ORIGIN: RP.origin,
 })
+// The server's own configuration object, which the passwordless cases switch.
+const harnessEnv = await import('../config/env.js')
 
 const browserHeaders = { 'content-type': 'application/json', origin: ORIGIN, 'x-oathweave-browser': 'true' }
 const post = (path: string, body: unknown, cookie?: string) =>
@@ -315,6 +317,70 @@ describe('max_age', () => {
     expect(response.status).toBe(200)
     const session = await harness.prisma.session.findUniqueOrThrow({ where: { id: sessionOf(cookie) } })
     expect((await idToken(((await response.json()) as { code: string }).code, verifier)).auth_time).toBe(seconds(session.stepUpVerifiedAt!))
+  })
+})
+
+describe('a passkey alone re-authenticates the signed-in person', () => {
+  const { env } = harnessEnv
+  async function passkeyStepUp(cookie: string, key = passkey, extra: { userVerified?: boolean } = {}) {
+    const options = await post('/auth/step-up/options', {}, cookie)
+    expect(options.status).toBe(200)
+    const { data } = (await options.json()) as { data: { challenge: string; userVerification: string } }
+    expect(data.userVerification).toBe('required')
+    return post('/auth/step-up', { assertion: key.assert({ ...RP, challenge: data.challenge, counter: ++passkeyCounter, ...extra }) }, cookie)
+  }
+
+  it('completes prompt=login on the same session, with a new auth_time for the same sub', async () => {
+    const cookie = await passwordlessSignIn()
+    await age(cookie, 3600)
+    const { body, verifier } = request(FIRST_PARTY, { prompt: 'login' })
+    const first = await post('/oauth/authorize', body, cookie)
+    expect(first.status).toBe(401)
+    const { loginTicket } = (await first.json()) as LoginRequired
+    // A step-up for the ticket's request: no password, the session's own passkey.
+    const stepUp = await passkeyStepUp(cookie)
+    expect(stepUp.status).toBe(200)
+    const response = await post('/oauth/authorize', { ...body, loginTicket }, cookie)
+    expect(response.status).toBe(200)
+    const session = await harness.prisma.session.findUniqueOrThrow({ where: { id: sessionOf(cookie) } })
+    const claims = await idToken(((await response.json()) as { code: string }).code, verifier)
+    expect(claims.sub).toBe(session.userId)
+    expect(claims.auth_time).toBe(seconds(session.stepUpVerifiedAt!))
+    expect(claims.auth_time).toBeGreaterThan(seconds(session.createdAt))
+  })
+
+  it('ignores the password policy: no password is used', async () => {
+    const cookie = await passwordlessSignIn()
+    const userId = (await harness.prisma.session.findUniqueOrThrow({ where: { id: sessionOf(cookie) } })).userId
+    await harness.prisma.user.update({ where: { id: userId }, data: { passwordChangedAt: new Date(Date.now() - 400 * 86_400_000) } })
+    try {
+      expect((await post('/auth/step-up', { password }, cookie)).status).toBe(403)
+      expect((await passkeyStepUp(cookie)).status).toBe(200)
+    } finally {
+      await harness.prisma.user.update({ where: { id: userId }, data: { passwordChangedAt: new Date() } })
+    }
+  })
+
+  it("refuses another account's passkey, an assertion without user verification, and an empty body", async () => {
+    const cookie = await passwordlessSignIn()
+    expect((await passkeyStepUp(cookie, secondFactorKey)).status).toBe(401)
+    expect((await passkeyStepUp(cookie, passkey, { userVerified: false })).status).toBe(401)
+    expect((await post('/auth/step-up', {}, cookie)).status).toBe(400)
+    const session = await harness.prisma.session.findUniqueOrThrow({ where: { id: sessionOf(cookie) } })
+    expect(session.stepUpVerifiedAt).toBeNull()
+  })
+
+  it('needs the password when passwordless sign-in is turned off', async () => {
+    const cookie = await passwordlessSignIn()
+    env.IAM_PASSWORDLESS_PASSKEYS = false
+    try {
+      const refused = await passkeyStepUp(cookie)
+      expect(refused.status).toBe(400)
+      expect(((await refused.json()) as { error: string }).error).toBe('PASSWORD_REQUIRED')
+    } finally {
+      env.IAM_PASSWORDLESS_PASSKEYS = true
+    }
+    expect((await harness.prisma.session.findUniqueOrThrow({ where: { id: sessionOf(cookie) } })).stepUpVerifiedAt).toBeNull()
   })
 })
 
