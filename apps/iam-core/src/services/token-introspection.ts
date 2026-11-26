@@ -104,7 +104,7 @@ async function revokeAccess(authority: TokenClientAuthority, token: string): Pro
   const payload = await verified(token)
   if (!payload) return { outcome: 'unknown' }
   if (!authority.revokeAny && !issuedTo(payload, authority.clientId)) return { outcome: 'forbidden' }
-  if (payload.sessionId) await revokeSession(payload.sessionId, `client:${authority.clientId}`)
+  if (payload.sessionId) await revokeSession(payload.sessionId, `client:${authority.clientId}`, { reason: 'token_revocation' })
   return { outcome: 'revoked', tokenType: 'access_token', subject: payload.sub, actorType: payload.actorType }
 }
 

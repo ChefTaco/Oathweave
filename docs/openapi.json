@@ -3960,6 +3960,84 @@
         ],
         "type": "object"
       },
+      "RevocationHiveEvent": {
+        "additionalProperties": false,
+        "description": "HiveEvent v1. session.revoked: sourceRef is session:<sid>, the value of the tokens' sid (ID token) and sessionId (access token) claims. user.sessions_revoked: every session of the user ended; sourceRef is user:<sub>. subject.actorId is the user (sub).",
+        "properties": {
+          "id": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "link": {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "product": {
+                "const": "oathweave"
+              }
+            },
+            "required": [
+              "product",
+              "path"
+            ],
+            "type": "object"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "product": {
+            "const": "oathweave"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ],
+            "type": "string"
+          },
+          "sourceRef": {
+            "pattern": "^(session|user):",
+            "type": "string"
+          },
+          "subject": {
+            "additionalProperties": false,
+            "properties": {
+              "actorId": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "session.revoked",
+              "user.sessions_revoked"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "product",
+          "type",
+          "severity",
+          "title",
+          "summary",
+          "occurredAt",
+          "link",
+          "sourceRef"
+        ],
+        "type": "object"
+      },
       "Role": {
         "properties": {
           "createdAt": {
@@ -7374,6 +7452,102 @@
         "summary": "Readiness check for SQLite and Redis",
         "tags": [
           "Health"
+        ]
+      }
+    },
+    "/api/v1/hive/events": {
+      "get": {
+        "operationId": "listRevocationEvents",
+        "parameters": [
+          {
+            "description": "nextCursor of the previous page; omit for the oldest retained event (seven days)",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Events per page, 1-200 (default 100)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/RevocationHiveEvent"
+                      },
+                      "type": "array"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Session revocations as a HiveEvent v1 feed, oldest first, for products that cache session checks; requires iam:tokens:introspect or iam:sessions:revoke",
+        "tags": [
+          "Sessions"
         ]
       }
     },

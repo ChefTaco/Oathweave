@@ -384,7 +384,7 @@ export async function exchangeAuthorizationCode(
     data: { usedAt: new Date(), issuedSessionId: sessionId },
   })
   if (consumed.count !== 1) {
-    if (createdSession) await revokeSession(createdSession, 'code_exchange_race')
+    if (createdSession) await revokeSession(createdSession, 'code_exchange_race', { reason: 'code_exchange_race' })
     throw new ApiError(400, 'INVALID_GRANT', 'Authorization code has already been consumed')
   }
 
@@ -442,7 +442,7 @@ async function revokeReplayedCode(
   code: { id: string; userId: string; clientId: string; issuedSessionId: string | null },
   ipAddress?: string,
 ): Promise<void> {
-  const revoked = code.issuedSessionId ? await revokeSession(code.issuedSessionId, 'code_replay') : false
+  const revoked = code.issuedSessionId ? await revokeSession(code.issuedSessionId, 'code_replay', { reason: 'code_replay' }) : false
   await logAuditEvent({
     eventType: 'oauth.code_reuse',
     category: 'AUTHENTICATION',

@@ -495,3 +495,20 @@ model DeviceAuthorization {
   @@index([expiresAt])
   @@map("device_authorizations")
 }
+
+// Session revocations, served as HiveEvent v1 at GET /api/v1/hive/events so suite products can
+// drop cached session answers at once. `seq` is the feed order: SQLite assigns it inside the
+// single writer transaction, so it follows commit order. No relation to users or sessions, so
+// an event outlives a deleted user. Rows carry identifiers only, never token material.
+model RevocationEvent {
+  seq        Int      @id @default(autoincrement())
+  id         String   @unique @default(cuid())
+  type       String   // session.revoked | user.sessions_revoked
+  sessionId  String?  // The session (the tokens' sid / sessionId claim); null for user.sessions_revoked
+  userId     String   // The subject (sub)
+  reason     String   // sign_out, admin, refresh_reuse, password_change, ...
+  occurredAt DateTime @default(now())
+
+  @@index([occurredAt])
+  @@map("revocation_events")
+}

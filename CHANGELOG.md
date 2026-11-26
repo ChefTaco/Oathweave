@@ -2,9 +2,34 @@
 
 ## [Unreleased]
 
+**Upgrade notes.** This release applies the migration `20261126000400_revocation_events` (a new
+`revocation_events` table; rolling back needs the pre-migration backup, as before).
+Deactivating a user now also revokes their sessions and refresh tokens: reactivating the account
+no longer revives sign-ins from before, so the person signs in again. Browser sign-out
+(`POST /api/v1/browser/logout`) now also revokes the session's refresh tokens. Passwords, tokens and sign-in are otherwise unchanged.
+
+### Added
+
+- **Session revocation feed.** `GET /api/v1/hive/events` serves session revocations as
+  HiveEvent v1 in cursor pages: `session.revoked` (`sourceRef` `session:<sid>`, the tokens' `sid`
+  / `sessionId` claim) for sign-out, a user ending a session, administrator revocation,
+  refresh-token and authorization-code reuse, token revocation, and password change, reset and
+  rotation; `user.sessions_revoked` (`sourceRef` `user:<sub>`) when every session of a user ends
+  (password reset or rotation, revoke-all, deactivation, deletion). `subject.actorId` is the user.
+  Events hold identifiers only. Readable with `iam:tokens:introspect` or `iam:sessions:revoke`;
+  kept seven days and pruned hourly. Each revocation records its event in the same transaction,
+  once however often the session is revoked. Suite products follow it with HiveCommon's
+  `followOathweaveRevocations()` (in the release after HiveCommon 0.7.0).
+
 ### Changed
 
 - Dependabot now opens one grouped weekly pull request (group `hivemagnus`) for `@hivemagnus/*` package updates, so suite package bumps arrive together. Repository configuration only; nothing to do when upgrading.
+- **Deactivating a user revokes their sessions.** `PATCH /api/v1/users/:id` with
+  `active: false` now revokes every session and refresh token of the user, as deletion,
+  password resets and administrator rotation already did.
+- **Browser sign-out revokes the session's refresh tokens** as other sign-outs do.
+- **Deleting a user revokes their sessions first**, so the revocations are recorded before the
+  sessions are removed with the account.
 
 ## [2.5.0] - 2026-11-26
 

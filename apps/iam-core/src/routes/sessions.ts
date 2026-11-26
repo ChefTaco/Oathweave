@@ -24,7 +24,7 @@ sessionsRouter.delete('/:id', requirePermission('iam:sessions:revoke'), async (c
   if (!session) throw new ApiError(404, 'NOT_FOUND', 'Session not found')
   // Signing someone out is managing their account: the privilege guard's rules apply.
   await assertMayManageUser(await resolveActor(c), session.userId, 'sign out this user')
-  if (!(await revokeSession(sessionId, principal.sub))) {
+  if (!(await revokeSession(sessionId, principal.sub, { reason: 'admin' }))) {
     throw new ApiError(404, 'NOT_FOUND', 'Session not found')
   }
 
@@ -48,7 +48,7 @@ sessionsRouter.delete('/user/:userId', requirePermission('iam:sessions:revoke'),
   const principal = c.get('principal')
   const userId = c.req.param('userId')
   await assertMayManageUser(await resolveActor(c), userId, 'sign out this user')
-  await revokeAllUserSessions(userId, principal.sub)
+  await revokeAllUserSessions(userId, principal.sub, { reason: 'admin' })
 
   await logAuditEvent({
     eventType: 'session.revoke_all',

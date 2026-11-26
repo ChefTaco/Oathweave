@@ -319,6 +319,14 @@
         "impact": "fast",
         "readableBy": "^1.2.2",
         "note": "Add the device authorization grant table. Older binaries reject this migration history; retain verified recovery backups."
+      },
+      {
+        "component": "iam",
+        "id": "20261126000400_revocation_events",
+        "checksum": "ce5ffc21739ec749dab3847d2865b76bcbc63aa471b54e4bc02998ffec9fa308",
+        "impact": "fast",
+        "readableBy": "^1.2.2",
+        "note": "Add the session revocation event table behind the HiveEvent feed. Older binaries reject this migration history; retain verified recovery backups."
       }
     ],
     "wireCompatibility": {

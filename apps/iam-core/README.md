@@ -247,7 +247,7 @@ Oathweave 2.x.
 `/api/v1/groups`, `/api/v1/service-accounts`, `/api/v1/clients`,
 `/api/v1/tokens`, `/api/v1/sessions`, `/api/v1/system-users`,
 `/api/v1/devices`, `/api/v1/password-policy`, `/api/v1/audit`,
-`/api/v1/enrollments`, `/api/v1/browser`, `/api/v1/oauth/*` (including `/.well-known/openid-configuration` and `/jwks`).
+`/api/v1/enrollments`, `/api/v1/browser`, `/api/v1/hive/events`, `/api/v1/oauth/*` (including `/.well-known/openid-configuration` and `/jwks`).
 
 For generic OAuth 2.0 / OpenID Connect relying parties, discovery is also served at the issuer
 (`/.well-known/openid-configuration` and `/.well-known/oauth-authorization-server`, under an
@@ -280,6 +280,25 @@ outlives the subject token, has no refresh token and cannot be exchanged again.
 
 Services that trust Oathweave tokens verify them locally with the Oathweave verifier in
 [`@hivemagnus/hive-common`](https://github.com/ChefTaco/HiveCommon).
+
+### Session revocation feed
+
+`GET /api/v1/hive/events?after=<cursor>&limit=<n>` serves every session that ended as a
+HiveEvent v1 page (`{ data, nextCursor }`, oldest first, `nextCursor` null on the last page), so a
+service that caches session checks can drop them at once instead of when the cache entry
+expires. It needs a token with `iam:tokens:introspect` (the `SERVICE` role, or a machine client
+policy that grants it) or `iam:sessions:revoke`. Events are kept for seven days.
+
+| `type` | When | `sourceRef` |
+| --- | --- | --- |
+| `session.revoked` | One session ended: sign-out (API, browser or RP-initiated logout), a user ending one of their sessions, an administrator's revocation, refresh-token or authorization-code reuse (`warning`), token revocation, a password change, reset or rotation, a deactivated or deleted user | `session:<sid>` |
+| `user.sessions_revoked` | Every session of a user ended: password reset or administrator rotation, revoke-all, deactivation, deletion. Follows the `session.revoked` events of those sessions | `user:<sub>` |
+
+`<sid>` is the value of the `sid` claim of ID tokens and the `sessionId` claim of access tokens;
+`subject.actorId` is the user's `sub`. Events carry identifiers only, never a token, password
+or address. The cursor is opaque; after restoring an older database backup, start followers from
+no cursor. `followOathweaveRevocations()` in `@hivemagnus/hive-common/oathweave` (the release
+after 0.7.0) follows this feed and calls the verifier's `invalidateSession()` and `invalidateSubject()`.
 
 ## Development
 

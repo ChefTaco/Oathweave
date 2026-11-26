@@ -158,7 +158,10 @@ usersRouter.patch('/:id', requirePermission('iam:users:write'), async (c) => {
   const user = await prisma.user.update({ where: { id: userId }, data })
   if (body.password !== undefined) {
     // Sessions and their refresh tokens: a reset must end every existing sign-in.
-    await revokeAllUserSessions(userId, principal.sub)
+    await revokeAllUserSessions(userId, principal.sub, { reason: 'password_change' })
+  } else if (body.active === false && existing.active) {
+    // A deactivated account keeps no sign-in: reactivating it does not revive old sessions.
+    await revokeAllUserSessions(userId, principal.sub, { reason: 'user_deactivated' })
   }
 
   await logAuditEvent({
@@ -205,6 +208,8 @@ usersRouter.delete('/:id', requirePermission('iam:users:delete'), async (c) => {
     source: 'iam-api',
   })
 
+  // Record the revocations before the cascade removes the sessions with the user.
+  await revokeAllUserSessions(userId, principal.sub, { reason: 'user_deleted' })
   await prisma.user.delete({ where: { id: userId } })
 
   return c.json({ success: true })
@@ -361,7 +366,7 @@ usersRouter.post('/:id/rotate-password', requirePermission('iam:users:write'), a
   })
 
   // Sessions and their refresh tokens: a reset must end every existing sign-in.
-  await revokeAllUserSessions(userId, principal.sub)
+  await revokeAllUserSessions(userId, principal.sub, { reason: 'password_change' })
 
   await logAuditEvent({
     eventType: 'user.password_rotated',
