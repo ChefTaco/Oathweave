@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { sha256Hex } from '@hivemagnus/hive-common/secrets'
 import { jwtVerify } from 'jose'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
@@ -51,7 +51,7 @@ export async function consumeLoginChallenge(token: string): Promise<void> {
   const key =
     env.REDIS_PREFIX +
     ':mfa:used:' +
-    createHash('sha256').update(token).digest('hex')
+    sha256Hex(token)
   let timer: NodeJS.Timeout | undefined
   try {
     const result = await Promise.race([

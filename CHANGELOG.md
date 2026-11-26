@@ -95,8 +95,20 @@ Tokens issued without a scope, such as native sign-in, keep every claim.
   token service. Their audiences, permissions and lifetimes are unchanged.
 - **The legacy `encryptedPassword` column is dropped** (see Migrations).
 
+### Build
+
+- **GitHub Actions are pinned to commit SHAs** in the CI, image release and recovery workflows,
+  and `scripts/workflow-pins.test.mjs` (part of `npm test`) fails on an unpinned action.
+- **`@hivemagnus/hive-common` is a dependency.** Constant-time secret comparison, token digests
+  and request-ID parsing come from its `/secrets` and `/contracts` modules. A test keeps the
+  `AGENTS.md` note on the differing CLI and development defaults in step with the code.
+
 ### Fixed
 
+- **The agent ingest secret check no longer throws on non-ASCII input.** A wrong
+  `x-agent-token` (or system-login secret) of the right length but more bytes made the
+  constant-time comparison throw, answering 500 instead of 401.
+- **Only a well-formed caller request ID is recorded** in `api.request` audit events.
 - **The first passkey issues recovery codes.** Registering a passkey turned MFA on without backup
   codes or an audit record. The first factor now returns ten one-time recovery codes in
   `backupCodes` and records `auth.webauthn_registered` and `auth.mfa_enabled`.

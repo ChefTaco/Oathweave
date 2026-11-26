@@ -55,6 +55,7 @@ that digest.
 - `@hivemagnus/oathweave` is not published on npm. The npm package
   `@hivemagnus/hive-iam-server` is the legacy 1.x line; do not document it as current.
 - The CLI applies its own defaults (`HOST=127.0.0.1`, `JWT_ISSUER=hive-iam`); `npm run dev`
-  reads `src/config/env-schema.ts` defaults directly, which differ.
+  reads `src/config/env-schema.ts` defaults directly, which differ (`HOST=0.0.0.0`,
+  `JWT_ISSUER=https://hive:4200`). `src/cli/defaults-documented.test.ts` keeps this note true.
 - `scripts/deploy-iam-core.sh` is the native systemd deploy (`/opt/hive-iam`), separate
   from the container image and the suite controller.

@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono'
-import { timingSafeEqual } from 'node:crypto'
+import { timingSafeEqualString } from '@hivemagnus/hive-common/secrets'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { requirePermission } from '../middleware/rbac.js'
@@ -17,10 +17,8 @@ import { env } from '../config/env.js'
 import { accountLockActive } from '../config/auth-limits.js'
 import { parseJsonFields, parseJsonFieldsArray } from '../utils/serialize.js'
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
+// Byte-length safe: a multi-byte value of the same string length no longer throws.
+const constantTimeEqual = timingSafeEqualString
 
 export const systemUsersRouter = new Hono()
 

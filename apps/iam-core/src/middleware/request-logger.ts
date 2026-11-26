@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono'
 import { logAuditEvent } from '../services/audit-service.js'
 import { getClientIp } from '../utils/ip.js'
+import { readRequestId } from '@hivemagnus/hive-common/contracts'
 
 const SKIP_PATHS = ['/api/v1/health', '/api/v1/auth/public-key']
 
@@ -21,7 +22,8 @@ export const requestLoggerMiddleware: MiddlewareHandler = async (c, next) => {
   const status = c.res.status
   const duration = Date.now() - start
   const principal = c.get('principal')
-  const requestId = c.req.header('x-hive-request-id') ?? c.req.header('x-request-id')
+  // Only a well-formed caller request ID reaches the audit record (x-request-id, or its aliases).
+  const requestId = readRequestId((name) => c.req.header(name))
 
   await logAuditEvent({
     eventType: 'api.request',

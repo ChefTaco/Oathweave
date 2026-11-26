@@ -1,7 +1,8 @@
+import { sha256Hex } from '@hivemagnus/hive-common/secrets'
 import { Hono } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { SignJWT } from 'jose'
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
@@ -989,7 +990,7 @@ authRouter.post(
     if (user && user.active) {
       // Generate a secure random token
       const token = randomBytes(32).toString('hex')
-      const tokenHash = createHash('sha256').update(token).digest('hex')
+      const tokenHash = sha256Hex(token)
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
 
       // Invalidate any existing unused tokens for this user
@@ -1047,7 +1048,7 @@ authRouter.post(
     const { token, newPassword } = await parseBody(c, ResetPasswordSchema)
     const ip = getClientIp(c)
 
-    const tokenHash = createHash('sha256').update(token).digest('hex')
+    const tokenHash = sha256Hex(token)
 
     const resetToken = await prisma.passwordResetToken.findFirst({
       where: {
