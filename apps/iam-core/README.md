@@ -340,6 +340,18 @@ startup migrations outside a managed install. Slow or one-way automatic migratio
 or reseeds existing accounts. See [UPGRADING.md](https://github.com/ChefTaco/hive/blob/v1.2.2/UPGRADING.md)
 for adoption, compatibility, recovery, update notices and container controls.
 
+**Native discovery in a suite install.** The suite controller sets a non-URL `JWT_ISSUER`
+(`oathweave-<installation>`) and, so far, no `IAM_PUBLIC_URL`, so
+`/api/v1/oauth/.well-known/openid-configuration` and the issuer `.well-known` paths answer 503
+`DISCOVERY_UNCONFIGURED`. No suite product reads native discovery: they are configured with
+`OATHWEAVE_JWKS_URL` and `OATHWEAVE_USERINFO_URL`, HiveXUI reads `/oauth/jwks` directly, and
+`/oauth/jwks`, sign-in, UserInfo and every grant work without `IAM_PUBLIC_URL`. To publish native
+discovery for native clients, the controller should set `IAM_PUBLIC_URL` to the Oathweave
+endpoint the suite products reach, `https://oathweave:4200` by default (the endpoint it already
+uses for `OATHWEAVE_JWKS_URL`, without `/api/v1/oauth/jwks`). Do not use the ingress origin: the
+ingress serves `/api/v1` at `/api/oathweave`, and `IAM_PUBLIC_URL` always names the URL `/api/v1`
+hangs off. Oathweave refuses to start when `IAM_PUBLIC_URL` is not an HTTPS URL.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
