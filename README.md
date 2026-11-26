@@ -151,7 +151,7 @@ On the target host:
 | --- | --- |
 | Reset the built-in admin password | `IAM_RESET_PASSWORD=<password> npm run reset:admin` (from `/opt/hive-iam`) |
 | Clear account lockouts and rate limits | `bash scripts/reset-iam-locks.sh <host>` |
-| End-to-end smoke test through the Hive UI proxy | `bash scripts/test-iam-api.sh https://hive.example.com` |
+| End-to-end smoke test through the HiveXUI proxy, with a signed-in session cookie (no password) | `HIVE_SESSION_COOKIE_FILE=<owner-only file> bash scripts/test-iam-api.sh https://hive.example.com` |
 
 ### Native deployment runtime checks
 
