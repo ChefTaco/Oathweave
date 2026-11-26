@@ -162,6 +162,7 @@ export async function assertMayManageServiceAccount(actor: Actor, serviceAccount
 export function assertMayManageClient(actor: Actor, client: { name: string; grantTypes: unknown }, action: string): void {
   if (actor.unrestricted) return
   const grantTypes = parsePermissionList(client.grantTypes)
-  if (client.name === ROUTER_PROXY_CLIENT_ID || grantTypes.includes('authorization_code')) assertUnrestricted(actor, action)
+  // The device grant signs people in too.
+  if (client.name === ROUTER_PROXY_CLIENT_ID || grantTypes.includes('authorization_code') || grantTypes.includes('urn:ietf:params:oauth:grant-type:device_code')) assertUnrestricted(actor, action)
   assertSubset(actor, clientCredentialsPermissionCeiling(client.name), action)
 }

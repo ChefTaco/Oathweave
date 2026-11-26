@@ -1571,6 +1571,24 @@ export function buildOpenApiSpec() {
     requestBody: jsonBody(ref('PasswordlessAuthenticationRequest')),
     responses: { 200: { description: 'Signed in' }, 400: err400, 401: err401, 404: err404, 429: err429 },
   } }
+  paths['/api/v1/oauth/device_authorization'] = { post: {
+    tags: ['Auth'], operationId: 'deviceAuthorization',
+    summary: 'RFC 8628 device authorization request (device_authorization_endpoint) for a client with the urn:ietf:params:oauth:grant-type:device_code grant. The device polls POST /oauth/token with that grant_type and its device_code. 503 without IAM_DEVICE_VERIFICATION_URL',
+    requestBody: { required: true, content: { 'application/x-www-form-urlencoded': { schema: { type: 'object', properties: { client_id: { type: 'string' }, client_secret: { type: 'string' }, scope: { type: 'string' } } } } } },
+    responses: { 200: { description: 'device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval' }, 400: { description: 'unauthorized_client' }, 401: { description: 'invalid_client' }, 429: err429, 503: { description: 'IAM_DEVICE_VERIFICATION_URL is not set' } },
+  } }
+  paths['/api/v1/oauth/device'] = {
+    get: {
+      tags: ['Auth'], operationId: 'describeDeviceAuthorization', summary: 'For a signed-in person: the client and scope a pending user code asks for', security: [{ BearerAuth: [] }],
+      parameters: [qp('user_code', 'The code the device shows; case and dashes are ignored', true)],
+      responses: { 200: { description: 'userCode, clientId, clientName, clientDescription, scope, expiresAt' }, 401: err401, 404: err404, 429: err429 },
+    },
+    post: {
+      tags: ['Auth'], operationId: 'decideDeviceAuthorization', summary: 'A signed-in person approves or denies a pending device sign-in', security: [{ BearerAuth: [] }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['userCode', 'decision'], properties: { userCode: { type: 'string' }, decision: { type: 'string', enum: ['approve', 'deny'] } } } } } },
+      responses: { 200: { description: 'Decided' }, 401: err401, 403: err403, 404: err404, 429: err429 },
+    },
+  }
   paths['/api/v1/oauth/.well-known/openid-configuration'] = { get: {
     tags: ['Auth'], operationId: 'discoverOpenIdConfiguration',
     summary: 'Native discovery by default; select an active registered public browser client for configured interactive metadata',

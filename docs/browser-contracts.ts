@@ -61,7 +61,7 @@ var IpAllowlistEntrySchema = z3.union([
 ], { error: "must be an IPv4 or IPv6 address, a CIDR range, or an IPv4 pattern such as 10.0.*.*" });
 
 // apps/iam-core/src/schemas/clients.ts
-var VALID_GRANT_TYPES = ["authorization_code", "refresh_token", "client_credentials"];
+var VALID_GRANT_TYPES = ["authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code"];
 var CreateClientSchema = z4.object({
   name: z4.string().min(2).max(128).regex(/^[a-z0-9-]+$/),
   description: z4.string().optional(),
@@ -254,8 +254,10 @@ var TokenExchangeSchema = z10.object({
   grant_type: z10.enum([
     "authorization_code",
     "refresh_token",
-    "client_credentials"
+    "client_credentials",
+    "urn:ietf:params:oauth:grant-type:device_code"
   ]),
+  device_code: z10.string().optional(),
   code: z10.string().optional(),
   redirect_uri: z10.string().optional(),
   client_id: z10.string().optional(),

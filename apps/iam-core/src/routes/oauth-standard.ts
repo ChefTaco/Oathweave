@@ -5,6 +5,8 @@
  *   POST /oauth/revoke      — RFC 7009 revocation, client_secret_basic / client_secret_post / none
  *   POST /oauth/introspect  — RFC 7662 introspection, confidential clients only
  *   GET|POST /oauth/logout  — OpenID Connect RP-Initiated Logout 1.0 (end_session_endpoint)
+ *   POST /oauth/device_authorization — RFC 8628 device authorization request
+ *   GET|POST /oauth/device  — a signed-in person looks up and approves or denies a user code
  *
  * The older `/tokens/revoke` and `/tokens/introspect` (x-client-id / x-client-secret headers)
  * remain; both pairs share token-introspection.ts, so a client reaches only its own tokens.
@@ -24,9 +26,13 @@ import { CLIENT_AUTH_FAILURE_WINDOW_MS, clientEndpointRateLimit } from '../servi
 import { introspectForClient, revokeForClient, tokenClientAuthority } from '../services/token-introspection.js'
 import { revokeSession } from '../services/session-service.js'
 import { browserClientPolicies, issuerForClient } from '../services/browser-policies.js'
-import { browserPrincipal, clearBrowserSessionCookie } from '../middleware/browser-session.js'
+import { browserAuthorization, browserPrincipal, clearBrowserSessionCookie } from '../middleware/browser-session.js'
 import { parsePermissionList } from '../services/effective-grants.js'
 import { extractBasicCredentials } from './oauth.js'
+import { z } from 'zod'
+import { parseBody } from '../utils/validate.js'
+import { rateLimitMiddleware } from '../middleware/rate-limit.js'
+import { decideDeviceAuthorization, describeDeviceAuthorization, startDeviceAuthorization } from '../services/device-authorization.js'
 
 export const oauthStandardRouter = new Hono()
 
@@ -51,7 +57,7 @@ function oauthError(c: Context, status: 400 | 401 | 429, error: string, descript
 }
 
 /** The calling client, authenticated as at the token endpoint; a Response when it is refused. */
-async function callingClient(c: Context, body: Record<string, string>): Promise<{ clientId: string; authenticated: boolean } | Response> {
+export async function callingClient(c: Context, body: Record<string, string>): Promise<{ clientId: string; authenticated: boolean } | Response> {
   const basic = extractBasicCredentials(c)
   if (basic && body['client_id'] !== undefined && body['client_id'] !== basic.clientId)
     return oauthError(c, 400, 'invalid_request', 'client_id in the body does not match the Basic credentials')
@@ -200,3 +206,46 @@ async function endSession(c: Context, parameters: Record<string, string | undefi
 
 oauthStandardRouter.get('/logout', (c) => endSession(c, c.req.query()))
 oauthStandardRouter.post('/logout', async (c) => endSession(c, await readOAuthParameters(c)))
+
+// ── Device Authorization Grant (RFC 8628) ──
+
+oauthStandardRouter.post('/device_authorization', clientEndpointRateLimit('rl:device'), async (c) => {
+  const body = await readOAuthParameters(c)
+  const client = await callingClient(c, body)
+  if (client instanceof Response) return client
+  try {
+    const response = await startDeviceAuthorization(client.clientId, body['scope'] || undefined, getClientIp(c))
+    c.header('Cache-Control', 'no-store')
+    return c.json(response)
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err
+    c.header('Cache-Control', 'no-store')
+    return c.json({ error: err.code.toLowerCase(), error_description: err.message }, err.status as 400)
+  }
+})
+
+const DeviceDecisionSchema = z.object({ userCode: z.string().min(1).max(32), decision: z.enum(['approve', 'deny']) })
+const deviceCodeEntry = rateLimitMiddleware({ keyPrefix: 'rl:device-user-code', max: 10, windowMs: 300_000, authAttempt: true })
+
+function interactivePerson(c: Context): { userId: string; sessionId: string } {
+  const principal = c.get('principal')
+  if (principal.actorType !== 'USER' || !principal.sessionId) throw new ApiError(403, 'FORBIDDEN', 'Interactive session required')
+  return { userId: principal.sub, sessionId: principal.sessionId }
+}
+
+/** The approval page reads which client asks, before the person decides. */
+oauthStandardRouter.get('/device', deviceCodeEntry, browserAuthorization, async (c) => {
+  interactivePerson(c)
+  const userCode = c.req.query('user_code')
+  if (!userCode) throw new ApiError(400, 'VALIDATION_ERROR', 'user_code is required')
+  c.header('Cache-Control', 'no-store')
+  return c.json(await describeDeviceAuthorization(userCode))
+})
+
+oauthStandardRouter.post('/device', deviceCodeEntry, browserAuthorization, async (c) => {
+  const person = interactivePerson(c)
+  const { userCode, decision } = await parseBody(c, DeviceDecisionSchema)
+  await decideDeviceAuthorization(userCode, person, decision, getClientIp(c))
+  c.header('Cache-Control', 'no-store')
+  return c.json({ success: true, decision })
+})

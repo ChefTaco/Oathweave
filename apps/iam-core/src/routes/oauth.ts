@@ -44,6 +44,7 @@ import {
 import { rotateRefreshToken, issueIdToken, scopeTokens } from '../services/token-service.js'
 import { env } from '../config/env.js'
 import { userTokenGrants } from '../services/effective-grants.js'
+import { clientAllowsDeviceGrant, DEVICE_CODE_GRANT, exchangeDeviceCode } from '../services/device-authorization.js'
 import {
   CLIENT_AUTH_FAILURE_WINDOW_MS,
   clientEndpointRateLimit,
@@ -389,6 +390,40 @@ oauthRouter.post('/token', clientEndpointRateLimit('rl:token'), async (c) => {
         },
         500,
       )
+    }
+  }
+
+  // ── Handle the device authorization grant (RFC 8628 §3.4) ──
+  if (params.grant_type === DEVICE_CODE_GRANT) {
+    if (!params.device_code || !clientId) {
+      return c.json({ error: 'invalid_request', error_description: 'device_code and client_id are required' }, 400)
+    }
+    const auth = await authenticate(clientId)
+    if (auth instanceof Response) return auth
+    try {
+      const client = await prisma.client.findUnique({ where: { id: clientId }, select: { clientType: true, grantTypes: true } })
+      if (!client || !clientAllowsDeviceGrant(client.grantTypes)) {
+        return c.json({ error: 'unauthorized_client', error_description: 'Client is not authorized for the device authorization grant' }, 400)
+      }
+      const result = await exchangeDeviceCode(params.device_code, { clientId, clientType: client.clientType, authenticated: auth.authenticated }, ip, c.req.header('user-agent'))
+      const response: Record<string, unknown> = {
+        access_token: result.accessToken,
+        ...(result.refreshToken ? { refresh_token: result.refreshToken } : {}),
+        expires_in: result.expiresIn,
+        token_type: 'Bearer',
+        ...(result.scope ? { scope: result.scope } : {}),
+      }
+      if (result.scope?.split(/\s+/).includes('openid')) {
+        response['id_token'] = await issueIdToken(result.userId, result.email, result.username, result.displayName, clientId, undefined, result.accessToken, {
+          sessionId: result.sessionId, authTime: result.authTime, scope: result.scope,
+        })
+      }
+      return c.json(response)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        return c.json({ error: err.code.toLowerCase(), error_description: err.message }, err.status as 400)
+      }
+      throw err
     }
   }
 
