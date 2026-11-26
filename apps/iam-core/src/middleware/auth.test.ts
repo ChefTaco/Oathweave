@@ -131,4 +131,40 @@ describe('authMiddleware', () => {
       expect((await routerApp().request('/users', { method: 'POST', headers: { Authorization: 'Bearer other-token' } })).status).toBe(200)
     })
   })
+  describe('a person\'s token issued to a client', () => {
+    const person = { sub: 'user-1', actorType: 'USER', roles: ['SUPER_ADMIN'], permissions: ['*'], sessionId: 's', jti: 'j' }
+    function app() {
+      const app = new Hono()
+      app.use('*', authMiddleware)
+      app.get('/api/v1/users', (c) => c.json({ ok: true }))
+      app.get('/api/v1/oauth/userinfo', (c) => c.json({ ok: true }))
+      app.post('/api/v1/auth/logout', (c) => c.json({ ok: true }))
+      return app
+    }
+    const call = (path: string, method = 'GET') => app().request(path, { method, headers: { Authorization: 'Bearer t' } })
+
+    it('manages Oathweave when it came from native sign-in', async () => {
+      mockedVerify.mockResolvedValue(person as never)
+      expect((await call('/api/v1/users')).status).toBe(200)
+    })
+
+    it('reaches only UserInfo and sign-out when a relying party holds it', async () => {
+      mockedVerify.mockResolvedValue({ ...person, clientId: 'third-party-rp', aud: 'third-party-rp' } as never)
+      const refused = await call('/api/v1/users')
+      expect(refused.status).toBe(401)
+      expect(((await refused.json()) as Record<string, unknown>).error).toBe('INVALID_AUDIENCE')
+      expect((await call('/api/v1/oauth/userinfo')).status).toBe(200)
+      expect((await call('/api/v1/auth/logout', 'POST')).status).toBe(200)
+    })
+
+    it('is refused even when an older token carries no audience', async () => {
+      mockedVerify.mockResolvedValue({ ...person, clientId: 'hive-router' } as never)
+      expect((await call('/api/v1/users')).status).toBe(401)
+    })
+
+    it('leaves service tokens of any client alone', async () => {
+      mockedVerify.mockResolvedValue({ ...person, actorType: 'SERVICE_ACCOUNT', sub: 'svc', clientId: 'svc' } as never)
+      expect((await call('/api/v1/users')).status).toBe(200)
+    })
+  })
 })

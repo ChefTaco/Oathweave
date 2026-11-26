@@ -1,6 +1,6 @@
 import { browserClientPolicies } from '../services/browser-policies.js'
 import type { MiddlewareHandler } from 'hono'
-import { verifyAccessToken } from '../services/token-service.js'
+import { verifyAccessToken, type AccessTokenPayload } from '../services/token-service.js'
 import { ApiError } from '../types/index.js'
 import type { Principal } from '../types/index.js'
 import { isRouterProxyPrincipal, routerOperatorAttributed } from '../services/router-operator.js'
@@ -14,6 +14,32 @@ declare module 'hono' {
   }
 }
 
+const USERINFO_PATH = '/api/v1/oauth/userinfo'
+/**
+ * What a relying party legitimately calls with the access token it was issued: OIDC UserInfo,
+ * and sign-out to end the session its sign-in opened.
+ */
+const RELYING_PARTY_PATHS: ReadonlySet<string> = new Set([USERINFO_PATH, '/api/v1/auth/logout'])
+
+/**
+ * Whether a token may call this API at `path`. Native sign-in tokens (no client), service tokens
+ * and tokens of a HiveXUI client whose browser policy names the `oathweave` audience manage
+ * Oathweave. A person's token issued to any other client is for that client (or the product
+ * audience its policy names): it reaches only UserInfo (and, for a relying party, sign-out), so a
+ * relying party that holds an administrator's token cannot use it as one here.
+ */
+function mayUseThisApi(payload: AccessTokenPayload, path: string): boolean {
+  if (payload.clientId === 'oathweave-enrollment') return path === USERINFO_PATH
+  // A delegated (token-exchange) token is for the downstream audience it names, not this API.
+  if (payload['act'] !== undefined) return payload.aud === 'oathweave' || path === USERINFO_PATH
+  if (!payload.clientId) return true
+  const policy = Object.hasOwn(browserClientPolicies, payload.clientId) ? browserClientPolicies[payload.clientId] : undefined
+  if (policy) return policy.audience === 'oathweave' || path === USERINFO_PATH
+  // Service tokens (client_credentials, service accounts) carry only what their policy grants.
+  if (payload.actorType !== 'USER') return true
+  return RELYING_PARTY_PATHS.has(path)
+}
+
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization?.startsWith('Bearer ')) {
@@ -23,10 +49,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const token = authorization.slice(7)
   try {
     const payload = await verifyAccessToken(token)
-    if (payload.clientId === 'oathweave-enrollment' && c.req.path !== '/api/v1/oauth/userinfo') return c.json({error:'INVALID_AUDIENCE'},401)
-    // A delegated (token-exchange) token is for the downstream audience it names, not this API.
-    if (payload['act'] !== undefined && payload.aud !== 'oathweave' && c.req.path !== '/api/v1/oauth/userinfo') return c.json({error:'INVALID_AUDIENCE'},401)
-    if (payload.clientId && browserClientPolicies[payload.clientId] && browserClientPolicies[payload.clientId]!.audience !== 'oathweave' && c.req.path !== '/api/v1/oauth/userinfo') return c.json({error:'INVALID_AUDIENCE'},401)
+    if (!mayUseThisApi(payload, c.req.path)) return c.json({ error: 'INVALID_AUDIENCE' }, 401)
     c.set('principal', {
       sub: payload.sub ?? '',
       actorType: payload.actorType as Principal['actorType'],
