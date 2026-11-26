@@ -23,8 +23,8 @@ describe('client credentials permission mapping', () => {
     const { permissionsForClientCredentials } = await loadPermissionsMapper()
     expect(permissionsForClientCredentials(
       'hive-router',
-      'iam:users:read iam:roles:write openid iam:sa:delete iam:unknown',
-    )).toEqual(['iam:users:read', 'iam:roles:write', 'iam:sa:delete'])
+      'iam:users:read iam:roles:write openid iam:sa:delete iam:groups:read iam:groups:write iam:unknown',
+    )).toEqual(['iam:users:read', 'iam:roles:write', 'iam:sa:delete', 'iam:groups:read', 'iam:groups:write'])
   })
 
   it('does not grant permissions to other clients', async () => {

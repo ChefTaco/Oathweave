@@ -33,7 +33,7 @@ The shared secret for this flow is stored in IAM env as `SEED_HIVE_ROUTER_CLIENT
 - A first install writes the seed value into `/opt/hive-iam/.env`.
 - Existing hosts missing `SEED_HIVE_ROUTER_CLIENT_SECRET` fail deployment rather than silently replacing an unrecoverable credential. Recovery or rotation must use the audited IAM client lifecycle.
 - Router deploy recovers the value from `HIVE_ROUTER_IAM_CLIENT_SECRET` or protected `/opt/hive-iam/.env` using sudo.
-- `HIVE_ROUTER_IAM_PROXY_SCOPES` controls the permissions requested for `/api/iam/*`.
+- `HIVE_ROUTER_IAM_PROXY_SCOPES` controls the permissions requested for `/api/iam/*`. IAM grants only those within the `hive-router` client policy (`apps/iam-core/src/services/client-policies.ts`): reads and writes of users, roles, groups, service accounts and clients, deletes of users and service accounts, `iam:policy:write`, `iam:audit:read`, `iam:sessions:revoke`, `iam:system:login` and `iam:tokens:introspect`.
 
 Routine seed is metadata-idempotent and preserves every existing confidential
 client hash even when a seed secret is supplied. Credential rotation is an
@@ -47,7 +47,7 @@ The seed (`apps/iam-core/prisma/seed.ts`) creates these confidential clients. Ex
 | Client ID | Created when | Grants | Notes |
 | --- | --- | --- | --- |
 | `hive` | always | authorization code, refresh, client credentials | Redirect URI from `SEED_HIVE_PUBLIC_URL`. |
-| `hive-router` | always | authorization code, refresh, client credentials | Redirect URI from `SEED_HIVE_ROUTER_REDIRECT_URI`; proxy permissions are allowlisted in the token service. |
+| `hive-router` | always | authorization code, refresh, client credentials | Redirect URI from `SEED_HIVE_ROUTER_REDIRECT_URI`; proxy permissions are allowlisted in its client policy (see above). |
 | `security-exporter` | `SEED_SECURITY_EXPORTER_CLIENT_SECRET` is set | client credentials | Audience `hive-router`; limited to `iam:audit:read` and `router:security-events:read`. |
 | `example-portal` | `SEED_EXAMPLE_PORTAL_CLIENT_SECRET` is set | authorization code, refresh, client credentials | Example third-party OIDC client; audience `example-portal`, limited to `example-portal:read`. |
 

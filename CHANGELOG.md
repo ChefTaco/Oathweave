@@ -167,6 +167,11 @@ token from its own authorization code or device sign-in must call it with a nati
 
 ### Fixed
 
+- **The console can manage groups through the `hive-router` client.** Its client policy now
+  includes `iam:groups:read` and `iam:groups:write`, which the model gateway's IAM proxy requests
+  for `/api/iam/groups*`; before, it was granted neither, so the suite console could not list or
+  change groups. Writes still need `x-hive-operator` and are bounded by that operator's own rights
+  (an operator without `SUPER_ADMIN` cannot change or delete a group that grants it).
 - **The agent ingest secret check no longer throws on non-ASCII input.** A wrong
   `x-agent-token` (or system-login secret) of the right length but more bytes made the
   constant-time comparison throw, answering 500 instead of 401.
