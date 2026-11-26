@@ -1,52 +1,53 @@
 #!/usr/bin/env bash
-# test-iam-api.sh — End-to-end IAM API verification via deployed dashboard
+# test-iam-api.sh — End-to-end IAM API verification through the HiveXUI admin proxy
 #
-# Reads DEPLOY_USER / DEPLOY_PASSWORD (dashboard login) from this repo's .env or apps/iam-core/.env
-# Uses curl to log in via the dashboard, then tests all IAM endpoints
-# through the /api/iam route (same path the browser uses).
+# Signs in with an existing admin session, never a password: sign in to HiveXUI in
+# a browser (through Oathweave's sign-in page), copy the session cookie as
+# `name=value` into an owner-only file, and pass that file. The script reads it
+# into a private header file, so the cookie never appears in the process list,
+# and tests the IAM endpoints through the /api/iam route (the path the browser uses).
 #
 # Usage:
-#   bash scripts/test-iam-api.sh [DASHBOARD_URL]
+#   HIVE_SESSION_COOKIE_FILE=<file> bash scripts/test-iam-api.sh [DASHBOARD_URL]
 #
 # DASHBOARD_URL defaults to $HIVE_PUBLIC_URL (e.g. https://hive.example.com).
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 DASHBOARD_URL="${1:-${HIVE_PUBLIC_URL:-}}"
-COOKIE_FILE="$(mktemp)"
+COOKIE_FILE="${HIVE_SESSION_COOKIE_FILE:-}"
 PASS=0
 FAIL=0
 TOTAL=0
 
-# ─── Read credentials from repo/package .env files ───────────────────
-ROOT_ENV="$ROOT_DIR/.env"
-API_ENV="$ROOT_DIR/apps/iam-core/.env"
-if [[ -f "$ROOT_ENV" ]]; then
-  set -a
-  source "$ROOT_ENV"
-  set +a
-fi
-if [[ -f "$API_ENV" ]]; then
-  set -a
-  source "$API_ENV"
-  set +a
-fi
-DEPLOY_USER="${DEPLOY_USER:-${DEPLOY_USERNAME:-}}"
-DEPLOY_PASS="${DEPLOY_PASSWORD:-}"
-
-if [[ -z "$DEPLOY_USER" || -z "$DEPLOY_PASS" ]]; then
-  echo "ERROR: DEPLOY_USER/DEPLOY_PASSWORD not set in $ROOT_ENV or $API_ENV"
-  exit 1
-fi
 if [[ -z "$DASHBOARD_URL" ]]; then
   echo "ERROR: pass DASHBOARD_URL as the first argument or set HIVE_PUBLIC_URL"
   exit 1
 fi
+if [[ -z "$COOKIE_FILE" ]]; then
+  echo "ERROR: set HIVE_SESSION_COOKIE_FILE to an owner-only file holding the HiveXUI session cookie (name=value)"
+  exit 1
+fi
+if [[ ! -f "$COOKIE_FILE" || -L "$COOKIE_FILE" || ! -r "$COOKIE_FILE" ]]; then
+  echo "ERROR: HIVE_SESSION_COOKIE_FILE must be a readable regular file"
+  exit 1
+fi
+if (( (8#$(stat -c %a "$COOKIE_FILE") & 077) != 0 )); then
+  echo "ERROR: HIVE_SESSION_COOKIE_FILE must be owner-only (chmod 600)"
+  exit 1
+fi
+COOKIE_VALUE="$(head -n 1 "$COOKIE_FILE" | tr -d '\r')"
+if [[ ! "$COOKIE_VALUE" =~ ^[^=[:space:]]+=[^[:space:]]+$ ]]; then
+  echo "ERROR: HIVE_SESSION_COOKIE_FILE must hold one name=value cookie"
+  exit 1
+fi
+HEADER_FILE="$(mktemp)"
+chmod 600 "$HEADER_FILE"
+printf 'Cookie: %s\n' "$COOKIE_VALUE" > "$HEADER_FILE"
+unset COOKIE_VALUE
 
 # ─── Helpers ──────────────────────────────────────────────────────────
-cleanup() { rm -f "$COOKIE_FILE"; }
+cleanup() { rm -f "$HEADER_FILE"; }
 trap cleanup EXIT
 
 assert_contains() {
@@ -115,39 +116,25 @@ assert_json_number() {
 
 proxy_get() {
   local path="$1"
-  curl --silent --show-error -b "$COOKIE_FILE" "$DASHBOARD_URL/api/iam/$path" 2>/dev/null
+  curl --silent --show-error -H @"$HEADER_FILE" "$DASHBOARD_URL/api/iam/$path" 2>/dev/null
 }
 
 proxy_get_status() {
   local path="$1"
-  curl --silent --show-error -o /dev/null -w '%{http_code}' -b "$COOKIE_FILE" "$DASHBOARD_URL/api/iam/$path" 2>/dev/null
+  curl --silent --show-error -o /dev/null -w '%{http_code}' -H @"$HEADER_FILE" "$DASHBOARD_URL/api/iam/$path" 2>/dev/null
 }
 
 echo ""
 echo "═══════════════════════════════════════════════════════════"
 echo "  IAM API End-to-End Test"
 echo "  Dashboard: $DASHBOARD_URL"
-echo "  User: $DEPLOY_USER"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
 
-# ─── 1. Login ─────────────────────────────────────────────────────────
-echo "▸ Login"
-LOGIN_STATUS=$(curl --silent --show-error -o /dev/null -w '%{http_code}' -c "$COOKIE_FILE" \
-  -X POST "$DASHBOARD_URL/api/auth/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"username\":\"$DEPLOY_USER\",\"password\":\"$DEPLOY_PASS\"}")
-assert_status "Login succeeds" "$LOGIN_STATUS" 200
-
-COOKIE_LEN=$(wc -c < "$COOKIE_FILE")
-TOTAL=$((TOTAL + 1))
-if [[ "$COOKIE_LEN" -gt 100 ]]; then
-  echo "  ✓ Session cookie set ($COOKIE_LEN bytes)"
-  PASS=$((PASS + 1))
-else
-  echo "  ✗ Session cookie missing or too small"
-  FAIL=$((FAIL + 1))
-fi
+# ─── 1. Session ───────────────────────────────────────────────────────
+echo "▸ Session"
+SESSION_STATUS=$(curl --silent --show-error -o /dev/null -w '%{http_code}' -H @"$HEADER_FILE" "$DASHBOARD_URL/api/auth/me")
+assert_status "Admin session accepted" "$SESSION_STATUS" 200
 echo ""
 
 # ─── 2. Health ────────────────────────────────────────────────────────

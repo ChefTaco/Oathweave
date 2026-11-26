@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- **The HiveXUI proxy smoke test no longer takes a password.** `scripts/test-iam-api.sh` used to
+  read `DEPLOY_USER`/`DEPLOY_PASSWORD` and post them to the console's password sign-in, which
+  relayed them to Oathweave. It now uses an existing admin session: sign in to HiveXUI in a
+  browser, save the session cookie as `name=value` in an owner-only file and pass it as
+  `HIVE_SESSION_COOKIE_FILE`.
+
 ## [2.6.0] - 2026-11-26
 
 **Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.6.0`. This release
