@@ -9,6 +9,8 @@ export interface Principal {
   readonly permissions: readonly string[]
   readonly sessionId: string | undefined
   readonly clientId: string | undefined
+  /** OAuth scope of the access token, when it was issued for one (authorization code, refresh). */
+  readonly scope?: string | undefined
 }
 
 export interface HealthCheck {

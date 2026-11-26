@@ -11,6 +11,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
 import { discoveryMetadataUrl } from '../config/browser-discovery.js'
+import { ID_TOKEN_CLAIMS } from './oidc-claims.js'
 import { ApiError } from '../types/index.js'
 import { getPublishedSigningJwks } from '../utils/keys.js'
 import { issueTokenPair } from './token-service.js'
@@ -37,6 +38,8 @@ export interface AuthorizeParams {
   state?: string | undefined
   nonce?: string | undefined
   browserSessionId?: string | undefined
+  /** The session the user approved from; its sign-in (or step-up) time becomes auth_time. */
+  authSessionId?: string | undefined
 }
 
 export interface TokenExchangeParams {
@@ -114,6 +117,10 @@ export async function createAuthorizationCode(
 
   // Generate authorization code (cryptographically secure)
   const code = randomBytes(32).toString('base64url')
+  const authSessionId = params.browserSessionId ?? params.authSessionId
+  const authSession = authSessionId
+    ? await prisma.session.findFirst({ where: { id: authSessionId, userId }, select: { createdAt: true, stepUpVerifiedAt: true } })
+    : null
 
   await prisma.authorizationCode.create({
     data: {
@@ -126,6 +133,7 @@ export async function createAuthorizationCode(
       state: params.state ?? null,
       nonce: params.nonce ?? null,
       browserSessionId: params.browserSessionId ?? null,
+      authTime: authSession ? (authSession.stepUpVerifiedAt ?? authSession.createdAt) : null,
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     },
   })
@@ -284,6 +292,8 @@ export async function exchangeAuthorizationCode(
   username?: string
   displayName?: string
   nonce?: string
+  sessionId: string
+  authTime?: Date
 }> {
   if (params.grantType !== 'authorization_code') {
     throw new ApiError(400, 'UNSUPPORTED_GRANT_TYPE', 'Only authorization_code grant type is supported here')
@@ -388,6 +398,9 @@ export async function exchangeAuthorizationCode(
     sessionId,
     ipAddress,
     authCode.clientId,
+    undefined,
+    undefined,
+    authCode.scope ?? undefined,
   )
 
   await logAuditEvent({
@@ -414,6 +427,8 @@ export async function exchangeAuthorizationCode(
     username: authCode.user.username,
     displayName: authCode.user.displayName,
     ...(authCode.nonce !== null ? { nonce: authCode.nonce } : {}),
+    sessionId,
+    ...(authCode.authTime ? { authTime: authCode.authTime } : {}),
   }
 }
 
@@ -524,14 +539,20 @@ export function getOpenIdConfiguration(): Record<string, unknown> | undefined {
     token_endpoint: `${api}/oauth/token`,
     userinfo_endpoint: `${api}/oauth/userinfo`,
     jwks_uri: `${api}/oauth/jwks`,
+    revocation_endpoint: `${api}/oauth/revoke`,
+    introspection_endpoint: `${api}/oauth/introspect`,
+    end_session_endpoint: `${api}/oauth/logout`,
     response_types_supported: ['code'],
+    response_modes_supported: ['query'],
     grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
     subject_types_supported: ['public'],
     id_token_signing_alg_values_supported: ['RS256'],
     scopes_supported: ['openid', 'profile', 'email', 'offline_access'],
     token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
+    revocation_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
+    introspection_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
     code_challenge_methods_supported: ['S256'],
-    claims_supported: ['sub', 'email', 'username', 'name', 'roles'],
+    claims_supported: [...ID_TOKEN_CLAIMS],
   }
 }
 

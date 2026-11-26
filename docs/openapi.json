@@ -333,6 +333,10 @@
             "minItems": 1,
             "type": "array"
           },
+          "end_session_endpoint": {
+            "format": "uri",
+            "type": "string"
+          },
           "grant_types_supported": {
             "items": {
               "anyOf": [
@@ -4658,6 +4662,40 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "operationId": "issuerAuthorizationServerMetadata",
+        "responses": {
+          "200": {
+            "description": "Native discovery metadata"
+          },
+          "503": {
+            "description": "No IAM_PUBLIC_URL and JWT_ISSUER is not an HTTPS URL"
+          }
+        },
+        "summary": "Native discovery at the issuer (also under an HTTPS JWT_ISSUER's path); the same document as /api/v1/oauth/.well-known/openid-configuration",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/.well-known/openid-configuration": {
+      "get": {
+        "operationId": "issuerOpenIdConfiguration",
+        "responses": {
+          "200": {
+            "description": "Native discovery metadata"
+          },
+          "503": {
+            "description": "No IAM_PUBLIC_URL and JWT_ISSUER is not an HTTPS URL"
+          }
+        },
+        "summary": "Native discovery at the issuer (also under an HTTPS JWT_ISSUER's path); the same document as /api/v1/oauth/.well-known/openid-configuration",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/audit": {
       "get": {
         "operationId": "queryAuditEvents",
@@ -5708,6 +5746,125 @@
           }
         },
         "summary": "Consume an expiring one-use reset token and revoke prior sessions, refresh tokens and authorization codes",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "operationId": "listOwnSessions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "sessions": {
+                      "items": {
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "The caller's own active sessions; current marks the calling one",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "revokeOwnSession",
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "current": {
+                      "type": "boolean"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "End one of the caller's own sessions; another user's answers 404",
         "tags": [
           "Auth"
         ]
@@ -7713,6 +7870,233 @@
           }
         },
         "summary": "Approve authorization; registered first-party browser clients receive a session-bound code, state and issuer",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/introspect": {
+      "post": {
+        "operationId": "oauthIntrospect",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "client_id": {
+                    "description": "Required unless sent as the HTTP Basic username",
+                    "type": "string"
+                  },
+                  "client_secret": {
+                    "description": "client_secret_post; or send HTTP Basic (client_secret_basic)",
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  },
+                  "token_type_hint": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenInfo"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "description": "invalid_client"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          }
+        },
+        "summary": "RFC 7662 introspection (introspection_endpoint) for authenticated confidential clients; other clients' tokens answer active:false unless the caller holds iam:tokens:introspect",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/logout": {
+      "get": {
+        "operationId": "endSession",
+        "parameters": [
+          {
+            "description": "An id_token this server issued (it may be expired); its sid session is ended",
+            "in": "query",
+            "name": "id_token_hint",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Client, when no id_token_hint names it",
+            "in": "query",
+            "name": "client_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact registered redirect URI of the client",
+            "in": "query",
+            "name": "post_logout_redirect_uri",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Returned with the redirect",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed out; { signedOut } says whether a session ended"
+          },
+          "302": {
+            "description": "Redirect to post_logout_redirect_uri"
+          },
+          "400": {
+            "description": "Unknown id_token_hint, mismatched client or unregistered redirect"
+          }
+        },
+        "summary": "OpenID Connect RP-Initiated Logout (end_session_endpoint): ends the id_token_hint session and the browser SSO session",
+        "tags": [
+          "Auth"
+        ]
+      },
+      "post": {
+        "operationId": "endSessionPost",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "id_token_hint": {
+                    "type": "string"
+                  },
+                  "post_logout_redirect_uri": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed out; { signedOut } says whether a session ended"
+          },
+          "302": {
+            "description": "Redirect to post_logout_redirect_uri"
+          },
+          "400": {
+            "description": "Unknown id_token_hint, mismatched client or unregistered redirect"
+          }
+        },
+        "summary": "OpenID Connect RP-Initiated Logout (end_session_endpoint): ends the id_token_hint session and the browser SSO session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/revoke": {
+      "post": {
+        "operationId": "oauthRevoke",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "client_id": {
+                    "description": "Required unless sent as the HTTP Basic username",
+                    "type": "string"
+                  },
+                  "client_secret": {
+                    "description": "client_secret_post; or send HTTP Basic (client_secret_basic)",
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  },
+                  "token_type_hint": {
+                    "enum": [
+                      "access_token",
+                      "refresh_token"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked, or the token was unknown"
+          },
+          "400": {
+            "description": "unauthorized_client: the token was issued to another client"
+          },
+          "401": {
+            "description": "invalid_client"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          }
+        },
+        "summary": "RFC 7009 revocation (revocation_endpoint). A client revokes the tokens issued to it; iam:tokens:revoke reaches others. A public client is identified by client_id",
         "tags": [
           "Auth"
         ]

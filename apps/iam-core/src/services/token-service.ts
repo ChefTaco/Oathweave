@@ -92,6 +92,8 @@ export async function issueTokenPair(
   userAgent?: string,
   /** The session's hard expiry: the refresh token never outlives it. */
   refreshNotAfter?: Date,
+  /** The OAuth scope granted (authorization code, refresh); the tokens carry and keep it. */
+  scope?: string,
 ): Promise<TokenPair> {
   const privateKey = await getPrivateKey()
   const signingKeyId = await getSigningKeyId()
@@ -110,6 +112,7 @@ export async function issueTokenPair(
     permissions: clientId ? browserPermissions(clientId, permissions) : permissions,
     sessionId,
     ...(clientId ? { clientId } : {}),
+    ...(scope ? { scope } : {}),
   })
     .setProtectedHeader({ alg: 'RS256', kid: signingKeyId })
     .setSubject(userId)
@@ -131,6 +134,7 @@ export async function issueTokenPair(
       tokenHash: refreshTokenHash,
       ipAddress: ipAddress ?? null,
       clientId: clientId ?? null,
+      scope: scope ?? null,
       userAgent: userAgent ?? null,
       expiresAt: new Date(
         Math.min(Date.now() + env.JWT_REFRESH_TTL * 1000, refreshNotAfter?.getTime() ?? Infinity),
@@ -197,9 +201,25 @@ export async function issueClientCredentialsToken(
   return token.sign(privateKey)
 }
 
+/** The space-separated tokens of an OAuth scope. */
+export function scopeTokens(scope: string | null | undefined): string[] {
+  return (scope ?? '').split(/\s+/).filter(Boolean)
+}
+
+export interface IdTokenContext {
+  /** Session the tokens belong to: the `sid` claim, which RP-initiated logout ends. */
+  sessionId?: string | undefined
+  /** When the user last authenticated: the `auth_time` claim. */
+  authTime?: Date | undefined
+  /** Granted scope. Without it every standard claim is included, as before scopes were honoured. */
+  scope?: string | undefined
+}
+
 /**
- * Issue an OIDC id_token.
- * Includes standard claims: sub, email, name, nonce, at_hash, aud.
+ * Issue an OIDC id_token: sub, aud, iss, iat, exp, auth_time, sid, nonce and at_hash, plus the
+ * `profile` claims (preferred_username, name) and `email` claims (email, email_verified) the
+ * granted scope asks for (OpenID Connect Core §5.4). Oathweave does not verify addresses, so
+ * `email_verified` is false.
  */
 export async function issueIdToken(
   userId: string,
@@ -209,16 +229,19 @@ export async function issueIdToken(
   clientId: string,
   nonce?: string,
   accessToken?: string,
+  context: IdTokenContext = {},
 ): Promise<string> {
   const privateKey = await getPrivateKey()
   const signingKeyId = await getSigningKeyId()
   const now = Math.floor(Date.now() / 1000)
+  const scopes = context.scope === undefined ? undefined : scopeTokens(context.scope)
 
   const claims: Record<string, unknown> = {
-    email,
-    preferred_username: username,
-    name: displayName,
+    ...(!scopes || scopes.includes('profile') ? { preferred_username: username, name: displayName } : {}),
+    ...(!scopes || scopes.includes('email') ? { email, email_verified: false } : {}),
   }
+  if (context.authTime) claims['auth_time'] = Math.floor(context.authTime.getTime() / 1000)
+  if (context.sessionId) claims['sid'] = context.sessionId
 
   if (nonce) claims['nonce'] = nonce
 
@@ -405,6 +428,7 @@ export async function rotateRefreshToken(
     existing.clientId ?? undefined,
     userAgent,
     sessionExpiresAt,
+    existing.scope ?? undefined,
   )
 }
 

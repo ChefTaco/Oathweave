@@ -22,6 +22,12 @@ by restoring the pre-migration backup. A write made with the built-in `hive-rout
 must name the console operator in `x-hive-operator` (the model gateway always does); without it
 the token is read-only.
 
+**OIDC conformance.** `20261126000200_token_scope_and_auth_time` adds `refresh_tokens.scope` and
+`authorization_codes.authTime`. id_tokens and UserInfo now return the standard claims the granted
+scope asks for: a relying party that requests only `openid` no longer receives `email` or
+`preferred_username` (HiveXUI requests `openid profile`, the model gateway `openid profile email`).
+Tokens issued without a scope, such as native sign-in, keep every claim.
+
 ### Security
 
 - **The `hive-router` client token is read-only without an operator.** A `client_credentials`
@@ -57,6 +63,25 @@ the token is read-only.
   revocation.
 - **Passkey sign-in and browser sessions carry group roles.** The passkey MFA step and the browser
   SSO session built roles and permissions from directly assigned roles only.
+
+### Added
+
+- **Standard endpoints for generic relying parties.** Discovery at the issuer root
+  (`/.well-known/openid-configuration`, `/.well-known/oauth-authorization-server`), RFC 7009
+  `POST /oauth/revoke` and RFC 7662 `POST /oauth/introspect` with `client_secret_basic` /
+  `client_secret_post`, and OpenID Connect RP-initiated logout at `GET|POST /oauth/logout`
+  (`end_session_endpoint`): it ends the `id_token_hint`'s session (`sid`) and the browser SSO
+  session, and returns only to a registered redirect URI. Browser discovery advertises it too.
+- **id_token and UserInfo claims follow OpenID Connect Core.** id_tokens carry `auth_time` (the
+  approving session's sign-in or step-up time) and `sid` for every client; `email_verified` is
+  `false` (Oathweave does not verify addresses); `profile` and `email` select the standard claims.
+  Access and refresh tokens keep the granted `scope`. Discovery advertises `preferred_username`,
+  not `username`, as tokens use. UserInfo is `no-store` and reports group roles too.
+- **Self-service sessions.** `GET /auth/sessions` lists the caller's own active sessions (marking
+  the current one) and `DELETE /auth/sessions/:id` ends one; another user's session answers 404.
+- **A conformance test in CI.** `oauth4webapi`, which validates responses strictly, runs the
+  discovery, code + PKCE, id_token, UserInfo, refresh, introspection, revocation and logout flows
+  against the real server.
 
 ### Changed
 

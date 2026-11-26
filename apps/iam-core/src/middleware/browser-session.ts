@@ -149,6 +149,11 @@ export async function clearBrowserSession(c: Context): Promise<void> {
       where: { id: principal.sessionId, userId: principal.sub },
       data: { revokedAt: new Date() },
     })
+  clearBrowserSessionCookie(c)
+}
+
+/** Remove the browser SSO cookie (its session is revoked by the caller). */
+export function clearBrowserSessionCookie(c: Context): void {
   deleteCookie(c, COOKIE, {
     secure: true,
     httpOnly: true,

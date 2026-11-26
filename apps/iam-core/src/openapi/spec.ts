@@ -1511,6 +1511,51 @@ export function buildOpenApiSpec() {
   paths['/api/v1/enrollments/{actorId}/receipt'] = Object.fromEntries(['get','delete'].map(method => [method, { tags: ['Service Accounts'], summary: method === 'get' ? 'Recover an explicitly migrated legacy enrollment receipt before its original expiry' : 'Acknowledge an owned legacy enrollment receipt', security: [{ BearerAuth: [] }], parameters: [pp('actorId','Explicit migrated actor ID')], responses: { ...success(method === 'get' ? ref('LegacyEnrollmentReceipt') : { type: 'object' }), 401: err401, 403: err403, 410: { description: 'Original legacy receipt expired or acknowledged' } } }]))
   paths['/api/v1/enrollments/installations'] = { get: { tags: ['Service Accounts'], summary: 'List only explicitly authorized installation namespace identifiers; no endpoint configuration is exposed', security: [{ BearerAuth: [] }], responses: { ...success(ref('EnrollmentInstallations')), 401: err401, 403: err403 } } }
   for (const [path,item] of Object.entries(paths)) if (path.startsWith('/api/v1/enrollments') && path !== '/api/v1/enrollments/installations') for (const operation of Object.values(item as Record<string,{parameters?:unknown[]}>)) operation.parameters = [...(operation.parameters ?? []), qp('installationId','Exact installation namespace; mandatory when this authority coordinates multiple installations',false,{type:'string',pattern:'^[a-z0-9][a-z0-9-]{0,63}$'})]
+  const oauthForm = (properties: Record<string, unknown>, required: string[]) => ({
+    required: true,
+    content: { 'application/x-www-form-urlencoded': { schema: { type: 'object', properties, required } } },
+  })
+  const clientCredentials = {
+    client_id: { type: 'string', description: 'Required unless sent as the HTTP Basic username' },
+    client_secret: { type: 'string', description: 'client_secret_post; or send HTTP Basic (client_secret_basic)' },
+  }
+  paths['/api/v1/oauth/revoke'] = { post: {
+    tags: ['Auth'], operationId: 'oauthRevoke',
+    summary: 'RFC 7009 revocation (revocation_endpoint). A client revokes the tokens issued to it; iam:tokens:revoke reaches others. A public client is identified by client_id',
+    requestBody: oauthForm({ token: { type: 'string' }, token_type_hint: { type: 'string', enum: ['access_token', 'refresh_token'] }, ...clientCredentials }, ['token']),
+    responses: { 200: { description: 'Revoked, or the token was unknown' }, 400: { description: 'unauthorized_client: the token was issued to another client' }, 401: { description: 'invalid_client' }, 429: err429 },
+  } }
+  paths['/api/v1/oauth/introspect'] = { post: {
+    tags: ['Auth'], operationId: 'oauthIntrospect',
+    summary: 'RFC 7662 introspection (introspection_endpoint) for authenticated confidential clients; other clients\' tokens answer active:false unless the caller holds iam:tokens:introspect',
+    requestBody: oauthForm({ token: { type: 'string' }, token_type_hint: { type: 'string' }, ...clientCredentials }, ['token']),
+    responses: { ...success(ref('TokenInfo')), 401: { description: 'invalid_client' }, 429: err429 },
+  } }
+  for (const method of ['get', 'post'] as const) {
+    const parameters = method === 'get'
+      ? [qp('id_token_hint', 'An id_token this server issued (it may be expired); its sid session is ended', false), qp('client_id', 'Client, when no id_token_hint names it', false), qp('post_logout_redirect_uri', 'Exact registered redirect URI of the client', false), qp('state', 'Returned with the redirect', false)]
+      : undefined
+    ;((paths['/api/v1/oauth/logout'] ??= {}) as Record<string, unknown>)[method] = {
+      tags: ['Auth'], operationId: method === 'get' ? 'endSession' : 'endSessionPost',
+      summary: 'OpenID Connect RP-Initiated Logout (end_session_endpoint): ends the id_token_hint session and the browser SSO session',
+      ...(parameters ? { parameters } : { requestBody: oauthForm({ id_token_hint: { type: 'string' }, client_id: { type: 'string' }, post_logout_redirect_uri: { type: 'string' }, state: { type: 'string' } }, []) }),
+      responses: { 200: { description: 'Signed out; { signedOut } says whether a session ended' }, 302: { description: 'Redirect to post_logout_redirect_uri' }, 400: { description: 'Unknown id_token_hint, mismatched client or unregistered redirect' } },
+    }
+  }
+  paths['/api/v1/auth/sessions'] = { get: {
+    tags: ['Auth'], operationId: 'listOwnSessions', summary: 'The caller\'s own active sessions; current marks the calling one', security: [{ BearerAuth: [] }],
+    responses: { ...success({ type: 'object', properties: { sessions: { type: 'array', items: { type: 'object' } } } }), 401: err401, 403: err403 },
+  } }
+  paths['/api/v1/auth/sessions/{id}'] = { delete: {
+    tags: ['Auth'], operationId: 'revokeOwnSession', summary: 'End one of the caller\'s own sessions; another user\'s answers 404', security: [{ BearerAuth: [] }],
+    parameters: [pp('id', 'Session ID')],
+    responses: { ...success({ type: 'object', properties: { success: { type: 'boolean' }, current: { type: 'boolean' } } }), 401: err401, 404: err404 },
+  } }
+  for (const path of ['/.well-known/openid-configuration', '/.well-known/oauth-authorization-server']) paths[path] = { get: {
+    tags: ['Auth'], operationId: path.includes('openid') ? 'issuerOpenIdConfiguration' : 'issuerAuthorizationServerMetadata',
+    summary: 'Native discovery at the issuer (also under an HTTPS JWT_ISSUER\'s path); the same document as /api/v1/oauth/.well-known/openid-configuration',
+    responses: { 200: { description: 'Native discovery metadata' }, 503: { description: 'No IAM_PUBLIC_URL and JWT_ISSUER is not an HTTPS URL' } },
+  } }
   paths['/api/v1/oauth/.well-known/openid-configuration'] = { get: {
     tags: ['Auth'], operationId: 'discoverOpenIdConfiguration',
     summary: 'Native discovery by default; select an active registered public browser client for configured interactive metadata',

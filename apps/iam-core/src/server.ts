@@ -21,11 +21,29 @@ import { auditRouter } from './routes/audit.js'
 import { passwordPolicyRouter } from './routes/password-policy.js'
 import { groupsRouter } from './routes/groups.js'
 import { docsRouter } from './routes/docs.js'
-import { oauthRouter } from './routes/oauth.js'
+import { oauthRouter, nativeDiscovery } from './routes/oauth.js'
+import { oauthStandardRouter } from './routes/oauth-standard.js'
 import { webauthnRouter } from './routes/webauthn.js'
 import { devicesRouter } from './routes/devices.js'
 import { enrollmentsRouter } from './routes/enrollments.js'
 import { enrollmentConfigurations } from './services/enrollment-runtime.js'
+
+/** Where an issuer's discovery documents live: at the root, and under the issuer's path. */
+export function issuerDiscoveryPaths(issuer: string): string[] {
+  let path = ''
+  try {
+    const url = new URL(issuer)
+    if (url.protocol === 'https:') path = url.pathname.replace(/\/+$/, '')
+  } catch {
+    path = ''
+  }
+  const paths = new Set(['/.well-known/openid-configuration', '/.well-known/oauth-authorization-server'])
+  if (path) {
+    paths.add(`${path}/.well-known/openid-configuration`)
+    paths.add(`/.well-known/oauth-authorization-server${path}`)
+  }
+  return [...paths]
+}
 
 export function createApp(): Hono {
   if (Object.keys(enrollmentConfigurations()).length) issuerForClient('oathweave-enrollment', env.JWT_ISSUER)
@@ -82,10 +100,14 @@ export function createApp(): Hono {
   app.route('/api/v1/password-policy', passwordPolicyRouter)
   app.route('/api/v1/groups', groupsRouter)
   app.route('/api/v1/oauth', oauthRouter)
+  app.route('/api/v1/oauth', oauthStandardRouter)
   app.route('/api/v1/mfa/webauthn', webauthnRouter)
   app.route('/api/v1/devices', devicesRouter)
   app.route('/api/v1/enrollments', enrollmentsRouter)
   app.route('/api/docs', docsRouter)
+
+  // ── Discovery at the issuer (OpenID Connect Discovery §4, RFC 8414 §3) ──
+  for (const path of issuerDiscoveryPaths(env.JWT_ISSUER)) app.get(path, nativeDiscovery)
 
   // ── 404 ──────────────────────────────────────────────────────────
   app.notFound((c) => c.json({ error: 'NOT_FOUND', message: 'Route not found' }, 404))
