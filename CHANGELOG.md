@@ -2,7 +2,10 @@
 
 ## [Unreleased]
 
-**Upgrade notes.** No database migration and no settings change. Group role assignments now
+## [2.4.0] - 2026-11-26
+
+**Upgrade notes.** No database migration and no settings change. Replace the image with
+`ghcr.io/cheftaco/oathweave:2.4.0`. Group role assignments now
 reach tokens, so a user who is a member of a group gains that group's roles and permissions at
 their next sign-in or refresh; review group role assignments before upgrading. A confidential
 client must now send its client secret on the `refresh_token` grant, as it already must for code
@@ -47,6 +50,9 @@ sends a secret containing `%` or `+` unencoded in Basic must encode it, or send 
 - **`id_token` is issued only for an exact `openid` scope token**, not for any scope containing the
   substring. A `client_credentials` response now reports the scope that was granted (the requested
   permissions the client may hold), not the scope that was requested.
+- **Startup and audit-retention logs no longer print configuration values.** The listener, port
+  conflict and permission errors and the audit-retention messages say what to check without
+  printing the bound host, the retention age or raw error objects.
 
 ## [2.3.3] - 2026-11-24
 
