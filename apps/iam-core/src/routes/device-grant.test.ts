@@ -113,6 +113,21 @@ describe('the device authorization grant', () => {
     expect(await refused.json()).toMatchObject({ error: 'unauthorized_client' })
   })
 
+  it('issues a token for the device client that cannot approve another device or manage Oathweave', async () => {
+    const first = await start('cli')
+    expect((await decide(first.user_code, 'approve')).status).toBe(200)
+    const tokens = (await (await poll('cli', await sincePoll(first.device_code))).json()) as { access_token: string }
+    const claims = JSON.parse(Buffer.from(tokens.access_token.split('.')[1]!, 'base64url').toString()) as Record<string, unknown>
+    expect(claims).toMatchObject({ aud: 'cli', clientId: 'cli' })
+
+    const second = await start('cli')
+    const approved = await decide(second.user_code, 'approve', tokens.access_token)
+    expect(approved.status).toBe(401)
+    expect(await approved.json()).toMatchObject({ error: 'INVALID_AUDIENCE' })
+    expect((await harness.request('/api/v1/roles', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(401)
+    expect((await harness.request('/api/v1/oauth/userinfo', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(200)
+  })
+
   it('needs a signed-in person to approve', async () => {
     const started = await start('cli')
     const anonymous = await harness.request('/api/v1/oauth/device', {

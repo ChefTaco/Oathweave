@@ -31,8 +31,23 @@ Tokens issued without a scope, such as native sign-in, keep every claim.
 **Device authorization grant.** `20261126000300_device_authorization` adds the
 `device_authorizations` table. The grant is off until `IAM_DEVICE_VERIFICATION_URL` is set.
 
+**Relying-party tokens.** A person's access token issued to a client other than a HiveXUI
+browser-policy client (the authorization code and device grants) now carries an `aud`: the
+audience the client's machine policy names, otherwise the client's id. Oathweave accepts it
+only at `GET /oauth/userinfo` and `POST /auth/logout`; anything else answers 401
+`INVALID_AUDIENCE`. Native sign-in tokens, service tokens and the
+`hivexui-oathweave` token are unchanged. An integration that called the management API with a
+token from its own authorization code or device sign-in must call it with a native sign-in, a
+`hivexui-oathweave` or a service token instead (no suite product does).
+
 ### Security
 
+- **A relying party's token no longer manages Oathweave.** Tokens from the authorization code and
+  device grants for clients without a browser policy had no audience and carried every
+  permission of the person, and the management API accepted them like a native sign-in, so a
+  third-party relying party holding an administrator's token could act as that administrator.
+  They are now addressed to their client (`aud`) and reach only UserInfo and sign-out here, so
+  they also cannot approve other device codes, authorize other clients or change the password.
 - **The `hive-router` client token is read-only without an operator.** A `client_credentials`
   token for `hive-router` can hold IAM user, role, client and policy writes, and with no
   `x-hive-operator` header it was treated as unrestricted. A write (any method but GET, HEAD and

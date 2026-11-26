@@ -88,12 +88,12 @@ describe('a replayed authorization code', () => {
     const first = await exchange('replay-spa', value)
     expect(first.status).toBe(200)
     const tokens = (await first.json()) as { access_token: string; refresh_token: string }
-    expect((await harness.request('/api/v1/auth/me', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(200)
+    expect((await harness.request('/api/v1/oauth/userinfo', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(200)
 
     const replay = await exchange('replay-spa', value)
     expect(replay.status).toBe(400)
     expect(await replay.json()).toMatchObject({ error: 'invalid_grant' })
-    expect((await harness.request('/api/v1/auth/me', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(401)
+    expect((await harness.request('/api/v1/oauth/userinfo', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(401)
     expect((await harness.request('/api/v1/oauth/token', form({ grant_type: 'refresh_token', client_id: 'replay-spa', refresh_token: tokens.refresh_token }))).status).toBe(400)
     expect(auditEvents.find((event) => event.eventType === 'oauth.code_reuse')).toMatchObject({ detail: { sessionRevoked: true } })
     // The user's own sign-in session is a different session and stays.
@@ -107,7 +107,7 @@ describe('a replayed authorization code', () => {
     const tokens = (await (await exchange('replay-spa', value)).json()) as { access_token: string }
     const forged = await exchange('replay-spa', value, 'x'.repeat(43))
     expect(forged.status).toBe(400)
-    expect((await harness.request('/api/v1/auth/me', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(200)
+    expect((await harness.request('/api/v1/oauth/userinfo', { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(200)
   })
 })
 

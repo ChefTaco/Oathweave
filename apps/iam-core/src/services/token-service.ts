@@ -47,6 +47,18 @@ export function audienceForClient(clientId?: string): string | undefined {
   return clientId ? clientCredentialsPolicy(clientId)?.audience : undefined
 }
 
+/**
+ * `aud` of a person's access token. A client with a browser or machine client policy that names
+ * an audience gets that audience, as before; a token issued to any other client (a relying
+ * party's authorization code or device grant) is for that client alone, so it cannot be replayed
+ * at a suite product. Native sign-in tokens (no client) carry no `aud`. Whether a token may call
+ * Oathweave's own API is decided by its client in middleware/auth.ts, not by this claim.
+ */
+export function userAudienceForClient(clientId?: string): string | undefined {
+  if (!clientId) return undefined
+  return audienceForClient(clientId) ?? clientId
+}
+
 /** Native unless the client's machine policy selects the browser issuer. */
 export function issuerForClientCredentials(clientId: string): string {
   return clientCredentialsPolicy(clientId)?.issuer === 'browser' ? issuerForClient(clientId, env.JWT_ISSUER) : env.JWT_ISSUER
@@ -119,7 +131,7 @@ export async function issueTokenPair(
     .setIssuedAt(now)
     .setExpirationTime(now + accessLifetime)
     .setJti(nanoid())
-  const audience = audienceForClient(clientId)
+  const audience = userAudienceForClient(clientId)
   if (audience) token.setAudience(audience)
   const accessToken = await token.sign(privateKey)
 

@@ -130,6 +130,40 @@ describe('a generic OpenID Connect relying party', () => {
   })
 })
 
+describe('an access token issued to a relying party', () => {
+  const claimsOf = (token: string) => JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString()) as Record<string, unknown>
+  const bearer = (token: string, init: RequestInit = {}) => ({ ...init, headers: { ...(init.headers as Record<string, string>), authorization: `Bearer ${token}` } })
+
+  it('is addressed to that client, not to Oathweave', async () => {
+    const tokens = await authorize('openid profile')
+    expect(claimsOf(tokens.access_token)).toMatchObject({ aud: 'conformance-rp', clientId: 'conformance-rp' })
+    expect(claimsOf(user.accessToken).aud).toBeUndefined()
+  })
+
+  it('cannot call the management API even when the person may', async () => {
+    const tokens = await authorize('openid profile')
+    // The person's own native token reads users; the relying party's copy of their grants does not.
+    expect((await harness.request('/api/v1/users', bearer(user.accessToken))).status).toBe(200)
+    for (const [path, init] of [
+      ['/api/v1/users', {}],
+      ['/api/v1/auth/me', {}],
+      ['/api/v1/auth/sessions', {}],
+      ['/api/v1/oauth/authorize', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId: 'conformance-rp', redirectUri: REDIRECT, responseType: 'code', consent: 'approve' }) }],
+    ] as const) {
+      const response = await harness.request(path, bearer(tokens.access_token, init))
+      expect(response.status, path).toBe(401)
+      expect(await response.json()).toMatchObject({ error: 'INVALID_AUDIENCE' })
+    }
+  })
+
+  it('still reaches UserInfo and signs its own session out', async () => {
+    const tokens = await authorize('openid profile')
+    expect((await harness.request('/api/v1/oauth/userinfo', bearer(tokens.access_token))).status).toBe(200)
+    expect((await harness.request('/api/v1/auth/logout', bearer(tokens.access_token, { method: 'POST' }))).status).toBe(200)
+    expect((await harness.request('/api/v1/oauth/userinfo', bearer(tokens.access_token))).status).toBe(401)
+  })
+})
+
 describe('self-service sessions', () => {
   it('lists and ends only the caller’s own sessions', async () => {
     const second = await harness.login('grace', 'grace-fixture-password')
