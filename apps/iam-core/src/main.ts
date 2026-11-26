@@ -26,12 +26,14 @@ export async function startServer(): Promise<void> {
   startAuditRetention()
   console.log('  ✓ Audit retention started')
 
-  // Hourly: drop expired authorization codes and device sign-ins (expired rows grant nothing).
+  // Hourly: drop expired authorization codes and device sign-ins (expired rows grant nothing),
+  // and revocation events past the feed's retention.
   // The modules load on first use; the app has them loaded by then.
   const pruneGrants = async () => {
     const { cleanupExpiredCodes } = await import('./services/oauth-service.js')
     const { cleanupExpiredDeviceAuthorizations } = await import('./services/device-authorization.js')
-    await Promise.all([cleanupExpiredCodes(), cleanupExpiredDeviceAuthorizations()])
+    const { pruneRevocationEvents } = await import('./services/revocation-events.js')
+    await Promise.all([cleanupExpiredCodes(), cleanupExpiredDeviceAuthorizations(), pruneRevocationEvents()])
   }
   setInterval(() => void pruneGrants().catch(() => undefined), 3_600_000).unref()
 

@@ -300,6 +300,24 @@ export function buildOpenApiSpec() {
         iat: { type: 'number' },
       },
     },
+    RevocationHiveEvent: {
+      type: 'object',
+      description: 'HiveEvent v1. session.revoked: sourceRef is session:<sid>, the value of the tokens\' sid (ID token) and sessionId (access token) claims. user.sessions_revoked: every session of the user ended; sourceRef is user:<sub>. subject.actorId is the user (sub).',
+      additionalProperties: false,
+      required: ['id', 'product', 'type', 'severity', 'title', 'summary', 'occurredAt', 'link', 'sourceRef'],
+      properties: {
+        id: { type: 'string', maxLength: 128 },
+        product: { const: 'oathweave' },
+        type: { type: 'string', enum: ['session.revoked', 'user.sessions_revoked'] },
+        severity: { type: 'string', enum: ['info', 'warning'] },
+        title: { type: 'string' },
+        summary: { type: 'string' },
+        occurredAt: { type: 'string', format: 'date-time' },
+        subject: { type: 'object', additionalProperties: false, properties: { actorId: { type: 'string' } } },
+        link: { type: 'object', additionalProperties: false, required: ['product', 'path'], properties: { product: { const: 'oathweave' }, path: { type: 'string' } } },
+        sourceRef: { type: 'string', pattern: '^(session|user):' },
+      },
+    },
     Session: {
       type: 'object',
       required: ['id', 'userId', 'createdAt', 'expiresAt', 'revokedAt'],
@@ -338,6 +356,21 @@ export function buildOpenApiSpec() {
         summary: 'Review distinct active sessions; requires iam:sessions:revoke',
         security: [{ BearerAuth: [] }],
         responses: { ...success({ type: 'object', required: ['sessions'], properties: { sessions: { type: 'array', items: ref('Session') } } }), 401: err401, 403: err403 },
+      },
+    },
+    '/api/v1/hive/events': {
+      get: {
+        tags: ['Sessions'], operationId: 'listRevocationEvents',
+        summary: 'Session revocations as a HiveEvent v1 feed, oldest first, for products that cache session checks; requires iam:tokens:introspect or iam:sessions:revoke',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          qp('after', 'nextCursor of the previous page; omit for the oldest retained event (seven days)'),
+          qp('limit', 'Events per page, 1-200 (default 100)', false, { type: 'integer', minimum: 1, maximum: 200 }),
+        ],
+        responses: {
+          ...success({ type: 'object', required: ['data', 'nextCursor'], properties: { data: { type: 'array', items: ref('RevocationHiveEvent') }, nextCursor: { type: ['string', 'null'] } } }),
+          400: err400, 401: err401, 403: err403,
+        },
       },
     },
     '/api/v1/sessions/{id}': {

@@ -13,13 +13,16 @@ const mock = vi.hoisted(() => ({
   refresh: [] as { sessionId: string; revokedAt: Date | null }[],
   updated: vi.fn(),
   refreshUpdated: vi.fn(),
+  events: [] as { type: string; userId: string; sessionId: string | null; reason: string }[],
 }))
 vi.mock('../config/env.js', () => ({ env: { JWT_REFRESH_TTL: 3600 } }))
 vi.mock('./session-risk-service.js', () => ({
   computeSessionRisk: async () => ({ score: 0.1, factors: ['shared_network'] }),
   deriveDeviceFingerprint: () => 'synthetic-shared-fingerprint',
 }))
-vi.mock('../db/client.js', () => ({ prisma: {
+vi.mock('../db/client.js', () => { const prisma = {
+  $transaction: async (run: (transaction: unknown) => Promise<unknown>) => run(prisma),
+  revocationEvent: { createMany: async ({ data }: { data: typeof mock.events }) => { mock.events.push(...data); return { count: data.length } } },
   session: {
     create: async ({ data }: { data: Omit<Session, 'revokedAt'> }) => {
       const session = { ...data, revokedAt: null }; mock.sessions.push(session); return session
@@ -29,18 +32,19 @@ vi.mock('../db/client.js', () => ({ prisma: {
         (where.revokedAt !== null || row.revokedAt === null) &&
         (!where.expiresAt || row.expiresAt > where.expiresAt.gt)),
     findUnique: async ({ where }: { where: { id: string } }) => mock.sessions.find(row => row.id === where.id) ?? null,
-    update: mock.updated,
-    updateMany: vi.fn(() => { throw Error('Unexpected bulk session mutation') }),
+    // Revocation is conditional on the session being live; anything wider is a bug.
+    updateMany: mock.updated,
   },
   refreshToken: { updateMany: mock.refreshUpdated },
-} }))
+}; return { prisma } })
 import { createSession, deduplicateSessions, listActiveSessions, revokeAllUserSessions, revokeSession } from './session-service.js'
 beforeEach(() => {
-  vi.clearAllMocks(); mock.sessions.length = 0; mock.refresh.length = 0
-  mock.updated.mockImplementation(async ({ where, data }: { where: { id: string }; data: { revokedAt: Date; revokedBy?: string } }) => {
-    const row = mock.sessions.find(session => session.id === where.id)
-    if (!row) throw Error('Unknown synthetic session')
-    Object.assign(row, data); return row
+  vi.clearAllMocks(); mock.sessions.length = 0; mock.refresh.length = 0; mock.events.length = 0
+  mock.updated.mockImplementation(async ({ where, data }: { where: { id: string; revokedAt: null }; data: { revokedAt: Date; revokedBy?: string } }) => {
+    if (typeof where.id !== 'string' || where.revokedAt !== null) throw Error('Unexpected bulk session mutation')
+    const row = mock.sessions.find(session => session.id === where.id && session.revokedAt === null)
+    if (!row) return { count: 0 }
+    Object.assign(row, data); return { count: 1 }
   })
   mock.refreshUpdated.mockImplementation(async ({ where, data }: { where: { sessionId: string }; data: { revokedAt: Date } }) => {
     for (const row of mock.refresh) if (row.sessionId === where.sessionId && row.revokedAt === null) row.revokedAt = data.revokedAt
@@ -89,4 +93,21 @@ it('keeps the original revocation record when a session is revoked again', async
   await expect(revokeSession(first.sessionId, 'synthetic-other')).resolves.toBe(true)
   expect(mock.sessions[0]).toMatchObject({ revokedAt, revokedBy: 'synthetic-operator' })
   expect(mock.updated).toHaveBeenCalledTimes(1)
+})
+it('records one session.revoked event per revocation, with the reason and no credential', async () => {
+  const first = await createSession('synthetic-user')
+  await revokeSession(first.sessionId, 'synthetic-operator', { reason: 'admin' })
+  await revokeSession(first.sessionId, 'synthetic-operator', { reason: 'admin' })
+  expect(mock.events).toEqual([{ type: 'session.revoked', userId: 'synthetic-user', sessionId: first.sessionId, reason: 'admin' }])
+})
+it('revoke-all records each session and then the user, also when no session is live', async () => {
+  const first = await createSession('synthetic-user'); const second = await createSession('synthetic-user')
+  await revokeAllUserSessions('synthetic-user', 'synthetic-operator', { reason: 'user_deactivated' })
+  await revokeAllUserSessions('synthetic-user', 'synthetic-operator', { reason: 'user_deactivated' })
+  expect(mock.events).toEqual([
+    { type: 'session.revoked', userId: 'synthetic-user', sessionId: first.sessionId, reason: 'user_deactivated' },
+    { type: 'session.revoked', userId: 'synthetic-user', sessionId: second.sessionId, reason: 'user_deactivated' },
+    { type: 'user.sessions_revoked', userId: 'synthetic-user', sessionId: null, reason: 'user_deactivated' },
+    { type: 'user.sessions_revoked', userId: 'synthetic-user', sessionId: null, reason: 'user_deactivated' },
+  ])
 })

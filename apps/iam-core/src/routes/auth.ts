@@ -13,7 +13,7 @@ import {
   rotateRefreshToken,
   revokeRefreshToken,
 } from '../services/token-service.js'
-import { createSession, revokeSession } from '../services/session-service.js'
+import { createSession, revokeSession, revokeUserSessionsInTransaction } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
 import {
   generateTotpSecret,
@@ -338,7 +338,7 @@ authRouter.post('/logout', authMiddleware, async (c) => {
   const refreshToken = getCookie(c, 'iam_refresh')
 
   if (principal.sessionId) {
-    await revokeSession(principal.sessionId, principal.sub)
+    await revokeSession(principal.sessionId, principal.sub, { reason: 'sign_out' })
   }
   if (refreshToken) {
     await revokeRefreshToken(refreshToken, { userId: principal.sub })
@@ -426,7 +426,7 @@ authRouter.delete('/sessions/:id', browserAuthorization, async (c) => {
     select: { id: true },
   })
   if (!session) throw new ApiError(404, 'NOT_FOUND', 'Session not found')
-  await revokeSession(session.id, principal.sub)
+  await revokeSession(session.id, principal.sub, { reason: 'self_service' })
   await logAuditEvent({
     eventType: 'session.revoked',
     category: 'AUTHENTICATION',
@@ -554,7 +554,7 @@ authRouter.post('/password', authMiddleware, async (c) => {
       select: { id: true },
     })
     for (const s of otherSessions) {
-      await revokeSession(s.id, principal.sub)
+      await revokeSession(s.id, principal.sub, { reason: 'password_change' })
     }
   }
 
@@ -1129,10 +1129,7 @@ authRouter.post(
         },
       })
       // Revoke all active sessions (security: password was compromised or forgotten)
-      await transaction.session.updateMany({
-        where: { userId: resetToken.userId, revokedAt: null },
-        data: { revokedAt: new Date(), revokedBy: 'password_reset' },
-      })
+      await revokeUserSessionsInTransaction(transaction, resetToken.userId, 'password_reset', 'password_reset')
       await transaction.refreshToken.deleteMany({
         where: { userId: resetToken.userId },
       })

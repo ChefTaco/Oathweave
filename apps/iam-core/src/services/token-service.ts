@@ -331,7 +331,7 @@ async function revokeReplayedRefreshSession(
     select: { id: true },
   })
   if (!live) return
-  await revokeSession(token.sessionId)
+  await revokeSession(token.sessionId, undefined, { reason: 'refresh_reuse' })
   await logAuditEvent({
     eventType: 'token.refresh_reuse',
     category: 'TOKEN',

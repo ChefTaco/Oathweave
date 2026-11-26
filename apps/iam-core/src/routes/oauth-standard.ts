@@ -174,12 +174,12 @@ async function endSession(c: Context, parameters: Record<string, string | undefi
   const ended: string[] = []
   if (hint?.sid) {
     const session = await prisma.session.findUnique({ where: { id: hint.sid }, select: { userId: true } })
-    if (session?.userId === hint.sub && (await revokeSession(hint.sid, 'rp_logout'))) ended.push(hint.sid)
+    if (session?.userId === hint.sub && (await revokeSession(hint.sid, 'rp_logout', { reason: 'sign_out' }))) ended.push(hint.sid)
   }
   // The suite browser session (a SameSite=Strict cookie, so only a same-site request carries it).
   if (getCookie(c, '__Host-oathweave_sso')) {
     const browser = await browserPrincipal(c)
-    if (browser?.sessionId && !ended.includes(browser.sessionId) && (await revokeSession(browser.sessionId, 'rp_logout'))) ended.push(browser.sessionId)
+    if (browser?.sessionId && !ended.includes(browser.sessionId) && (await revokeSession(browser.sessionId, 'rp_logout', { reason: 'sign_out' }))) ended.push(browser.sessionId)
     clearBrowserSessionCookie(c)
   }
   if (ended.length > 0) {

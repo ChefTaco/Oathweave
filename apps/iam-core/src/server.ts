@@ -16,6 +16,7 @@ import { serviceAccountsRouter } from './routes/service-accounts.js'
 import { clientsRouter } from './routes/clients.js'
 import { tokensRouter } from './routes/tokens.js'
 import { sessionsRouter } from './routes/sessions.js'
+import { hiveEventsRouter } from './routes/hive-events.js'
 import { systemUsersRouter } from './routes/system-users.js'
 import { auditRouter } from './routes/audit.js'
 import { passwordPolicyRouter } from './routes/password-policy.js'
@@ -95,6 +96,7 @@ export function createApp(): Hono {
   app.route('/api/v1/clients', clientsRouter)
   app.route('/api/v1/tokens', tokensRouter)
   app.route('/api/v1/sessions', sessionsRouter)
+  app.route('/api/v1/hive', hiveEventsRouter)
   app.route('/api/v1/system-users', systemUsersRouter)
   app.route('/api/v1/audit', auditRouter)
   app.route('/api/v1/password-policy', passwordPolicyRouter)

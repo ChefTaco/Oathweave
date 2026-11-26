@@ -7,7 +7,9 @@ const mocks = vi.hoisted(() => ({
   active: true,
   permissionsJson: '[]',
   deleted: vi.fn(),
-  revoked: vi.fn(),
+  revoked: vi.fn(async () => ({ count: 1 })),
+  refreshRevoked: vi.fn(),
+  events: vi.fn(),
   keys: null as unknown as Awaited<ReturnType<typeof generateKeyPair>>,
   jwks: { keys: [] } as { keys: object[] },
 }))
@@ -46,8 +48,15 @@ vi.mock('./auth.js', () => ({
 vi.mock('../db/client.js', () => ({
   prisma: {
     refreshToken: { deleteMany: mocks.deleted },
+    $transaction: async (run: (transaction: unknown) => Promise<unknown>) => run({
+      session: {
+        findUnique: async () => ({ userId: 'fake-user', revokedAt: null }),
+        updateMany: mocks.revoked,
+      },
+      refreshToken: { updateMany: mocks.refreshRevoked },
+      revocationEvent: { createMany: mocks.events },
+    }),
     session: {
-      updateMany: mocks.revoked,
       findFirst: async () =>
         mocks.active
           ? {
@@ -203,8 +212,16 @@ describe('browser SSO session transport', () => {
       ).status,
     ).toBe(200)
     expect(mocks.revoked).toHaveBeenCalledWith({
-      where: { id: 'fake-session', userId: 'fake-user' },
+      where: { id: 'fake-session', revokedAt: null },
+      data: { revokedAt: expect.any(Date), revokedBy: 'fake-user' },
+    })
+    // Sign-out also ends the session's refresh tokens and tells suite products.
+    expect(mocks.refreshRevoked).toHaveBeenCalledWith({
+      where: { sessionId: 'fake-session', revokedAt: null },
       data: { revokedAt: expect.any(Date) },
+    })
+    expect(mocks.events).toHaveBeenCalledWith({
+      data: [{ type: 'session.revoked', userId: 'fake-user', sessionId: 'fake-session', reason: 'sign_out' }],
     })
   })
 })

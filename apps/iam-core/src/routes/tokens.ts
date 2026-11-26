@@ -98,7 +98,7 @@ tokensRouter.post('/revoke-own', authMiddleware, async (c) => {
     }
     // Revoke the associated session
     if (payload.sessionId) {
-      await revokeSession(payload.sessionId, principal.sub)
+      await revokeSession(payload.sessionId, principal.sub, { reason: 'token_revocation' })
     }
   } catch {
     // If the token is invalid / expired, treat it as one of the caller's refresh tokens

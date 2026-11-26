@@ -10,6 +10,7 @@ import {
   getSigningKeyId,
 } from '../utils/keys.js'
 import { verifyAccessToken } from '../services/token-service.js'
+import { revokeSession } from '../services/session-service.js'
 import { authMiddleware } from './auth.js'
 import { userTokenGrants } from '../services/effective-grants.js'
 import { ApiError, type Principal } from '../types/index.js'
@@ -144,11 +145,8 @@ export const browserAuthorization: MiddlewareHandler = async (c, next) => {
 export async function clearBrowserSession(c: Context): Promise<void> {
   requireBrowserOrigin(c)
   const principal = await browserPrincipal(c)
-  if (principal?.sessionId)
-    await prisma.session.updateMany({
-      where: { id: principal.sessionId, userId: principal.sub },
-      data: { revokedAt: new Date() },
-    })
+  // browserPrincipal() answers only for a live session of this user.
+  if (principal?.sessionId) await revokeSession(principal.sessionId, principal.sub, { reason: 'sign_out' })
   clearBrowserSessionCookie(c)
 }
 

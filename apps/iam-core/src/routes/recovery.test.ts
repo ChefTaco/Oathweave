@@ -19,7 +19,8 @@ const mock = vi.hoisted(() => ({
     updateMany: vi.fn(),
     create: vi.fn(),
   },
-  session: { updateMany: vi.fn() },
+  session: { updateMany: vi.fn(), findMany: vi.fn(async () => [{ id: 'fake-session' }]) },
+  revocationEvent: { createMany: vi.fn() },
   refreshToken: { deleteMany: vi.fn() },
   authorizationCode: { deleteMany: vi.fn() },
   outbox: vi.fn(async () => '/opt/private/recovery'),
@@ -143,6 +144,14 @@ it('concurrent use of a reset token changes the password once and revokes every 
   expect(responses.map((r) => r.status).sort()).toEqual([200, 400])
   expect(mock.user.update).toHaveBeenCalledOnce()
   expect(mock.session.updateMany).toHaveBeenCalledOnce()
+  // The revocations are recorded for suite products in the same transaction.
+  expect(mock.revocationEvent.createMany).toHaveBeenCalledOnce()
+  expect(mock.revocationEvent.createMany).toHaveBeenCalledWith({
+    data: [
+      { type: 'session.revoked', userId: 'fake-user', sessionId: 'fake-session', reason: 'password_reset' },
+      { type: 'user.sessions_revoked', userId: 'fake-user', sessionId: null, reason: 'password_reset' },
+    ],
+  })
   expect(mock.refreshToken.deleteMany).toHaveBeenCalledOnce()
   expect(mock.authorizationCode.deleteMany).toHaveBeenCalledOnce()
 })
