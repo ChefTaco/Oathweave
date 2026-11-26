@@ -55,6 +55,15 @@ token from its own authorization code or device sign-in must call it with a nati
 - **System login honours group roles.** `POST /system-users/check` (the PAM agent) read only
   directly assigned roles, so `iam:system:login` granted through a group was denied; it now uses
   the same direct-plus-group grants as sign-in.
+- **Refresh retries no longer sign people out.** Reuse detection had no grace, so two refreshes
+  racing (two tabs, a retried request after a lost response) revoked the whole session. A refresh
+  token sent again within 10 seconds of its rotation is now answered with the pair that rotation
+  already issued, provided that successor is still unused and every refresh check still passes
+  (`token.refresh_retry` audit event); nothing new is minted, so a copied token used in the window
+  gets the same successor as its holder and the next use of the other copy is still detected as a
+  replay. After the window, or once the successor was used, reuse revokes the session as before.
+  The successor is held in Redis for the window only, sealed with a key derived from the consumed
+  token, which is never stored; without Redis the window is off.
 - **The `hive-router` client token is read-only without an operator.** A `client_credentials`
   token for `hive-router` can hold IAM user, role, client and policy writes, and with no
   `x-hive-operator` header it was treated as unrestricted. A write (any method but GET, HEAD and
