@@ -7,6 +7,7 @@ import { logAuditEvent } from '../services/audit-service.js'
 import { getClientIp } from '../utils/ip.js'
 import { parseBody } from '../utils/validate.js'
 import { assertMayManageUser, resolveActor } from '../services/privilege-guard.js'
+import { userTokenGrants } from '../services/effective-grants.js'
 import {
   CreateSystemUserSchema,
   UpdateSystemUserSchema,
@@ -140,11 +141,7 @@ systemUsersRouter.post('/check', async (c) => {
 
   const systemUser = await prisma.systemUser.findUnique({
     where: { linuxUsername: body.linuxUsername },
-    include: {
-      user: {
-        include: { roles: { include: { role: true } } },
-      },
-    },
+    include: { user: true },
   })
 
   const deny = (reason: string) => {
@@ -167,12 +164,8 @@ systemUsersRouter.post('/check', async (c) => {
   if (!systemUser.user.active) return deny('user_inactive')
   if (accountLockActive(systemUser.user.lockedUntil)) return deny('account_locked')
 
-  const permissions: string[] = [
-    ...new Set(systemUser.user.roles.flatMap((r) => {
-      const perms = r.role.permissions
-      return (typeof perms === 'string' ? JSON.parse(perms) : perms) as string[]
-    })),
-  ]
+  // Direct and group roles, as the person's tokens carry them.
+  const { permissions } = await userTokenGrants(systemUser.user.id)
   if (!permissions.includes('iam:system:login')) return deny('insufficient_permissions')
 
   const authorizedHosts: string[] = typeof systemUser.authorizedHosts === 'string'

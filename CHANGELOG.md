@@ -48,6 +48,13 @@ token from its own authorization code or device sign-in must call it with a nati
   third-party relying party holding an administrator's token could act as that administrator.
   They are now addressed to their client (`aud`) and reach only UserInfo and sign-out here, so
   they also cannot approve other device codes, authorize other clients or change the password.
+- **Deleting or changing a group needs standing over its roles.** `DELETE /groups/:id` and
+  `PATCH /groups/:id` now apply the privilege guard that already covered group members and
+  roles, so a holder of `iam:groups:write` can no longer delete the group that grants
+  `SUPER_ADMIN` (taking it from every member) unless they hold what the group grants.
+- **System login honours group roles.** `POST /system-users/check` (the PAM agent) read only
+  directly assigned roles, so `iam:system:login` granted through a group was denied; it now uses
+  the same direct-plus-group grants as sign-in.
 - **The `hive-router` client token is read-only without an operator.** A `client_credentials`
   token for `hive-router` can hold IAM user, role, client and policy writes, and with no
   `x-hive-operator` header it was treated as unrestricted. A write (any method but GET, HEAD and
