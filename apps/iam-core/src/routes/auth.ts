@@ -494,7 +494,6 @@ authRouter.post('/password', authMiddleware, async (c) => {
     where: { id: user.id },
     data: {
       passwordHash: newHash,
-      encryptedPassword: null,
       passwordChangedAt: new Date(),
     },
   })
@@ -1079,7 +1078,6 @@ authRouter.post(
         where: { id: resetToken.userId },
         data: {
           passwordHash,
-          encryptedPassword: null,
           passwordChangedAt: new Date(),
           failedAttempts: 0,
           lockedUntil: null,

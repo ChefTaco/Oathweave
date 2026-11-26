@@ -5,6 +5,7 @@ const VALID_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_creden
 export const CreateClientSchema = z.object({
   name: z.string().min(2).max(128).regex(/^[a-z0-9-]+$/),
   description: z.string().optional(),
+  // Deprecated: leave it out and the server generates the secret and returns it once.
   secret: z.string().min(16).optional(),
   clientType: z.enum(['public', 'confidential']).default('confidential'),
   redirectUris: z.array(z.url()).default([]),
@@ -12,8 +13,8 @@ export const CreateClientSchema = z.object({
   firstParty: z.boolean().default(false),
   allowedIps: z.array(IpAllowlistEntrySchema).default([]),
 }).refine(
-  (data) => data.clientType === 'public' || data.secret,
-  { error: 'Confidential clients must provide a secret', path: ['secret'] },
+  (data) => data.clientType !== 'public' || data.secret === undefined,
+  { error: 'Public clients have no secret', path: ['secret'] },
 ).refine(
   (data) => data.clientType !== 'public' || !data.grantTypes.includes('client_credentials'),
   { error: 'Public clients cannot use client_credentials grant', path: ['grantTypes'] },
@@ -28,6 +29,7 @@ export const UpdateClientSchema = z.object({
   allowedIps: z.array(IpAllowlistEntrySchema).optional(),
 })
 
+// Deprecated `secret`: leave it out and the server generates the new secret and returns it once.
 export const RotateClientSecretSchema = z.object({
-  secret: z.string().min(32),
+  secret: z.string().min(32).optional(),
 })

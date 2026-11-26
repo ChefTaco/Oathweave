@@ -169,7 +169,6 @@ async function seedRecords(
       username: adminUsername,
       displayName: 'IAM Administrator',
       passwordHash,
-      encryptedPassword: null,
       passwordChangedAt: new Date(),
       active: true,
     },

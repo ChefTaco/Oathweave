@@ -23,6 +23,14 @@ advisory will credit you unless you ask not to be named.
 
 - Run every service over TLS in production, and keep admin listeners on a private network.
 - Keep `.env` files, IAM signing keys, and TLS keys readable only by root or the service user.
-- Rotate client secrets with `POST /api/v1/clients/:id/rotate-secret` and JWT signing keys with
-  the root-owned helper; see [apps/iam-core/README.md](apps/iam-core/README.md) and
-  [README.md](README.md#deployment).
+- Rotate client secrets with `POST /api/v1/clients/:id/rotate-secret` (send no `secret` and the
+  server generates one and returns it once) and JWT signing keys with the root-owned helper; see
+  [apps/iam-core/README.md](apps/iam-core/README.md) and [README.md](README.md#deployment).
+- Guard the `hive-router` client secret like an administrator password. A `client_credentials`
+  token for it can hold `iam:users:*`, `iam:roles:write`, `iam:clients:write`, `iam:policy:write`
+  and `iam:sessions:revoke`: whoever holds the secret can read and change every account, role
+  and client. The model gateway's console proxy uses it on behalf of a signed-in console operator,
+  whom it names in `x-hive-operator`. Oathweave refuses a write made with this token that names
+  no operator (the token alone is read-only), and checks operators signed in through Oathweave
+  (`authMode: "iam-oidc"`) as themselves. Operators the gateway signs in by host account
+  (`authMode: "os"`) act unrestricted, so restrict who can reach that console.

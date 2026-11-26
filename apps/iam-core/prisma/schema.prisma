@@ -41,7 +41,6 @@ model User {
   username          String    @unique
   displayName       String
   passwordHash      String
-  encryptedPassword String?   // Legacy migration column; production writes and migrations keep this null.
   active            Boolean   @default(true)
   mfaEnabled     Boolean   @default(false)
   mfaSecret      String?
@@ -394,6 +393,7 @@ model AuthorizationCode {
   state         String?   // Opaque state passed by client
   expiresAt     DateTime  // 10-minute validity
   usedAt        DateTime?
+  issuedSessionId String? // Session the exchange issued tokens for; a replay revokes it
   createdAt     DateTime  @default(now())
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)

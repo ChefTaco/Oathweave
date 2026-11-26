@@ -1000,12 +1000,12 @@ export function buildOpenApiSpec() {
       },
       post: {
         tags: ['Clients'],
-        summary: 'Create client',
+        summary: 'Create client. A confidential client sent without secret gets a server-generated one, returned once as clientSecret',
         operationId: 'createClient',
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('CreateClientRequest')),
         responses: {
-          ...created(ref('Client')),
+          ...created({ type: 'object', properties: { client: ref('Client'), clientSecret: { type: 'string', description: 'Only when the server generated the secret; shown once' } } }),
           400: err400,
           401: err401,
           403: err403,
@@ -1048,15 +1048,15 @@ export function buildOpenApiSpec() {
     '/api/v1/clients/{id}/rotate-secret': {
       post: {
         tags: ['Clients'],
-        summary: 'Rotate a confidential client secret',
+        summary: 'Rotate a confidential client secret. Send no secret (or no body) and the server generates one, returned once as clientSecret',
         operationId: 'rotateClientSecret',
         security: [{ BearerAuth: [] }],
         parameters: [pp('id', 'Client ID')],
-        requestBody: jsonBody(ref('RotateClientSecretRequest')),
+        requestBody: { required: false, content: { 'application/json': { schema: ref('RotateClientSecretRequest') } } },
         responses: {
           ...success({
             type: 'object',
-            properties: { success: { type: 'boolean' } },
+            properties: { success: { type: 'boolean' }, clientSecret: { type: 'string', description: 'Only when the server generated the secret; shown once' } },
           }),
           400: err400,
           401: err401,

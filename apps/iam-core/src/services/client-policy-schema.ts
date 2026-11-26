@@ -10,6 +10,7 @@ const policySchema = z.object({
   issuer: z.enum(['native', 'browser']).default('native'),
 }).strict();
 export type ClientPolicy = z.infer<typeof policySchema>;
+// The built-in policies in client-policies.ts.
 const reserved = new Set(['hive-router', 'security-exporter', 'example-portal']);
 export function parseClientPolicies(raw = '{}'): Readonly<Record<string, ClientPolicy>> {
   const policies = z.record(z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/), policySchema).parse(JSON.parse(raw));

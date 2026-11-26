@@ -2,7 +2,9 @@ import {describe,it,expect} from 'vitest'
 import {CreateIamClientRequestSchema,IamAssignRolesRequestSchema,EnrollmentRequestSchema,IamUserSchema,IamClientMutationResponseSchema,UpdateIamPasswordPolicyRequestSchema} from './browser-contracts.js'
 describe('owned browser identity contracts',()=>{
  it('retains actual request refinements and prevents public-client secret-flow confusion',()=>{
-  expect(()=>CreateIamClientRequestSchema.parse({name:'fixture-client'})).toThrow()
+  // A confidential client may leave its secret out: the server generates it and returns it once.
+  expect(CreateIamClientRequestSchema.parse({name:'fixture-client'}).secret).toBeUndefined()
+  expect(()=>CreateIamClientRequestSchema.parse({name:'fixture-client',clientType:'public',secret:'x'.repeat(32)})).toThrow()
   expect(()=>CreateIamClientRequestSchema.parse({name:'fixture-client',clientType:'public',grantTypes:['client_credentials']})).toThrow()
   expect(CreateIamClientRequestSchema.parse({name:'fixture-client',clientType:'public'}).clientType).toBe('public')
   expect(()=>IamAssignRolesRequestSchema.parse({roleIds:[]})).toThrow()

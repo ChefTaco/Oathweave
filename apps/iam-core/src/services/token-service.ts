@@ -1,5 +1,5 @@
 import { browserAccessLifetime, issuerForClient, browserClientPolicies, browserIssuedMachineClients, browserPermissions } from './browser-policies.js'
-import { machineClientPolicies } from './client-policies.js';
+import { clientCredentialsPolicy } from './client-policies.js';
 import { createLocalJWKSet, SignJWT, jwtVerify, type JWTPayload } from 'jose'
 import { nanoid } from 'nanoid'
 import { createHash } from 'node:crypto'
@@ -28,69 +28,33 @@ export interface AccessTokenPayload extends JWTPayload {
   jti: string
 }
 
-const HIVE_ROUTER_PROXY_CLIENT_ID = 'hive-router'
-const SECURITY_EXPORTER_CLIENT_ID = 'security-exporter'
-const EXAMPLE_PORTAL_CLIENT_ID = 'example-portal'
-const HIVE_ROUTER_AUDIENCE = 'hive-router'
-const EXAMPLE_PORTAL_AUDIENCE = 'example-portal'
-const EXAMPLE_PORTAL_CLIENT_PERMISSIONS = new Set(['example-portal:read'])
-const HIVE_ROUTER_PROXY_PERMISSIONS = new Set([
-  'iam:policy:write',
-  'iam:users:read',
-  'iam:users:write',
-  'iam:users:delete',
-  'iam:roles:read',
-  'iam:roles:write',
-  'iam:sa:read',
-  'iam:sa:write',
-  'iam:sa:delete',
-  'iam:clients:read',
-  'iam:clients:write',
-  'iam:audit:read',
-  'iam:sessions:revoke',
-  'iam:system:login',
-  'iam:tokens:introspect',
-])
-
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
 /** Every permission a client_credentials token for this client could ever carry. */
 export function clientCredentialsPermissionCeiling(clientId: string): string[] {
-  if (clientId === SECURITY_EXPORTER_CLIENT_ID) return ['iam:audit:read', 'router:security-events:read']
-  if (clientId === EXAMPLE_PORTAL_CLIENT_ID) return [...EXAMPLE_PORTAL_CLIENT_PERMISSIONS]
-  if (clientId === HIVE_ROUTER_PROXY_CLIENT_ID) return [...HIVE_ROUTER_PROXY_PERMISSIONS]
-  return [...(machineClientPolicies[clientId]?.permissions ?? [])]
+  return [...(clientCredentialsPolicy(clientId)?.permissions ?? [])]
 }
 
 export function permissionsForClientCredentials(clientId: string, scope?: string): string[] {
   if (!scope) return []
-  const requested = scope.split(/\s+/).map((entry) => entry.trim()).filter(Boolean)
-  if (clientId === SECURITY_EXPORTER_CLIENT_ID) {
-    return requested.filter((permission) => ['iam:audit:read', 'router:security-events:read'].includes(permission))
-  }
-  if (clientId === EXAMPLE_PORTAL_CLIENT_ID) {
-    return requested.filter((permission) => EXAMPLE_PORTAL_CLIENT_PERMISSIONS.has(permission))
-  }
-  if (clientId !== HIVE_ROUTER_PROXY_CLIENT_ID) return requested.filter((permission) => machineClientPolicies[clientId]?.permissions.includes(permission))
-  return requested.filter((permission) => HIVE_ROUTER_PROXY_PERMISSIONS.has(permission))
+  const ceiling = new Set(clientCredentialsPolicy(clientId)?.permissions ?? [])
+  return scope.split(/\s+/).map((entry) => entry.trim()).filter((permission) => permission && ceiling.has(permission))
 }
 
 export function audienceForClient(clientId?: string): string | undefined {
   if (clientId && browserClientPolicies[clientId]) return browserClientPolicies[clientId]!.audience
-  if (clientId === SECURITY_EXPORTER_CLIENT_ID) return HIVE_ROUTER_AUDIENCE
-  if (clientId === EXAMPLE_PORTAL_CLIENT_ID) return EXAMPLE_PORTAL_AUDIENCE
-  return clientId ? machineClientPolicies[clientId]?.audience : undefined
+  return clientId ? clientCredentialsPolicy(clientId)?.audience : undefined
 }
 
 /** Native unless the client's machine policy selects the browser issuer. */
 export function issuerForClientCredentials(clientId: string): string {
-  return machineClientPolicies[clientId]?.issuer === 'browser' ? issuerForClient(clientId, env.JWT_ISSUER) : env.JWT_ISSUER
+  return clientCredentialsPolicy(clientId)?.issuer === 'browser' ? issuerForClient(clientId, env.JWT_ISSUER) : env.JWT_ISSUER
 }
 
 export function lifetimeForClientCredentials(clientId: string): number {
-  return Math.min(env.JWT_ACCESS_TTL, machineClientPolicies[clientId]?.lifetimeSeconds ?? env.JWT_ACCESS_TTL)
+  return Math.min(env.JWT_ACCESS_TTL, clientCredentialsPolicy(clientId)?.lifetimeSeconds ?? env.JWT_ACCESS_TTL)
 }
 
 export function clientCredentialsTokenProfile(

@@ -14,7 +14,7 @@ import { discoveryMetadataUrl } from '../config/browser-discovery.js'
 import { ApiError } from '../types/index.js'
 import { getPublishedSigningJwks } from '../utils/keys.js'
 import { issueTokenPair } from './token-service.js'
-import { createSession } from './session-service.js'
+import { createSession, revokeSession } from './session-service.js'
 import { parsePermissionList, userTokenGrants } from './effective-grants.js'
 import { checkIpAllowlist } from '../utils/ip-allowlist.js'
 import { logAuditEvent } from './audit-service.js'
@@ -309,24 +309,6 @@ export async function exchangeAuthorizationCode(
     throw new ApiError(400, 'INVALID_GRANT', 'Authorization code has expired')
   }
 
-  // Code must not be already used (RFC 6749 §4.1.2: MUST invalidate after use)
-  if (authCode.usedAt) {
-    // Potential replay attack. The attempt is refused and audited; tokens issued by the first
-    // exchange are not revoked, because a code does not record the session it produced.
-    await logAuditEvent({
-      eventType: 'oauth.code_reuse',
-      category: 'AUTHENTICATION',
-      actorId: authCode.userId,
-      actorType: 'USER',
-      ipAddress,
-      action: 'oauth_code_reuse_attempt',
-      outcome: 'DENIED',
-      detail: { clientId: authCode.clientId, codeId: authCode.id },
-      source: 'iam-api',
-    })
-    throw new ApiError(400, 'INVALID_GRANT', 'Authorization code has already been used')
-  }
-
   // Validate client_id matches
   if (authCode.clientId !== params.clientId) {
     throw new ApiError(400, 'INVALID_GRANT', 'Client ID does not match the authorization code')
@@ -362,26 +344,41 @@ export async function exchangeAuthorizationCode(
     }
   }
 
+  // Code must not be already used (RFC 6749 §4.1.2: MUST invalidate after use). The replay is
+  // judged only after it proved the client binding above, so a code copied from a log cannot be
+  // used to sign anyone out: whoever replays it holds the client's secret or PKCE verifier, and
+  // the tokens the first exchange issued are revoked with their session.
+  if (authCode.usedAt) {
+    await revokeReplayedCode(authCode, ipAddress)
+    throw new ApiError(400, 'INVALID_GRANT', 'Authorization code has already been used')
+  }
+
   if (!authCode.client.active) throw new ApiError(400, 'INVALID_GRANT', 'Client is inactive')
   if (authCode.browserSessionId) {
     const active = await prisma.session.findFirst({where:{id:authCode.browserSessionId,userId:authCode.userId,revokedAt:null,expiresAt:{gt:new Date()}}})
     if (!active) throw new ApiError(400, 'INVALID_GRANT', 'Browser session is inactive')
   }
-  const consumed = await prisma.authorizationCode.updateMany({
-    where: { id: authCode.id, usedAt:null, expiresAt:{gt:new Date()} },
-    data: { usedAt: new Date() },
-  })
-  if (consumed.count !== 1) throw new ApiError(400, 'INVALID_GRANT', 'Authorization code has already been consumed')
 
   // Validate user is still active
   if (!authCode.user.active) {
     throw new ApiError(400, 'INVALID_GRANT', 'User account is inactive')
   }
 
+  // The session is known before the code is consumed, so the consumption records it in the same
+  // write and a replay can always find what to revoke.
+  const createdSession = authCode.browserSessionId ? undefined : (await createSession(authCode.userId, ipAddress)).sessionId
+  const sessionId = authCode.browserSessionId ?? createdSession!
+  const consumed = await prisma.authorizationCode.updateMany({
+    where: { id: authCode.id, usedAt:null, expiresAt:{gt:new Date()} },
+    data: { usedAt: new Date(), issuedSessionId: sessionId },
+  })
+  if (consumed.count !== 1) {
+    if (createdSession) await revokeSession(createdSession, 'code_exchange_race')
+    throw new ApiError(400, 'INVALID_GRANT', 'Authorization code has already been consumed')
+  }
+
   // Issue tokens
   const { roles, permissions } = await userTokenGrants(authCode.userId)
-
-  const sessionId = authCode.browserSessionId ?? (await createSession(authCode.userId, ipAddress)).sessionId
   const tokenPair = await issueTokenPair(
     authCode.userId,
     authCode.user.email,
@@ -418,6 +415,29 @@ export async function exchangeAuthorizationCode(
     displayName: authCode.user.displayName,
     ...(authCode.nonce !== null ? { nonce: authCode.nonce } : {}),
   }
+}
+
+/**
+ * An authorization code was exchanged again by its own client. Either that client or whoever
+ * copied the code and its verifier is replaying it; the tokens the first exchange issued are
+ * revoked with their session (RFC 6749 §4.1.2, RFC 9700 §4.2.4), and the attempt is audited.
+ */
+async function revokeReplayedCode(
+  code: { id: string; userId: string; clientId: string; issuedSessionId: string | null },
+  ipAddress?: string,
+): Promise<void> {
+  const revoked = code.issuedSessionId ? await revokeSession(code.issuedSessionId, 'code_replay') : false
+  await logAuditEvent({
+    eventType: 'oauth.code_reuse',
+    category: 'AUTHENTICATION',
+    actorId: code.userId,
+    actorType: 'USER',
+    ipAddress,
+    action: 'oauth_code_reuse_attempt',
+    outcome: 'DENIED',
+    detail: { clientId: code.clientId, codeId: code.id, sessionRevoked: revoked, ...(code.issuedSessionId ? { sessionId: code.issuedSessionId } : {}) },
+    source: 'iam-api',
+  })
 }
 
 // ── Client Credentials Grant ──
