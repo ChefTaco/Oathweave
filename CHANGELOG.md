@@ -2,13 +2,26 @@
 
 ## [Unreleased]
 
-**Upgrade notes.** No migration and no new settings. Existing sign-in and authorization requests
-are unchanged when they carry no `prompt` or `max_age`. Two behaviour notes:
-`POST /api/v1/oauth/authorize` now validates the client and redirect URI before checking the
-sign-in, so an invalid request without a session answers `400` where it answered `401`. Its `401
-LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`. `StepUpRequest`'s
-`password` is optional (a passkey assertion alone is accepted); browser clients re-vendor the
-contract.
+## [2.7.0] - 2026-11-26
+
+**Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.7.0`. No database
+migration and no new settings: a Hive suite upgrade needs no `--allow-migrations` for this
+release, and rolling back to 2.6.0 is safe (same schema). Sign-in and authorization requests
+without `prompt` or `max_age` are unchanged.
+
+- **Re-authentication for relying parties.** The authorization endpoint honours `prompt` and
+  `max_age`; a required sign-in answers `401 LOGIN_REQUIRED` with a `loginTicket` (see Added).
+  HiveXUI 0.14.0 needs this release for its re-authentication and passkey sign-in.
+- **Validation order.** `POST /api/v1/oauth/authorize` now validates the client and redirect URI
+  before checking the sign-in, so an invalid request without a session answers `400` where it
+  answered `401`. Its `401 LOGIN_REQUIRED` body now also carries `message`, `reason` and
+  `loginTicket`.
+- **Step-up contract.** `StepUpRequest.password` is optional: a user-verified passkey assertion
+  alone is accepted while `IAM_PASSWORDLESS_PASSKEYS` is on (the default). Browser clients
+  re-vendor `docs/browser-contracts.ts`. An installation that wants passkeys to stay a second
+  factor only sets `IAM_PASSWORDLESS_PASSKEYS=false`, which also turns off passwordless sign-in.
+- **Smoke test.** `scripts/test-iam-api.sh` takes `HIVE_SESSION_COOKIE_FILE` instead of
+  `DEPLOY_USER`/`DEPLOY_PASSWORD` (see Changed).
 
 ### Added
 
