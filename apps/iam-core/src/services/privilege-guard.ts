@@ -4,6 +4,9 @@ import { accountLockActive } from '../config/auth-limits.js'
 import { ApiError, type Principal } from '../types/index.js'
 import { clientCredentialsPermissionCeiling } from './token-service.js'
 import { parsePermissionList, userEffectiveGrants, type RoleGrant } from './effective-grants.js'
+import { isRouterProxyPrincipal, MAX_OPERATOR_HEADER_BYTES, ROUTER_PROXY_CLIENT_ID } from './router-operator.js'
+
+export { isRouterProxyPrincipal, routerOperatorAttributed } from './router-operator.js'
 
 export { parsePermissionList }
 
@@ -29,8 +32,6 @@ export { parsePermissionList }
  */
 
 export const SUPER_ADMIN_ROLE = 'SUPER_ADMIN'
-const ROUTER_PROXY_CLIENT_ID = 'hive-router'
-const MAX_OPERATOR_HEADER_BYTES = 2048
 
 export interface Actor {
   readonly userId: string | undefined
@@ -41,11 +42,6 @@ export interface Actor {
 export interface RouterOperator {
   readonly authMode: 'os' | 'iam-oidc' | undefined
   readonly iamSubject: string | undefined
-}
-
-/** True only for the Router's own client-credentials token (subject and client are both the Router). */
-export function isRouterProxyPrincipal(principal: Pick<Principal, 'sub' | 'clientId' | 'actorType'>): boolean {
-  return principal.actorType === 'SERVICE_ACCOUNT' && principal.sub === ROUTER_PROXY_CLIENT_ID && principal.clientId === ROUTER_PROXY_CLIENT_ID
 }
 
 export function parseRouterOperator(raw: string | undefined): RouterOperator | null {

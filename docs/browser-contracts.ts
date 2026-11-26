@@ -65,6 +65,7 @@ var VALID_GRANT_TYPES = ["authorization_code", "refresh_token", "client_credenti
 var CreateClientSchema = z4.object({
   name: z4.string().min(2).max(128).regex(/^[a-z0-9-]+$/),
   description: z4.string().optional(),
+  // Deprecated: leave it out and the server generates the secret and returns it once.
   secret: z4.string().min(16).optional(),
   clientType: z4.enum(["public", "confidential"]).default("confidential"),
   redirectUris: z4.array(z4.url()).default([]),
@@ -72,8 +73,8 @@ var CreateClientSchema = z4.object({
   firstParty: z4.boolean().default(false),
   allowedIps: z4.array(IpAllowlistEntrySchema).default([])
 }).refine(
-  (data) => data.clientType === "public" || data.secret,
-  { error: "Confidential clients must provide a secret", path: ["secret"] }
+  (data) => data.clientType !== "public" || data.secret === void 0,
+  { error: "Public clients have no secret", path: ["secret"] }
 ).refine(
   (data) => data.clientType !== "public" || !data.grantTypes.includes("client_credentials"),
   { error: "Public clients cannot use client_credentials grant", path: ["grantTypes"] }
@@ -87,7 +88,7 @@ var UpdateClientSchema = z4.object({
   allowedIps: z4.array(IpAllowlistEntrySchema).optional()
 });
 var RotateClientSecretSchema = z4.object({
-  secret: z4.string().min(32)
+  secret: z4.string().min(32).optional()
 });
 
 // apps/iam-core/src/schemas/service-accounts.ts
@@ -411,7 +412,8 @@ var IamUserMutationResponseSchema = z12.object({ user: userRecord.extend({ roles
 var IamRolesResponseSchema = z12.object({ roles: z12.array(IamRoleSchema) });
 var IamRoleResponseSchema = z12.object({ role: IamRoleSchema });
 var IamClientsResponseSchema = z12.object({ clients: z12.array(IamClientSchema) });
-var IamClientMutationResponseSchema = z12.object({ client: IamClientSchema.omit({ createdAt: true }).extend({ createdAt: string.optional(), redirectUris: z12.union([strings, string]), grantTypes: z12.union([strings, string]) }) });
+var IamClientMutationResponseSchema = z12.object({ client: IamClientSchema.omit({ createdAt: true }).extend({ createdAt: string.optional(), redirectUris: z12.union([strings, string]), grantTypes: z12.union([strings, string]) }), clientSecret: string.optional() });
+var IamClientSecretRotationResponseSchema = z12.object({ success: z12.literal(true), clientSecret: string.optional() });
 var IamServiceAccountsResponseSchema = z12.object({ serviceAccounts: z12.array(IamServiceAccountSchema) });
 var IamServiceAccountMutationResponseSchema = z12.object({ serviceAccount: serviceAccount.extend({ roles: z12.array(IamRoleAssignmentSchema).optional() }) });
 var IamCreatedServiceAccountResponseSchema = z12.object({ id: string, apiKey: string, warning: string });
@@ -496,6 +498,7 @@ export {
   IamAuditStatsSchema,
   IamClientMutationResponseSchema,
   IamClientSchema,
+  IamClientSecretRotationResponseSchema,
   IamClientsResponseSchema,
   IamCreatedServiceAccountResponseSchema,
   IamHealthResponseSchema,
@@ -570,6 +573,7 @@ export type IamAuditResponse = ZodTypes.infer<typeof IamAuditResponseSchema>;
 export type IamAuditStats = ZodTypes.infer<typeof IamAuditStatsSchema>;
 export type IamClientMutationResponse = ZodTypes.infer<typeof IamClientMutationResponseSchema>;
 export type IamClient = ZodTypes.infer<typeof IamClientSchema>;
+export type IamClientSecretRotationResponse = ZodTypes.infer<typeof IamClientSecretRotationResponseSchema>;
 export type IamClientsResponse = ZodTypes.infer<typeof IamClientsResponseSchema>;
 export type IamCreatedServiceAccountResponse = ZodTypes.infer<typeof IamCreatedServiceAccountResponseSchema>;
 export type IamHealthResponse = ZodTypes.infer<typeof IamHealthResponseSchema>;

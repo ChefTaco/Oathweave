@@ -82,4 +82,53 @@ describe('authMiddleware', () => {
     const body = (await res.json()) as Record<string, unknown>
     expect(body.error).toBe('UNAUTHORIZED')
   })
+
+  describe('the Router client token', () => {
+    const router = {
+      sub: 'hive-router',
+      actorType: 'SERVICE_ACCOUNT',
+      clientId: 'hive-router',
+      roles: [],
+      permissions: ['iam:users:read', 'iam:users:write'],
+      jti: 'fixture',
+    }
+    function routerApp() {
+      const app = new Hono()
+      app.use('*', authMiddleware)
+      app.get('/users', (c) => c.json({ ok: true }))
+      app.post('/users', (c) => c.json({ ok: true }))
+      app.delete('/users/x', (c) => c.json({ ok: true }))
+      return app
+    }
+    const operator = JSON.stringify({ id: 'console-operator', sessionId: 's', authenticatedAt: 1, authMode: 'os' })
+
+    it('reads without operator attribution', async () => {
+      mockedVerify.mockResolvedValue(router as never)
+      expect((await routerApp().request('/users', { headers: { Authorization: 'Bearer router-token' } })).status).toBe(200)
+    })
+
+    it('refuses a write that names no console operator', async () => {
+      mockedVerify.mockResolvedValue(router as never)
+      for (const [method, path, header] of [
+        ['POST', '/users', undefined],
+        ['DELETE', '/users/x', undefined],
+        ['POST', '/users', 'not json'],
+        ['POST', '/users', JSON.stringify({ authMode: 'os' })],
+      ] as const) {
+        const res = await routerApp().request(path, {
+          method,
+          headers: { Authorization: 'Bearer router-token', ...(header ? { 'x-hive-operator': header } : {}) },
+        })
+        expect(res.status).toBe(403)
+        expect(((await res.json()) as Record<string, unknown>).error).toBe('ROUTER_OPERATOR_REQUIRED')
+      }
+    })
+
+    it('admits a write attributed to an operator, and never restricts other clients', async () => {
+      mockedVerify.mockResolvedValue(router as never)
+      expect((await routerApp().request('/users', { method: 'POST', headers: { Authorization: 'Bearer router-token', 'x-hive-operator': operator } })).status).toBe(200)
+      mockedVerify.mockResolvedValue({ ...router, sub: 'other-service', clientId: 'other-service' } as never)
+      expect((await routerApp().request('/users', { method: 'POST', headers: { Authorization: 'Bearer other-token' } })).status).toBe(200)
+    })
+  })
 })

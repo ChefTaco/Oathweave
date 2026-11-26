@@ -96,7 +96,6 @@ usersRouter.post('/', requirePermission('iam:users:write'), async (c) => {
       username: body.username,
       displayName: body.displayName,
       passwordHash,
-      encryptedPassword: null,
       passwordChangedAt: new Date(),
       active: body.active,
       ...(body.roleIds.length > 0 ? { roles: { create: body.roleIds.map((roleId) => ({ roleId, grantedBy: principal.sub })) } } : {}),
@@ -117,7 +116,7 @@ usersRouter.post('/', requirePermission('iam:users:write'), async (c) => {
     source: 'iam-api',
   })
 
-  return c.json({ user: { ...user, passwordHash: undefined, encryptedPassword: undefined } }, 201)
+  return c.json({ user: { ...user, passwordHash: undefined } }, 201)
 })
 
 // GET /users/:id
@@ -135,7 +134,7 @@ usersRouter.get('/:id', requirePermission('iam:users:read'), async (c) => {
     },
   })
   if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found')
-  return c.json({ user: { ...user, passwordHash: undefined, encryptedPassword: undefined } })
+  return c.json({ user: { ...user, passwordHash: undefined } })
 })
 
 // PATCH /users/:id
@@ -153,7 +152,6 @@ usersRouter.patch('/:id', requirePermission('iam:users:write'), async (c) => {
   if (body.active !== undefined) data['active'] = body.active
   if (body.password !== undefined) {
     data['passwordHash'] = await hashPassword(body.password)
-    data['encryptedPassword'] = null
     data['passwordChangedAt'] = new Date()
   }
 
@@ -177,7 +175,7 @@ usersRouter.patch('/:id', requirePermission('iam:users:write'), async (c) => {
     source: 'iam-api',
   })
 
-  return c.json({ user: { ...user, passwordHash: undefined, encryptedPassword: undefined } })
+  return c.json({ user: { ...user, passwordHash: undefined } })
 })
 
 // DELETE /users/:id — hard delete
@@ -358,7 +356,6 @@ usersRouter.post('/:id/rotate-password', requirePermission('iam:users:write'), a
     where: { id: userId },
     data: {
       passwordHash,
-      encryptedPassword: null,
       passwordChangedAt: new Date(),
     },
   })

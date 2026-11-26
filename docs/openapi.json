@@ -1888,10 +1888,29 @@
               "firstParty"
             ],
             "type": "object"
+          },
+          "clientSecret": {
+            "type": "string"
           }
         },
         "required": [
           "client"
+        ],
+        "type": "object"
+      },
+      "IamClientSecretRotationResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "clientSecret": {
+            "type": "string"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
         ],
         "type": "object"
       },
@@ -3937,9 +3956,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "secret"
-        ],
         "type": "object"
       },
       "RotatePasswordRequest": {
@@ -5951,7 +5967,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Create client",
+        "summary": "Create client. A confidential client sent without secret gets a server-generated one, returned once as clientSecret",
         "tags": [
           "Clients"
         ]
@@ -6137,8 +6153,7 @@
               }
             }
           },
-          "description": "",
-          "required": true
+          "required": false
         },
         "responses": {
           "200": {
@@ -6146,6 +6161,10 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "clientSecret": {
+                      "description": "Only when the server generated the secret; shown once",
+                      "type": "string"
+                    },
                     "success": {
                       "type": "boolean"
                     }
@@ -6212,7 +6231,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Rotate a confidential client secret",
+        "summary": "Rotate a confidential client secret. Send no secret (or no body) and the server generates one, returned once as clientSecret",
         "tags": [
           "Clients"
         ]

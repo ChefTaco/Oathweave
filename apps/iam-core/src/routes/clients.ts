@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import argon2 from 'argon2'
+import { randomBytes } from 'node:crypto'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { requirePermission } from '../middleware/rbac.js'
@@ -11,6 +12,11 @@ import { ApiError } from '../types/index.js'
 import { assertMayManageClient, resolveActor } from '../services/privilege-guard.js'
 import { parseJsonFields, parseJsonFieldsArray } from '../utils/serialize.js'
 import { browserClientPolicies } from '../services/browser-policies.js'
+
+/** 256 bits from the CSPRNG, base64url: what a generated client secret is. */
+function generateClientSecret(): string {
+  return randomBytes(32).toString('base64url')
+}
 
 const ARGON2_OPTIONS: argon2.Options = {
   type: argon2.argon2id,
@@ -46,9 +52,10 @@ clientsRouter.post('/', requirePermission('iam:clients:write'), async (c) => {
   if (browserId && await prisma.client.findUnique({ where: { id: browserId } })) {
     throw new ApiError(409, 'CONFLICT', 'Client identifier already exists')
   }
-  const secretHash = body.secret
-    ? await argon2.hash(body.secret, ARGON2_OPTIONS)
-    : null
+  // A confidential client gets a server-generated secret unless the caller still sends one.
+  const generated = body.clientType === 'confidential' && body.secret === undefined ? generateClientSecret() : undefined
+  const secret = body.secret ?? generated
+  const secretHash = secret ? await argon2.hash(secret, ARGON2_OPTIONS) : null
   const client = await prisma.client.create({
     data: {
       ...(browserId ? { id: browserId } : {}),
@@ -74,9 +81,14 @@ clientsRouter.post('/', requirePermission('iam:clients:write'), async (c) => {
     resourceType: 'client',
     resourceId: client.id,
     action: 'create',
+    detail: { secretSource: generated ? 'generated' : body.secret ? 'caller' : 'none' },
     source: 'iam-api',
   })
 
+  if (generated) {
+    c.header('Cache-Control', 'no-store')
+    return c.json({ client, clientSecret: generated }, 201)
+  }
   return c.json({ client }, 201)
 })
 
@@ -123,7 +135,8 @@ clientsRouter.patch('/:id', requirePermission('iam:clients:write'), async (c) =>
 clientsRouter.post('/:id/rotate-secret', requirePermission('iam:clients:write'), async (c) => {
   const principal = c.get('principal')
   const clientId = c.req.param('id')
-  const body = await parseBody(c, RotateClientSecretSchema)
+  // An empty body asks for a generated secret.
+  const body = (await c.req.raw.clone().text()).trim() === '' ? {} : await parseBody(c, RotateClientSecretSchema)
   const existing = await prisma.client.findUnique({ where: { id: clientId } })
 
   if (!existing) throw new ApiError(404, 'NOT_FOUND', 'Client not found')
@@ -132,7 +145,8 @@ clientsRouter.post('/:id/rotate-secret', requirePermission('iam:clients:write'),
     throw new ApiError(409, 'CONFLICT', 'Public clients do not have client secrets')
   }
 
-  const secretHash = await argon2.hash(body.secret, ARGON2_OPTIONS)
+  const generated = body.secret === undefined ? generateClientSecret() : undefined
+  const secretHash = await argon2.hash(body.secret ?? generated!, ARGON2_OPTIONS)
   await prisma.client.update({
     where: { id: clientId },
     data: { secretHash },
@@ -148,10 +162,14 @@ clientsRouter.post('/:id/rotate-secret', requirePermission('iam:clients:write'),
     resourceType: 'client',
     resourceId: clientId,
     action: 'rotate-secret',
-    detail: { name: existing.name },
+    detail: { name: existing.name, secretSource: generated ? 'generated' : 'caller' },
     source: 'iam-api',
   })
 
+  if (generated) {
+    c.header('Cache-Control', 'no-store')
+    return c.json({ success: true, clientSecret: generated })
+  }
   return c.json({ success: true })
 })
 

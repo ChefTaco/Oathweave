@@ -38,7 +38,9 @@ export const IamRolesResponseSchema = z.object({ roles: z.array(IamRoleSchema) }
 export const IamRoleResponseSchema = z.object({ role: IamRoleSchema })
 export const IamClientsResponseSchema = z.object({ clients: z.array(IamClientSchema) })
 // Native create replies retain serialized arrays; list/update replies expose decoded arrays.
-export const IamClientMutationResponseSchema = z.object({ client: IamClientSchema.omit({createdAt:true}).extend({createdAt:string.optional(),redirectUris:z.union([strings,string]),grantTypes:z.union([strings,string])}) })
+export const IamClientMutationResponseSchema = z.object({ client: IamClientSchema.omit({createdAt:true}).extend({createdAt:string.optional(),redirectUris:z.union([strings,string]),grantTypes:z.union([strings,string])}), clientSecret: string.optional() })
+// A secret the server generated is returned once, here; a caller-chosen secret is never echoed.
+export const IamClientSecretRotationResponseSchema = z.object({ success: z.literal(true), clientSecret: string.optional() })
 export const IamServiceAccountsResponseSchema = z.object({ serviceAccounts: z.array(IamServiceAccountSchema) })
 export const IamServiceAccountMutationResponseSchema = z.object({ serviceAccount: serviceAccount.extend({roles:z.array(IamRoleAssignmentSchema).optional()}) })
 export const IamCreatedServiceAccountResponseSchema = z.object({ id:string, apiKey:string, warning:string })

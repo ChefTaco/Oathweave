@@ -3,6 +3,9 @@ import type { MiddlewareHandler } from 'hono'
 import { verifyAccessToken } from '../services/token-service.js'
 import { ApiError } from '../types/index.js'
 import type { Principal } from '../types/index.js'
+import { isRouterProxyPrincipal, routerOperatorAttributed } from '../services/router-operator.js'
+
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 // Augment Hono context variable map
 declare module 'hono' {
@@ -32,6 +35,17 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
       sessionId: payload.sessionId,
       clientId: payload.clientId,
     })
+    const principal = c.get('principal')
+    if (
+      isRouterProxyPrincipal(principal) &&
+      !READ_METHODS.has(c.req.method) &&
+      !routerOperatorAttributed(c.req.header('x-hive-operator'))
+    ) {
+      return c.json(
+        { error: 'ROUTER_OPERATOR_REQUIRED', message: 'A write with the Router client token must name the console operator (x-hive-operator)' },
+        403,
+      )
+    }
   } catch (err) {
     if (err instanceof ApiError) {
       return c.json({ error: err.code, message: err.message }, 401)

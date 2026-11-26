@@ -285,6 +285,22 @@
         "impact": "fast",
         "readableBy": "^1.2.2",
         "note": "Add Oathweave-owned enrollment coordination and explicit legacy receipt migration. Older binaries reject this migration history; retain verified source and target recovery backups."
+      },
+      {
+        "component": "iam",
+        "id": "20261126000000_drop_legacy_encrypted_password",
+        "checksum": "a687a9ce0a7f009a9c9f349475f7340ce2a26af1c2549c7f8bac9ad732301d43",
+        "impact": "fast",
+        "readableBy": "^1.2.2",
+        "note": "Drop the always-NULL legacy users.encryptedPassword column. Older binaries reject this migration history and still write the column; restore the pre-migration backup to roll back."
+      },
+      {
+        "component": "iam",
+        "id": "20261126000100_authorization_code_session",
+        "checksum": "a7923cd7e606400045e2d31906b79776503066b1ac4413ee08f6ef36a32d859e",
+        "impact": "fast",
+        "readableBy": "^1.2.2",
+        "note": "Record the session an authorization code issued tokens for, so a replayed code revokes them. Older binaries reject this migration history; retain verified recovery backups."
       }
     ],
     "wireCompatibility": {
