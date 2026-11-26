@@ -194,6 +194,15 @@ var PasskeyAuthenticationSchema = z9.object({
   mfaToken: z9.string().min(1).max(8192),
   response: z9.record(z9.string(), z9.unknown())
 });
+var PasswordlessAuthenticationSchema = z9.object({
+  ceremonyId: z9.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  response: z9.record(z9.string(), z9.unknown())
+});
+var PasswordlessOptionsResponseSchema = z9.object({
+  success: z9.literal(true),
+  data: z9.record(z9.string(), z9.unknown()),
+  ceremonyId: z9.string()
+});
 var PasskeyAuthenticationOptionsSchema = z9.object({
   mfaToken: z9.string().min(1).max(8192)
 });
@@ -450,6 +459,8 @@ var PasskeyAuthenticationRequestSchema = PasskeyAuthenticationSchema;
 var PasskeyAuthenticationOptionsRequestSchema = PasskeyAuthenticationOptionsSchema;
 var PasskeyOptionsResponseSchema2 = PasskeyOptionsResponseSchema;
 var PasskeyCredentialSchema2 = PasskeyCredentialSchema;
+var PasswordlessAuthenticationRequestSchema = PasswordlessAuthenticationSchema;
+var PasswordlessOptionsResponseSchema2 = PasswordlessOptionsResponseSchema;
 var MfaStatusSchema2 = MfaStatusSchema;
 var RecoveryCodesSchema2 = RecoveryCodesSchema;
 var AuthorizeConsentRequestSchema = AuthorizeConsentSchema;
@@ -536,6 +547,8 @@ export {
   PasskeyCredentialsResponseSchema,
   PasskeyOptionsResponseSchema2 as PasskeyOptionsResponseSchema,
   PasskeyRegisterRequestSchema,
+  PasswordlessAuthenticationRequestSchema,
+  PasswordlessOptionsResponseSchema2 as PasswordlessOptionsResponseSchema,
   RecoveryCodesSchema2 as RecoveryCodesSchema,
   ResetPasswordRequestSchema,
   StepUpRequestSchema,
@@ -611,6 +624,8 @@ export type PasskeyCredential = ZodTypes.infer<typeof PasskeyCredentialSchema>;
 export type PasskeyCredentialsResponse = ZodTypes.infer<typeof PasskeyCredentialsResponseSchema>;
 export type PasskeyOptionsResponse = ZodTypes.infer<typeof PasskeyOptionsResponseSchema>;
 export type PasskeyRegisterRequest = ZodTypes.input<typeof PasskeyRegisterRequestSchema>;
+export type PasswordlessAuthenticationRequest = ZodTypes.input<typeof PasswordlessAuthenticationRequestSchema>;
+export type PasswordlessOptionsResponse = ZodTypes.infer<typeof PasswordlessOptionsResponseSchema>;
 export type RecoveryCodes = ZodTypes.infer<typeof RecoveryCodesSchema>;
 export type ResetPasswordRequest = ZodTypes.input<typeof ResetPasswordRequestSchema>;
 export type StepUpRequest = ZodTypes.input<typeof StepUpRequestSchema>;

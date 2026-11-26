@@ -165,3 +165,48 @@ export async function verifyAuthentication(
     },
   })
 }
+
+// ── Passwordless sign-in (discoverable credentials) ──
+
+/** The ceremony store's user slot for a sign-in whose user the passkey itself names. */
+const DISCOVERABLE_SIGN_IN = 'discoverable-sign-in'
+
+/**
+ * Options for a passwordless sign-in: no allowCredentials, so the authenticator offers its
+ * discoverable passkeys for this relying party, and user verification is required, so the
+ * passkey alone is two factors (possession and the device PIN or biometric).
+ */
+export async function getPasswordlessOptions(
+  ceremonyId: string,
+): Promise<ReturnType<typeof generateAuthenticationOptions>> {
+  const options = await generateAuthenticationOptions({
+    rpID: RP_ID,
+    allowCredentials: [],
+    userVerification: 'required',
+  })
+  await ceremonies.save(DISCOVERABLE_SIGN_IN, 'authenticate', ceremonyId, options.challenge)
+  return options
+}
+
+export async function verifyPasswordless(
+  ceremonyId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  response: any,
+  credential: StoredCredential,
+): Promise<VerifiedAuthenticationResponse> {
+  const expectedChallenge = await ceremonies.consume(DISCOVERABLE_SIGN_IN, 'authenticate', ceremonyId, response)
+  if (!expectedChallenge) throw new Error('Authentication challenge expired or not found')
+  return verifyAuthenticationResponse({
+    response,
+    expectedChallenge,
+    expectedOrigin: RP_ORIGIN,
+    expectedRPID: RP_ID,
+    requireUserVerification: true,
+    credential: {
+      id: credential.credentialId,
+      publicKey: Buffer.from(credential.publicKey, 'base64url'),
+      counter: credential.counter,
+      transports: (credential.transports ?? []) as AuthenticatorTransportFuture[],
+    },
+  })
+}

@@ -3,16 +3,18 @@
  *
  * Registration: GET /options → POST /register
  * Authentication: GET /authenticate-options → POST /authenticate
+ * Passwordless sign-in: POST /passwordless/options → POST /passwordless/authenticate
  *
  * All routes require a valid Bearer JWT (except /authenticate which
  * accepts an mfaToken for the login-time challenge flow).
  */
 
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import {
   PasskeyRegisterSchema as RegisterBodySchema,
   PasskeyAuthenticationSchema as AuthenticationBodySchema,
   PasskeyAuthenticationOptionsSchema,
+  PasswordlessAuthenticationSchema,
 } from '../schemas/webauthn.js'
 import { nanoid } from 'nanoid'
 import { setCookie } from 'hono/cookie'
@@ -39,7 +41,12 @@ import {
   verifyRegistration,
   getAuthenticationOptions,
   verifyAuthentication,
+  getPasswordlessOptions,
+  verifyPasswordless,
 } from '../services/webauthn-service.js'
+import { randomBytes } from 'node:crypto'
+import { checkIpAllowlist } from '../utils/ip-allowlist.js'
+import { parsePermissionList } from '../services/effective-grants.js'
 
 export const webauthnRouter = new Hono()
 
@@ -323,11 +330,120 @@ webauthnRouter.post(
       )
     }
 
+    return passkeySignIn(c, {
+      userId,
+      stored,
+      newCounter: verification.authenticationInfo.newCounter,
+      beforeIssue: () => consumeLoginChallenge(body.mfaToken),
+      eventType: 'auth.webauthn_challenge',
+      action: 'webauthn_challenge',
+    })
+  },
+)
+
+// ── Passwordless sign-in: a discoverable passkey, with user verification, and no password ──
+
+webauthnRouter.post(
+  '/passwordless/options',
+  rateLimitMiddleware({
+    keyPrefix: 'rl:webauthn-passwordless-options',
+    max: 10,
+    windowMs: 300_000,
+    authAttempt: true,
+  }),
+  async (c) => {
+    if (!env.IAM_PASSWORDLESS_PASSKEYS)
+      throw new ApiError(404, 'NOT_FOUND', 'Passwordless sign-in is turned off')
+    // The ceremony is bound to this random ID, which only the caller learns.
+    const ceremonyId = randomBytes(32).toString('base64url')
+    const options = await getPasswordlessOptions(ceremonyId)
+    c.header('Cache-Control', 'no-store')
+    return c.json({ success: true, data: options, ceremonyId })
+  },
+)
+
+webauthnRouter.post(
+  '/passwordless/authenticate',
+  rateLimitMiddleware({
+    keyPrefix: 'rl:webauthn-passwordless',
+    max: 5,
+    windowMs: 300_000,
+    authAttempt: true,
+  }),
+  async (c) => {
+    if (!env.IAM_PASSWORDLESS_PASSKEYS)
+      throw new ApiError(404, 'NOT_FOUND', 'Passwordless sign-in is turned off')
+    const body = PasswordlessAuthenticationSchema.parse(await c.req.json())
+    const ip = getClientIp(c)
+    const credentialId = (body.response as { id?: unknown }).id
+    if (typeof credentialId !== 'string' || !/^[A-Za-z0-9_-]{1,2048}$/.test(credentialId))
+      throw new ApiError(400, 'VALIDATION_ERROR', 'Missing credential ID in response')
+    const refuse = async (reason: string, userId?: string): Promise<never> => {
+      await logAuditEvent({
+        eventType: 'auth.passkey_sign_in.failed',
+        category: 'AUTHENTICATION',
+        ...(userId ? { actorId: userId } : {}),
+        actorType: 'USER',
+        ipAddress: ip,
+        userAgent: c.req.header('user-agent'),
+        action: 'passkey_sign_in',
+        outcome: 'FAILURE',
+        detail: { reason },
+        source: 'iam-api',
+      })
+      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Passkey sign-in failed')
+    }
+    // The passkey names its user: a credential ID is unique, and its public key verifies below.
+    const stored = await prisma.webAuthnCredential.findFirst({
+      where: { credentialId: { in: credentialLookupIds(credentialId) } },
+      include: { user: { select: { active: true, lockedUntil: true, allowedIps: true } } },
+    })
+    if (!stored) return refuse('unknown_credential')
+    if (!stored.user.active || accountLockActive(stored.user.lockedUntil)) return refuse('account_unavailable', stored.userId)
+    // The per-user address allowlist applies as it does to password sign-in.
+    if (!checkIpAllowlist(parsePermissionList(stored.user.allowedIps), ip)) return refuse('ip_not_allowed', stored.userId)
+
+    let verification: Awaited<ReturnType<typeof verifyPasswordless>>
+    try {
+      verification = await verifyPasswordless(body.ceremonyId, body.response, {
+        credentialId,
+        publicKey: stored.publicKey,
+        counter: stored.counter,
+        transports: JSON.parse(stored.transports) as string[],
+      })
+    } catch {
+      return refuse('verification_failed', stored.userId)
+    }
+    if (!verification.verified) return refuse('verification_failed', stored.userId)
+
+    return passkeySignIn(c, {
+      userId: stored.userId,
+      stored,
+      newCounter: verification.authenticationInfo.newCounter,
+      eventType: 'auth.passkey_sign_in',
+      action: 'passkey_sign_in',
+    })
+  },
+)
+
+/** Ends a verified passkey ceremony: advances the counter, then signs the user in. */
+async function passkeySignIn(
+  c: Context,
+  ceremony: {
+    userId: string
+    stored: { id: string; counter: number }
+    newCounter: number
+    beforeIssue?: () => Promise<unknown>
+    eventType: string
+    action: string
+  },
+): Promise<Response> {
+  const { userId, stored } = ceremony
     // Update counter for clone detection
     const advanced = await prisma.webAuthnCredential.updateMany({
       where: { id: stored.id, counter: stored.counter },
       data: {
-        counter: verification.authenticationInfo.newCounter,
+        counter: ceremony.newCounter,
         lastUsedAt: new Date(),
       },
     })
@@ -337,8 +453,7 @@ webauthnRouter.post(
         'INVALID_CREDENTIALS',
         'Passkey changed during verification; try again',
       )
-    await consumeLoginChallenge(body.mfaToken)
-
+    await ceremony.beforeIssue?.()
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user || !user.active || !user.mfaEnabled)
       throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
@@ -379,14 +494,14 @@ webauthnRouter.post(
       path: '/api/v1/auth',
     })
     await logAuditEvent({
-      eventType: 'auth.webauthn_challenge',
+      eventType: ceremony.eventType,
       category: 'AUTHENTICATION',
       actorId: userId,
       actorType: 'USER',
       actorEmail: user.email,
       ipAddress: ip,
       userAgent,
-      action: 'webauthn_challenge',
+      action: ceremony.action,
       outcome: 'SUCCESS',
       source: 'iam-api',
     })
@@ -408,8 +523,7 @@ webauthnRouter.post(
         permissions,
       },
     })
-  },
-)
+}
 
 // ── Management ──
 

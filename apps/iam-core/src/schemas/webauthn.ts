@@ -7,6 +7,15 @@ export const PasskeyAuthenticationSchema = z.object({
   mfaToken: z.string().min(1).max(8192),
   response: z.record(z.string(), z.unknown()),
 })
+export const PasswordlessAuthenticationSchema = z.object({
+  ceremonyId: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  response: z.record(z.string(), z.unknown()),
+})
+export const PasswordlessOptionsResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.record(z.string(), z.unknown()),
+  ceremonyId: z.string(),
+})
 export const PasskeyAuthenticationOptionsSchema = z.object({
   mfaToken: z.string().min(1).max(8192),
 })
