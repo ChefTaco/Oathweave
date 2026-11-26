@@ -24,6 +24,8 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
   try {
     const payload = await verifyAccessToken(token)
     if (payload.clientId === 'oathweave-enrollment' && c.req.path !== '/api/v1/oauth/userinfo') return c.json({error:'INVALID_AUDIENCE'},401)
+    // A delegated (token-exchange) token is for the downstream audience it names, not this API.
+    if (payload['act'] !== undefined && payload.aud !== 'oathweave' && c.req.path !== '/api/v1/oauth/userinfo') return c.json({error:'INVALID_AUDIENCE'},401)
     if (payload.clientId && browserClientPolicies[payload.clientId] && browserClientPolicies[payload.clientId]!.audience !== 'oathweave' && c.req.path !== '/api/v1/oauth/userinfo') return c.json({error:'INVALID_AUDIENCE'},401)
     c.set('principal', {
       sub: payload.sub ?? '',

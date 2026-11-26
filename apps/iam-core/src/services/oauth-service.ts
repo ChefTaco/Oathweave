@@ -12,6 +12,7 @@ import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
 import { discoveryMetadataUrl } from '../config/browser-discovery.js'
 import { ID_TOKEN_CLAIMS } from './oidc-claims.js'
+import { TOKEN_EXCHANGE_GRANT, tokenExchangeEnabled } from './token-exchange.js'
 import { ApiError } from '../types/index.js'
 import { getPublishedSigningJwks } from '../utils/keys.js'
 import { issueTokenPair } from './token-service.js'
@@ -545,7 +546,7 @@ export function getOpenIdConfiguration(): Record<string, unknown> | undefined {
     response_types_supported: ['code'],
     response_modes_supported: ['query'],
     ...(env.IAM_DEVICE_VERIFICATION_URL ? { device_authorization_endpoint: `${api}/oauth/device_authorization` } : {}),
-    grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials', ...(env.IAM_DEVICE_VERIFICATION_URL ? ['urn:ietf:params:oauth:grant-type:device_code'] : [])],
+    grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials', ...(env.IAM_DEVICE_VERIFICATION_URL ? ['urn:ietf:params:oauth:grant-type:device_code'] : []), ...(tokenExchangeEnabled() ? [TOKEN_EXCHANGE_GRANT] : [])],
     subject_types_supported: ['public'],
     id_token_signing_alg_values_supported: ['RS256'],
     scopes_supported: ['openid', 'profile', 'email', 'offline_access'],

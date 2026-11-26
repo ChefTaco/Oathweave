@@ -78,6 +78,14 @@ Tokens issued without a scope, such as native sign-in, keep every claim.
   exchange once; code entry is rate-limited. Discovery advertises the endpoint when it is on.
   Managing a client with this grant needs `SUPER_ADMIN`, as for sign-in clients. Expired codes and
   device sign-ins are pruned hourly.
+- **Token exchange (RFC 8693), first slice: delegation for people.** A confidential client with
+  the `urn:ietf:params:oauth:grant-type:token-exchange` grant and an `IAM_TOKEN_EXCHANGE_POLICIES`
+  entry trades a person's access token that was issued to it (or addressed to one of its
+  `subjectAudiences`) for a token for one listed `audience`: permissions narrowed to that
+  audience's list and the person's current grants, `act.sub` naming the client, the person's
+  session, at most the policy's lifetime (default 300 s) and never past the subject token. No
+  refresh tokens, `actor_token` or chained exchanges yet. Oathweave's own API refuses such a
+  token unless its audience is `oathweave`. Discovery lists the grant when a policy exists.
 - **Standard endpoints for generic relying parties.** Discovery at the issuer root
   (`/.well-known/openid-configuration`, `/.well-known/oauth-authorization-server`), RFC 7009
   `POST /oauth/revoke` and RFC 7662 `POST /oauth/introspect` with `client_secret_basic` /

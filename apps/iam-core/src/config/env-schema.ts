@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { browserDiscoveryConfigurationSchema, discoveryMetadataUrl } from './browser-discovery.js'
 import { parseClientPolicies } from '../services/client-policy-schema.js'
+import { parseTokenExchangePolicies } from '../services/token-exchange-policy.js'
 import { parseMachineClientSecrets } from '../services/machine-client-secrets.js'
 
 /**
@@ -87,7 +88,13 @@ export const envSchema = z.object({
   IAM_AGENT_SECRET: z.string().min(16),
   IAM_MACHINE_CLIENT_POLICIES: z.string().optional(),
   IAM_MACHINE_CLIENT_SECRETS: z.string().optional(),
+  IAM_TOKEN_EXCHANGE_POLICIES: z.string().optional(),
 }).superRefine((source, context) => {
+  try {
+    parseTokenExchangePolicies(source.IAM_TOKEN_EXCHANGE_POLICIES)
+  } catch {
+    context.addIssue({ code: 'custom', path: ['IAM_TOKEN_EXCHANGE_POLICIES'], message: 'must be a JSON object of valid token exchange policies' })
+  }
   let policies: ReturnType<typeof parseClientPolicies> | undefined
   try {
     policies = parseClientPolicies(source.IAM_MACHINE_CLIENT_POLICIES)

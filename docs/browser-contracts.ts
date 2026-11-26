@@ -61,7 +61,7 @@ var IpAllowlistEntrySchema = z3.union([
 ], { error: "must be an IPv4 or IPv6 address, a CIDR range, or an IPv4 pattern such as 10.0.*.*" });
 
 // apps/iam-core/src/schemas/clients.ts
-var VALID_GRANT_TYPES = ["authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code"];
+var VALID_GRANT_TYPES = ["authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code", "urn:ietf:params:oauth:grant-type:token-exchange"];
 var CreateClientSchema = z4.object({
   name: z4.string().min(2).max(128).regex(/^[a-z0-9-]+$/),
   description: z4.string().optional(),
@@ -78,6 +78,9 @@ var CreateClientSchema = z4.object({
 ).refine(
   (data) => data.clientType !== "public" || !data.grantTypes.includes("client_credentials"),
   { error: "Public clients cannot use client_credentials grant", path: ["grantTypes"] }
+).refine(
+  (data) => data.clientType !== "public" || !data.grantTypes.includes("urn:ietf:params:oauth:grant-type:token-exchange"),
+  { error: "Public clients cannot use token exchange", path: ["grantTypes"] }
 );
 var UpdateClientSchema = z4.object({
   description: z4.string().optional(),
@@ -255,9 +258,17 @@ var TokenExchangeSchema = z10.object({
     "authorization_code",
     "refresh_token",
     "client_credentials",
-    "urn:ietf:params:oauth:grant-type:device_code"
+    "urn:ietf:params:oauth:grant-type:device_code",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
   ]),
   device_code: z10.string().optional(),
+  subject_token: z10.string().optional(),
+  subject_token_type: z10.string().optional(),
+  actor_token: z10.string().optional(),
+  actor_token_type: z10.string().optional(),
+  requested_token_type: z10.string().optional(),
+  audience: z10.string().optional(),
+  resource: z10.string().optional(),
   code: z10.string().optional(),
   redirect_uri: z10.string().optional(),
   client_id: z10.string().optional(),

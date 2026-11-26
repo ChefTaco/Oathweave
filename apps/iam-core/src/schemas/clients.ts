@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { IpAllowlistEntrySchema } from './ip-allowlist.js'
-const VALID_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_credentials', 'urn:ietf:params:oauth:grant-type:device_code'] as const
+const VALID_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_credentials', 'urn:ietf:params:oauth:grant-type:device_code', 'urn:ietf:params:oauth:grant-type:token-exchange'] as const
 
 export const CreateClientSchema = z.object({
   name: z.string().min(2).max(128).regex(/^[a-z0-9-]+$/),
@@ -18,6 +18,9 @@ export const CreateClientSchema = z.object({
 ).refine(
   (data) => data.clientType !== 'public' || !data.grantTypes.includes('client_credentials'),
   { error: 'Public clients cannot use client_credentials grant', path: ['grantTypes'] },
+).refine(
+  (data) => data.clientType !== 'public' || !data.grantTypes.includes('urn:ietf:params:oauth:grant-type:token-exchange'),
+  { error: 'Public clients cannot use token exchange', path: ['grantTypes'] },
 )
 
 export const UpdateClientSchema = z.object({
