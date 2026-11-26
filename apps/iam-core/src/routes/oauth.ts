@@ -35,7 +35,7 @@ import {
 import {
   validateAuthorizeRequest,
   createAuthorizationCode,
-  authenticateCodeExchangeClient,
+  authenticateTokenClient,
   exchangeAuthorizationCode,
   exchangeClientCredentials,
   getOpenIdConfiguration,
@@ -43,7 +43,10 @@ import {
 } from '../services/oauth-service.js'
 import { rotateRefreshToken, issueIdToken } from '../services/token-service.js'
 import { env } from '../config/env.js'
-import argon2 from 'argon2'
+import {
+  CLIENT_AUTH_FAILURE_WINDOW_MS,
+  clientEndpointRateLimit,
+} from '../services/client-auth-guard.js'
 
 export const oauthRouter = new Hono()
 
@@ -205,7 +208,7 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
 })
 
 // ── POST /token — Exchange code for tokens (or refresh) ──
-oauthRouter.post('/token', async (c) => {
+oauthRouter.post('/token', clientEndpointRateLimit('rl:token'), async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Pragma', 'no-cache')
   // Parse as form-urlencoded (OAuth2 spec) or JSON
@@ -245,6 +248,40 @@ oauthRouter.post('/token', async (c) => {
   const params = parsed.data
   const ip = getClientIp(c)
 
+  // Client identification (RFC 6749 §2.3.1): the body, or HTTP Basic (client_secret_basic).
+  const basic = extractBasicCredentials(c)
+  if (basic && params.client_id !== undefined && params.client_id !== basic.clientId) {
+    return c.json(
+      {
+        error: 'invalid_request',
+        error_description: 'client_id in the body does not match the Basic credentials',
+      },
+      400,
+    )
+  }
+  const clientId = params.client_id ?? basic?.clientId
+  const presentedSecret = params.client_secret ?? basic?.clientSecret
+
+  /** Authenticates the client; returns the error response when it is refused. */
+  const authenticate = async (
+    id: string,
+  ): Promise<{ authenticated: boolean } | Response> => {
+    try {
+      return await authenticateTokenClient(id, presentedSecret, ip)
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err
+      if (err.status === 429) {
+        c.header('Retry-After', String(Math.ceil(CLIENT_AUTH_FAILURE_WINDOW_MS / 1000)))
+      } else if (basic) {
+        c.header('WWW-Authenticate', 'Basic realm="oauth"')
+      }
+      return c.json(
+        { error: err.code.toLowerCase(), error_description: err.message },
+        err.status as 401,
+      )
+    }
+  }
+
   // ── Handle refresh_token grant ──
   if (params.grant_type === 'refresh_token') {
     if (!params.refresh_token) {
@@ -257,12 +294,22 @@ oauthRouter.post('/token', async (c) => {
       )
     }
 
+    // A confidential client must authenticate to refresh (RFC 6749 §6); a public client is
+    // identified by its client_id alone. The refresh token's own binding is checked on rotation.
+    let clientAuthenticated = false
+    if (clientId) {
+      const auth = await authenticate(clientId)
+      if (auth instanceof Response) return auth
+      clientAuthenticated = auth.authenticated
+    }
+
     try {
       const tokenPair = await rotateRefreshToken(
         params.refresh_token,
         ip,
-        params.client_id,
+        clientId,
         c.req.header('user-agent'),
+        { clientAuthenticated },
       )
       return c.json({
         access_token: tokenPair.accessToken,
@@ -271,6 +318,12 @@ oauthRouter.post('/token', async (c) => {
         token_type: 'Bearer',
       })
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'INVALID_CLIENT') {
+        return c.json({ error: 'invalid_client', error_description: err.message }, 401)
+      }
+      if (err instanceof ApiError && err.code === 'UNAUTHORIZED_CLIENT') {
+        return c.json({ error: 'unauthorized_client', error_description: err.message }, 400)
+      }
       return c.json(
         {
           error: 'invalid_grant',
@@ -284,7 +337,7 @@ oauthRouter.post('/token', async (c) => {
 
   // ── Handle client_credentials grant ──
   if (params.grant_type === 'client_credentials') {
-    if (!params.client_id) {
+    if (!clientId) {
       return c.json(
         {
           error: 'invalid_request',
@@ -295,8 +348,9 @@ oauthRouter.post('/token', async (c) => {
     }
 
     // Authenticate the client (required for client_credentials)
-    const clientSecret = params.client_secret ?? extractBasicAuthSecret(c)
-    if (!clientSecret) {
+    const auth = await authenticate(clientId)
+    if (auth instanceof Response) return auth
+    if (!auth.authenticated) {
       return c.json(
         {
           error: 'invalid_client',
@@ -306,29 +360,9 @@ oauthRouter.post('/token', async (c) => {
       )
     }
 
-    const client = await prisma.client.findUnique({
-      where: { id: params.client_id },
-    })
-    if (!client || !client.active || !client.secretHash) {
-      return c.json(
-        {
-          error: 'invalid_client',
-          error_description: 'Unknown or inactive client',
-        },
-        401,
-      )
-    }
-    const validSecret = await argon2.verify(client.secretHash, clientSecret)
-    if (!validSecret) {
-      return c.json(
-        { error: 'invalid_client', error_description: 'Invalid client secret' },
-        401,
-      )
-    }
-
     try {
       const result = await exchangeClientCredentials(
-        params.client_id,
+        clientId,
         params.scope,
         ip,
       )
@@ -356,7 +390,7 @@ oauthRouter.post('/token', async (c) => {
   }
 
   // ── Handle authorization_code grant ──
-  if (!params.code || !params.redirect_uri || !params.client_id) {
+  if (!params.code || !params.redirect_uri || !clientId) {
     return c.json(
       {
         error: 'invalid_request',
@@ -368,23 +402,9 @@ oauthRouter.post('/token', async (c) => {
 
   // Bind the exchange to the client: a confidential client must authenticate with its secret
   // (body or Basic auth); a public client is bound by PKCE, enforced with the code below.
-  let clientAuthenticated: boolean
-  try {
-    clientAuthenticated = (
-      await authenticateCodeExchangeClient(
-        params.client_id,
-        params.client_secret ?? extractBasicAuthSecret(c),
-      )
-    ).authenticated
-  } catch (err) {
-    if (!(err instanceof ApiError)) throw err
-    if (c.req.header('authorization')?.startsWith('Basic '))
-      c.header('WWW-Authenticate', 'Basic realm="oauth"')
-    return c.json(
-      { error: err.code.toLowerCase(), error_description: err.message },
-      err.status as 401,
-    )
-  }
+  const auth = await authenticate(clientId)
+  if (auth instanceof Response) return auth
+  const clientAuthenticated = auth.authenticated
 
   try {
     const result = await exchangeAuthorizationCode(
@@ -392,7 +412,7 @@ oauthRouter.post('/token', async (c) => {
         grantType: params.grant_type,
         code: params.code,
         redirectUri: params.redirect_uri,
-        clientId: params.client_id,
+        clientId,
         codeVerifier: params.code_verifier,
         clientAuthenticated,
       },
@@ -407,21 +427,21 @@ oauthRouter.post('/token', async (c) => {
       scope: result.scope,
     }
 
-    // Issue id_token when openid scope is requested (OIDC compliance)
-    if (result.scope?.includes('openid') && result.userId) {
+    // Issue id_token when openid is one of the granted scope tokens (OIDC compliance)
+    if (result.scope?.split(/\s+/).includes('openid') && result.userId) {
       const idToken = await issueIdToken(
         result.userId,
         result.email ?? '',
         result.username ?? '',
         result.displayName ?? '',
-        params.client_id,
+        clientId,
         result.nonce,
         result.accessToken,
       )
       response['id_token'] = idToken
     }
 
-    if (browserClientPolicies[params.client_id]) {
+    if (browserClientPolicies[clientId]) {
       await prisma.refreshToken.deleteMany({
         where: {
           tokenHash: createHash('sha256')
@@ -504,21 +524,26 @@ oauthRouter.get('/jwks', async (c) => {
   return c.json(jwks)
 })
 
-// ── Helper: extract client secret from Basic auth header ──
-function extractBasicAuthSecret(c: {
-  req: { header: (name: string) => string | undefined }
-}): string | undefined {
-  const authorization = c.req.header('authorization')
-  if (!authorization?.startsWith('Basic ')) return undefined
-
+// ── Helper: client credentials from the Basic auth header (RFC 6749 §2.3.1) ──
+/** Reverses application/x-www-form-urlencoded encoding; a malformed value is used as sent. */
+function formUrlDecode(value: string): string {
   try {
-    const decoded = Buffer.from(authorization.slice(6), 'base64').toString(
-      'utf-8',
-    )
-    const colonIndex = decoded.indexOf(':')
-    if (colonIndex === -1) return undefined
-    return decoded.slice(colonIndex + 1)
+    return decodeURIComponent(value.replace(/\+/g, ' '))
   } catch {
-    return undefined
+    return value
   }
+}
+
+export function extractBasicCredentials(c: {
+  req: { header: (name: string) => string | undefined }
+}): { clientId: string; clientSecret: string } | undefined {
+  const authorization = c.req.header('authorization')
+  if (!authorization || !/^basic /i.test(authorization)) return undefined
+
+  const decoded = Buffer.from(authorization.slice(6).trim(), 'base64').toString('utf-8')
+  const colonIndex = decoded.indexOf(':')
+  if (colonIndex === -1) return undefined
+  const clientId = formUrlDecode(decoded.slice(0, colonIndex))
+  if (!clientId) return undefined
+  return { clientId, clientSecret: formUrlDecode(decoded.slice(colonIndex + 1)) }
 }

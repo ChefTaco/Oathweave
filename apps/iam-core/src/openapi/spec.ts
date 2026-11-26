@@ -117,6 +117,10 @@ const err409 = {
   description: 'Conflict',
   content: { 'application/json': { schema: ref('ApiError') } },
 }
+const err429 = {
+  description: 'Too many requests, or too many failed client authentications from this address; see Retry-After',
+  content: { 'application/json': { schema: ref('ApiError') } },
+}
 
 function qp(
   name: string,
@@ -414,7 +418,7 @@ export function buildOpenApiSpec() {
         summary:
           'Exchange a one-use authorization code with PKCE. Suite browser clients receive no refresh token.',
         description:
-          'An authorization_code exchange is always bound to the client the code was issued to. A confidential client must authenticate with its client secret (client_secret in the body, or HTTP Basic) and, when it started the flow with a PKCE challenge, also send the code_verifier. A public client has no secret: it must have started the flow with an S256 code_challenge and must send the matching code_verifier. A missing, unknown or wrong client credential answers 401 invalid_client; a missing or wrong code_verifier, a code issued to another client and a used or expired code answer 400 invalid_grant.',
+          'An authorization_code exchange is always bound to the client the code was issued to. A confidential client must authenticate with its client secret (client_secret in the body, or HTTP Basic) and, when it started the flow with a PKCE challenge, also send the code_verifier. A public client has no secret: it must have started the flow with an S256 code_challenge and must send the matching code_verifier. A missing, unknown or wrong client credential answers 401 invalid_client; a missing or wrong code_verifier, a code issued to another client and a used or expired code answer 400 invalid_grant. With HTTP Basic (client_secret_basic) the form-URL-encoded username is the client_id, and a body client_id must match it. A refresh_token request from a confidential client must authenticate the same way; refresh is refused after the session\'s hard expiry, and presenting an already-rotated refresh token revokes its session. Failed client authentications are counted per address: past the ceiling the endpoint answers 429 before verifying any secret.',
         security: [],
         requestBody: {
           required: true,
@@ -432,6 +436,7 @@ export function buildOpenApiSpec() {
           },
           400: err400,
           401: err401,
+          429: err429,
         },
       },
     },
@@ -1069,7 +1074,7 @@ export function buildOpenApiSpec() {
         summary: 'Introspect a JWT token',
         operationId: 'introspectToken',
         security: [{ BearerAuth: [] }],
-        responses: { ...success(ref('TokenInfo')), 401: err401 },
+        responses: { ...success(ref('TokenInfo')), 401: err401, 429: err429 },
       },
     },
 

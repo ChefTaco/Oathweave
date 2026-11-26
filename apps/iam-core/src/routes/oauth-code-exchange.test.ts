@@ -37,15 +37,63 @@ const store = vi.hoisted(() => ({
   clients: new Map<string, unknown>(),
   codes: new Map<string, unknown>(),
   issued: [] as string[],
+  grants: [] as { roles: unknown; permissions: unknown }[],
   audits: [] as string[],
+  redis: new Map<string, number[]>(),
+  secretChecks: 0,
+  ip: '198.51.100.10',
+  groupRoles: [] as { name: string; permissions: string }[],
 }))
 const clients = store.clients as Map<string, StoredClient>
 const codes = store.codes as Map<string, StoredCode>
 
 vi.mock('argon2', () => ({
-  default: { verify: async (hash: string, secret: string) => hash === `hash:${secret}` },
+  default: {
+    verify: async (hash: string, secret: string) => {
+      store.secretChecks++
+      return hash === `hash:${secret}`
+    },
+  },
 }))
-vi.mock('../config/env.js', () => ({ env: { JWT_ISSUER: 'https://identity.example.com' } }))
+vi.mock('../config/env.js', () => ({
+  env: {
+    JWT_ISSUER: 'https://identity.example.com',
+    REDIS_PREFIX: 'fixture',
+    RATE_LIMIT_WINDOW_MS: 900_000,
+    RATE_LIMIT_MAX_ATTEMPTS: 5,
+    RELAX_AUTH_LIMITS: false,
+  },
+}))
+// In-memory sorted sets: enough of Redis for the sliding-window limiters.
+vi.mock('../queue/audit-queue.js', () => ({
+  redisConnection: {
+    pipeline: () => {
+      const ops: (() => unknown)[] = []
+      const set = (key: string) => store.redis.get(key) ?? (store.redis.set(key, []), store.redis.get(key)!)
+      const chain = {
+        zremrangebyscore: (key: string, _min: string, max: number) => {
+          ops.push(() => store.redis.set(key, set(key).filter((score) => score > max)))
+          return chain
+        },
+        zadd: (key: string, score: number) => {
+          ops.push(() => set(key).push(score))
+          return chain
+        },
+        zcard: (key: string) => {
+          ops.push(() => set(key).length)
+          return chain
+        },
+        pexpire: () => {
+          ops.push(() => 1)
+          return chain
+        },
+        exec: async () => ops.map((op) => [null, op()]),
+      }
+      return chain
+    },
+  },
+}))
+vi.mock('../utils/ip.js', () => ({ getClientIp: () => store.ip }))
 vi.mock('../utils/keys.js', () => ({ getPublishedSigningJwks: async () => ({ keys: [] }) }))
 vi.mock('../middleware/auth.js', () => ({ authMiddleware: async () => undefined }))
 vi.mock('../middleware/browser-session.js', () => ({
@@ -60,12 +108,16 @@ vi.mock('../services/audit-service.js', () => ({
   logAuditEvent: async (event: { eventType: string }) => void store.audits.push(event.eventType),
 }))
 vi.mock('../services/token-service.js', () => ({
-  rotateRefreshToken: vi.fn(),
+  rotateRefreshToken: vi.fn(async () => ({ accessToken: 'rotated-access', refreshToken: 'rotated-refresh', expiresIn: 900 })),
   issueIdToken: async () => 'fake-id-token',
   issueTokenPair: async (...args: unknown[]) => {
     store.issued.push(String(args[7]))
+    store.grants.push({ roles: args[3], permissions: args[4] })
     return { accessToken: 'fake-access', refreshToken: 'fake-refresh', expiresIn: 900 }
   },
+  introspectToken: vi.fn(async () => ({ valid: false, reason: 'fixture' })),
+  revokeRefreshToken: vi.fn(),
+  verifyAccessToken: vi.fn(),
 }))
 vi.mock('../db/client.js', () => ({
   prisma: {
@@ -99,12 +151,21 @@ vi.mock('../db/client.js', () => ({
     },
     session: { findFirst: async () => null },
     refreshToken: { deleteMany: async () => ({ count: 0 }) },
+    userRoleAssignment: {
+      findMany: async () => [{ role: { name: 'VIEWER', permissions: JSON.stringify(['example:read']) } }],
+    },
+    groupMember: {
+      findMany: async () =>
+        store.groupRoles.length ? [{ group: { roles: store.groupRoles.map((role) => ({ role })) } }] : [],
+    },
   },
 }))
 
 const { oauthRouter } = await import('./oauth.js')
+const { tokensRouter } = await import('./tokens.js')
 const { createAuthorizationCode, validateAuthorizeRequest } = await import('../services/oauth-service.js')
-const app = new Hono().route('/oauth', oauthRouter).onError(errorHandler)
+const { rotateRefreshToken } = await import('../services/token-service.js')
+const app = new Hono().route('/oauth', oauthRouter).route('/tokens', tokensRouter).onError(errorHandler)
 
 const redirectUri = 'https://client.example.com/callback'
 const secret = 'fake-client-secret-0123456789abcdef'
@@ -142,7 +203,13 @@ beforeEach(() => {
   clients.clear()
   codes.clear()
   store.issued.length = 0
+  store.grants.length = 0
   store.audits.length = 0
+  store.redis.clear()
+  store.secretChecks = 0
+  store.ip = '198.51.100.10'
+  store.groupRoles = []
+  vi.mocked(rotateRefreshToken).mockClear()
   register('spa', 'public', null)
   register('portal', 'confidential', `hash:${secret}`)
 })
@@ -273,5 +340,118 @@ describe('any client', () => {
     expect(replay).toMatchObject({ status: 400, body: { error: 'invalid_grant' } })
     expect(store.audits).toContain('oauth.code_reuse')
     expect(store.issued).toEqual(['spa'])
+  })
+})
+
+describe('effective grants', () => {
+  it('issues the permissions of roles held through a group, next to direct roles', async () => {
+    store.groupRoles = [{ name: 'OPERATORS', permissions: JSON.stringify(['example:deploy', 'example:read']) }]
+    const code = await authorize('spa', true)
+    expect((await exchange({ client_id: 'spa', code, code_verifier: verifier })).status).toBe(200)
+    expect(store.grants).toEqual([
+      { roles: ['VIEWER', 'OPERATORS'], permissions: ['example:read', 'example:deploy'] },
+    ])
+  })
+})
+
+describe('client_secret_basic', () => {
+  it('identifies the client from the Basic username alone', async () => {
+    const code = await authorize('portal', false)
+    const reply = await exchange({ code }, { form: true, basic: `portal:${secret}` })
+    expect(reply.status).toBe(200)
+    expect(store.issued).toEqual(['portal'])
+  })
+
+  it('form-URL-decodes the Basic client id and secret', async () => {
+    const special = 'fake secret+with:reserved/characters'
+    register('portal two', 'confidential', `hash:${special}`)
+    const code = await authorize('portal two', false)
+    const encoded = `${encodeURIComponent('portal two')}:${encodeURIComponent(special)}`
+    expect((await exchange({ code }, { form: true, basic: encoded })).status).toBe(200)
+  })
+
+  it('refuses a body client_id that differs from the Basic username', async () => {
+    const code = await authorize('portal', false)
+    const reply = await exchange({ client_id: 'spa', code }, { form: true, basic: `portal:${secret}` })
+    expect(reply).toMatchObject({ status: 400, body: { error: 'invalid_request' } })
+    expect(store.issued).toEqual([])
+  })
+})
+
+async function refresh(fields: Record<string, string>, basic?: string) {
+  const response = await app.request('/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(basic ? { Authorization: `Basic ${Buffer.from(basic).toString('base64')}` } : {}),
+    },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'fake-refresh-token', ...fields }).toString(),
+  })
+  return { status: response.status, body: (await response.json()) as Record<string, unknown> }
+}
+
+describe('refresh_token grant', () => {
+  it('requires a confidential client to authenticate', async () => {
+    expect(await refresh({ client_id: 'portal' })).toMatchObject({ status: 401, body: { error: 'invalid_client' } })
+    expect(await refresh({ client_id: 'portal', client_secret: `${secret}-wrong` })).toMatchObject({ status: 401 })
+    expect(rotateRefreshToken).not.toHaveBeenCalled()
+    expect((await refresh({}, `portal:${secret}`)).status).toBe(200)
+    expect(vi.mocked(rotateRefreshToken).mock.calls[0]?.[2]).toBe('portal')
+    expect(vi.mocked(rotateRefreshToken).mock.calls[0]?.[4]).toEqual({ clientAuthenticated: true })
+  })
+
+  it('identifies a public client by its client_id', async () => {
+    expect((await refresh({ client_id: 'spa' })).status).toBe(200)
+    expect(vi.mocked(rotateRefreshToken).mock.calls[0]?.[4]).toEqual({ clientAuthenticated: false })
+  })
+})
+
+describe('client authentication throttle', () => {
+  it('stops verifying secrets for a client after repeated failures from one address', async () => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await refresh({ client_id: 'portal', client_secret: `guess-${attempt}` })).status).toBe(401)
+    }
+    expect(store.secretChecks).toBe(10)
+    const blocked = await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grant_type: 'client_credentials', client_id: 'portal', client_secret: secret }),
+    })
+    expect(blocked.status).toBe(429)
+    expect(blocked.headers.get('retry-after')).toBe('300')
+    expect(store.secretChecks).toBe(10)
+    // Another address, and other clients from this address, are not affected.
+    expect((await refresh({ client_id: 'spa' })).status).toBe(200)
+    store.ip = '198.51.100.11'
+    expect((await refresh({ client_id: 'portal', client_secret: secret })).status).toBe(200)
+  })
+
+  it('counts unknown clients and caps failures per address across clients', async () => {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      expect((await refresh({ client_id: `missing-${attempt}`, client_secret: 'guess' })).status).toBe(401)
+    }
+    expect((await refresh({ client_id: 'portal', client_secret: secret })).status).toBe(429)
+  })
+
+  it('shares the failure count with the client-authenticated token routes', async () => {
+    const introspect = (clientSecret: string) =>
+      app.request('/tokens/introspect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-id': 'portal', 'x-client-secret': clientSecret },
+        body: JSON.stringify({ token: 'fake-token' }),
+      })
+    expect((await introspect(secret)).status).toBe(200)
+    for (let attempt = 0; attempt < 10; attempt++) expect((await introspect(`guess-${attempt}`)).status).toBe(401)
+    const blocked = await introspect(secret)
+    expect(blocked.status).toBe(429)
+    expect(store.secretChecks).toBe(11)
+    expect((await refresh({ client_id: 'portal', client_secret: secret })).status).toBe(429)
+  })
+
+  it('rate-limits token requests per address', async () => {
+    const malformed = () =>
+      app.request('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    for (let attempt = 0; attempt < 300; attempt++) expect((await malformed()).status).toBe(400)
+    expect((await malformed()).status).toBe(429)
   })
 })

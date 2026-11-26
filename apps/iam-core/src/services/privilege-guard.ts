@@ -3,6 +3,9 @@ import { prisma } from '../db/client.js'
 import { accountLockActive } from '../config/auth-limits.js'
 import { ApiError, type Principal } from '../types/index.js'
 import { clientCredentialsPermissionCeiling } from './token-service.js'
+import { parsePermissionList, userEffectiveGrants, type RoleGrant } from './effective-grants.js'
+
+export { parsePermissionList }
 
 /**
  * Privilege guard. Without it, anyone with iam:roles:write could grant themselves
@@ -38,18 +41,6 @@ export interface Actor {
 export interface RouterOperator {
   readonly authMode: 'os' | 'iam-oidc' | undefined
   readonly iamSubject: string | undefined
-}
-
-export function parsePermissionList(value: unknown): string[] {
-  let parsed: unknown = value
-  if (typeof value === 'string') {
-    try {
-      parsed = JSON.parse(value)
-    } catch {
-      return []
-    }
-  }
-  return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
 }
 
 /** True only for the Router's own client-credentials token (subject and client are both the Router). */
@@ -92,29 +83,11 @@ function assertUnrestricted(actor: Actor, action: string): void {
   if (!actor.unrestricted) deny(`Cannot ${action}: only ${SUPER_ADMIN_ROLE} may do this`)
 }
 
-interface RoleGrant {
-  readonly name: string
-  readonly permissions: string[]
-}
-
 function toGrants(rows: ReadonlyArray<{ role: { name: string; permissions: string } }>): RoleGrant[] {
   return rows.map((row) => ({ name: row.role.name, permissions: parsePermissionList(row.role.permissions) }))
 }
 
 const ROLE_FIELDS = { select: { name: true, permissions: true } } as const
-
-async function userDirectGrants(userId: string): Promise<RoleGrant[]> {
-  return toGrants(await prisma.userRoleAssignment.findMany({ where: { userId }, include: { role: ROLE_FIELDS } }))
-}
-
-/** Direct roles plus roles inherited from groups. */
-async function userEffectiveGrants(userId: string): Promise<RoleGrant[]> {
-  const [direct, memberships] = await Promise.all([
-    userDirectGrants(userId),
-    prisma.groupMember.findMany({ where: { userId }, include: { group: { include: { roles: { include: { role: ROLE_FIELDS } } } } } }),
-  ])
-  return [...direct, ...memberships.flatMap((membership) => toGrants(membership.group.roles))]
-}
 
 function actorFromGrants(userId: string | undefined, grants: readonly RoleGrant[]): Actor {
   return {
@@ -146,8 +119,8 @@ export async function resolveActor(c: Context): Promise<Actor> {
   if (!user || !user.active || accountLockActive(user.lockedUntil)) {
     throw new ApiError(403, 'FORBIDDEN', 'The IAM user behind this Router request is not active')
   }
-  // Same grants the user's own access token carries (direct roles).
-  return actorFromGrants(user.id, await userDirectGrants(user.id))
+  // Same grants the user's own access token carries (direct and group roles).
+  return actorFromGrants(user.id, await userEffectiveGrants(user.id))
 }
 
 async function roleGrants(roleIds: readonly string[]): Promise<RoleGrant[]> {

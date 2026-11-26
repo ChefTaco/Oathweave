@@ -5,6 +5,7 @@
 import { nanoid } from 'nanoid'
 import { prisma } from '../db/client.js'
 import { ApiError } from '../types/index.js'
+import { userTokenGrants } from './effective-grants.js'
 
 // ── List groups ──
 
@@ -202,41 +203,5 @@ export async function removeRole(groupId: string, roleId: string) {
 // ── Get effective permissions for a user (direct + group-derived) ──
 
 export async function getEffectivePermissions(userId: string): Promise<string[]> {
-  // Direct role permissions
-  const directRoles = await prisma.userRoleAssignment.findMany({
-    where: { userId },
-    include: { role: { select: { permissions: true } } },
-  })
-
-  // Group-derived role permissions
-  const groups = await prisma.groupMember.findMany({
-    where: { userId },
-    include: {
-      group: {
-        include: {
-          roles: {
-            include: { role: { select: { permissions: true } } },
-          },
-        },
-      },
-    },
-  })
-
-  const allPermissions = new Set<string>()
-
-  // Add direct permissions
-  for (const dr of directRoles) {
-    const perms: string[] = JSON.parse(dr.role.permissions)
-    for (const p of perms) allPermissions.add(p)
-  }
-
-  // Add group permissions
-  for (const gm of groups) {
-    for (const gr of gm.group.roles) {
-      const perms: string[] = JSON.parse(gr.role.permissions)
-      for (const p of perms) allPermissions.add(p)
-    }
-  }
-
-  return [...allPermissions]
+  return (await userTokenGrants(userId)).permissions
 }

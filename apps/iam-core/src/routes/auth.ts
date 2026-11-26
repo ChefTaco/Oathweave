@@ -5,6 +5,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
+import { userTokenGrants } from '../services/effective-grants.js'
 import { verifyPassword, hashPassword } from '../services/password-service.js'
 import {
   issueTokenPair,
@@ -15,7 +16,7 @@ import { createSession, revokeSession } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
 import {
   generateTotpSecret,
-  verifyTotpCode,
+  consumeTotpCode,
   generateBackupCodes,
   verifyBackupCode,
 } from '../services/mfa-service.js'
@@ -78,7 +79,6 @@ authRouter.post(
     const user = await prisma.user.findFirst({
       where: { OR: [{ username }, { email: username }] },
       include: {
-        roles: { include: { role: true } },
         webauthnCredentials: { select: { id: true } },
       },
     })
@@ -207,17 +207,7 @@ authRouter.post(
       )
     }
 
-    const roles = user.roles.map((r) => r.role.name)
-    const permissions: string[] = [
-      ...new Set(
-        user.roles.flatMap((r) => {
-          const perms = r.role.permissions
-          return (
-            typeof perms === 'string' ? JSON.parse(perms) : perms
-          ) as string[]
-        }),
-      ),
-    ]
+    const { roles, permissions } = await userTokenGrants(user.id)
 
     // ── Password expiry check ──
     const policy = await getDefaultPolicy()
@@ -639,7 +629,7 @@ authRouter.post(
       throw new ApiError(409, 'MFA_ALREADY_ENABLED', 'MFA is already enabled')
     }
 
-    if (!verifyTotpCode(user.mfaSecret, code)) {
+    if (!(await consumeTotpCode(user.id, user.mfaSecret, code))) {
       throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP code')
     }
 
@@ -732,7 +722,7 @@ authRouter.post(
       throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid password')
     }
 
-    if (!user.mfaSecret || !verifyTotpCode(user.mfaSecret, code)) {
+    if (!user.mfaSecret || !(await consumeTotpCode(user.id, user.mfaSecret, code))) {
       throw new ApiError(401, 'INVALID_MFA_CODE', 'Invalid TOTP code')
     }
 
@@ -782,10 +772,7 @@ authRouter.post(
     // Verify the short-lived MFA token
     const userId = await loginChallengeUser(mfaToken)
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { roles: { include: { role: true } } },
-    })
+    const user = await prisma.user.findUnique({ where: { id: userId } })
 
     if (
       !user ||
@@ -803,7 +790,7 @@ authRouter.post(
       user.mfaSecret &&
       user.mfaVerifiedAt &&
       code.length === 6 &&
-      verifyTotpCode(user.mfaSecret, code)
+      (await consumeTotpCode(user.id, user.mfaSecret, code))
     ) {
       // TOTP verified
     } else {
@@ -864,17 +851,7 @@ authRouter.post(
           'Recovery code has already been used',
         )
     }
-    const roles = user.roles.map((r) => r.role.name)
-    const permissions: string[] = [
-      ...new Set(
-        user.roles.flatMap((r) => {
-          const perms = r.role.permissions
-          return (
-            typeof perms === 'string' ? JSON.parse(perms) : perms
-          ) as string[]
-        }),
-      ),
-    ]
+    const { roles, permissions } = await userTokenGrants(user.id)
 
     const { sessionId, riskScore, riskFactors } = await createSession(
       userId,
@@ -1258,7 +1235,7 @@ authRouter.post(
           403,
         )
       }
-      const mfaValid = verifyTotpCode(user.mfaSecret, body.totpCode)
+      const mfaValid = await consumeTotpCode(user.id, user.mfaSecret, body.totpCode)
       if (!mfaValid) {
         await logAuditEvent({
           eventType: 'auth.step_up_failed',
