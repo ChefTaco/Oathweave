@@ -31,6 +31,10 @@ no longer revives sign-ins from before, so the person signs in again. Browser si
 - **Deleting a user revokes their sessions first**, so the revocations are recorded before the
   sessions are removed with the account.
 
+### Security
+
+- The repository privacy checks (`scripts/check-private-data.sh` and `scripts/scan-secrets.sh`) now report a finding as `path:line: rule` and never print the matching text or the line around it, so a failing check cannot copy a private term or a credential into a public CI log. A path that itself contains a private term is shown as `(path redacted)`. Exit codes are unchanged, and `scripts/privacy-output.test.sh` (run in CI) plants fake values and checks they stay out of the output. Repository tooling only; nothing to do when upgrading.
+
 ## [2.5.0] - 2026-11-26
 
 **Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.5.0`. This release
