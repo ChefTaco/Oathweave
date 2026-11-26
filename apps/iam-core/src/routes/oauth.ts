@@ -189,17 +189,20 @@ oauthRouter.post('/authorize', optionalBrowserAuthorization, async (c) => {
     return c.json(await loginRequiredBody(outcome.reason, binding), 401)
   }
   const signedIn = principal!
+  // A declined authorization never allocates a code, for browser and native callers alike.
+  if (body.consent === 'deny') {
+    c.header('Cache-Control', 'no-store')
+    return c.json(
+      {
+        error: 'ACCESS_DENIED',
+        message: 'Authorization declined',
+        redirectTo: authorizationErrorResponse(binding, 'access_denied', 'The user declined access').redirectTo,
+      },
+      403,
+    )
+  }
   if (browser) {
     c.header('Cache-Control', 'no-store')
-    if (body.consent === 'deny')
-      return c.json(
-        {
-          error: 'ACCESS_DENIED',
-          message: 'Authorization declined',
-          redirectTo: authorizationErrorResponse(binding, 'access_denied', 'The user declined access').redirectTo,
-        },
-        403,
-      )
     const consentNeeded = !request.skipConsent || outcome.prompts.has('consent')
     if (consentNeeded && body.consent !== 'approve') {
       if (outcome.prompts.has('none'))

@@ -34,6 +34,11 @@ LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`.
   browser, save the session cookie as `name=value` in an owner-only file and pass it as
   `HIVE_SESSION_COOKIE_FILE`.
 
+### Fixed
+
+- A native `POST /api/v1/oauth/authorize` with `consent: "deny"` no longer issues a code. It
+  answers `403 ACCESS_DENIED` with `redirectTo`, as the browser flow already did.
+
 ## [2.6.0] - 2026-11-26
 
 **Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.6.0`. This release

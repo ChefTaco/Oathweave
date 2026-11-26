@@ -399,6 +399,21 @@ describe('a cancelled or declined authorization', () => {
   })
 })
 
+describe('native POST approval', () => {
+  it('a declined native approval creates no code', async () => {
+    const { accessToken } = await harness.login('pat', password)
+    const { body } = request(FIRST_PARTY)
+    const response = await harness.request('/api/v1/oauth/authorize', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ...body, consent: 'deny' }),
+    })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: 'ACCESS_DENIED' })
+    expect(await harness.prisma.authorizationCode.count({ where: { state: body.state } })).toBe(0)
+  })
+})
+
 describe('discovery', () => {
   it('advertises the prompt values', async () => {
     const native = (await (await harness.request('/.well-known/openid-configuration')).json()) as { prompt_values_supported: string[] }
