@@ -5,6 +5,7 @@ import { BrowserOpenIdConfigurationSchema } from '../schemas/discovery.js'
 import { ApiError } from '../types/index.js'
 import { browserClientPolicies } from './browser-policies.js'
 import { ID_TOKEN_CLAIMS } from './oidc-claims.js'
+import { PROMPT_VALUES } from './authorization-prompt.js'
 
 export async function getBrowserOpenIdConfiguration(clientId: string) {
   if (!Object.hasOwn(browserClientPolicies, clientId)) throw new ApiError(
@@ -38,5 +39,6 @@ export async function getBrowserOpenIdConfiguration(clientId: string) {
     token_endpoint_auth_methods_supported: ['none'],
     code_challenge_methods_supported: ['S256'],
     claims_supported: [...ID_TOKEN_CLAIMS],
+    prompt_values_supported: [...PROMPT_VALUES],
   })
 }

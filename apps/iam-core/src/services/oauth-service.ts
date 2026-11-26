@@ -12,6 +12,7 @@ import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
 import { discoveryMetadataUrl } from '../config/browser-discovery.js'
 import { ID_TOKEN_CLAIMS } from './oidc-claims.js'
+import { PROMPT_VALUES } from './authorization-prompt.js'
 import { TOKEN_EXCHANGE_GRANT, tokenExchangeEnabled } from './token-exchange.js'
 import { ApiError } from '../types/index.js'
 import { getPublishedSigningJwks } from '../utils/keys.js'
@@ -555,6 +556,7 @@ export function getOpenIdConfiguration(): Record<string, unknown> | undefined {
     introspection_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
     code_challenge_methods_supported: ['S256'],
     claims_supported: [...ID_TOKEN_CLAIMS],
+    prompt_values_supported: [...PROMPT_VALUES],
   }
 }
 

@@ -142,6 +142,19 @@ export const browserAuthorization: MiddlewareHandler = async (c, next) => {
   return next()
 }
 
+/**
+ * Like browserAuthorization, but a missing browser sign-in is left to the route, which may
+ * answer it (for example with an OAuth error for `prompt=none`). An invalid bearer token
+ * is still refused here.
+ */
+export const optionalBrowserAuthorization: MiddlewareHandler = async (c, next) => {
+  if (c.req.header('authorization')) return authMiddleware(c, next)
+  if (c.req.method !== 'GET') requireBrowserOrigin(c)
+  const principal = await browserPrincipal(c)
+  if (principal) c.set('principal', principal)
+  return next()
+}
+
 export async function clearBrowserSession(c: Context): Promise<void> {
   requireBrowserOrigin(c)
   const principal = await browserPrincipal(c)

@@ -16,4 +16,5 @@ export const BrowserOpenIdConfigurationSchema = z.object({
   token_endpoint_auth_methods_supported: z.tuple([z.literal('none')]),
   code_challenge_methods_supported: z.tuple([z.literal('S256')]),
   claims_supported: z.array(z.string()),
+  prompt_values_supported: z.array(z.enum(['none', 'login', 'consent', 'select_account'])).optional(),
 }).strict()

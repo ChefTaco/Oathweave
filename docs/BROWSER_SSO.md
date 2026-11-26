@@ -45,6 +45,29 @@ state and proves native/browser issuer separation, PKCE, one-use codes, exact
 resource HTTP read access, preserved local product identity, unauthorized-write
 denial and logout revocation. It never uses production credentials.
 
+## Re-authentication through the sign-in portal
+
+The portal at `IAM_BROWSER_AUTHORIZATION_URL` passes the client's `prompt` and `max_age` to
+`POST /oauth/authorize` as `prompt` and `maxAge` (an integer). It handles the answers like this:
+
+- `200 {code, state, iss}`: redirect to the callback as before.
+- `401 LOGIN_REQUIRED {reason, loginTicket}`: show the sign-in form, even if an SSO session
+  exists, then repeat the same request with `loginTicket`. For `prompt=login` (or `max_age=0`)
+  the first attempt always answers this, and only a sign-in after the ticket satisfies it.
+- `403 CONSENT_REQUIRED`: consent as before. A declined consent answers
+  `403 ACCESS_DENIED` with `redirectTo`.
+- `400 {error: "login_required" | "consent_required", state, iss, redirectTo}` (`prompt=none`):
+  navigate to `redirectTo`.
+- Cancel: `POST /oauth/authorize/cancel` with the same request fields answers
+  `{error: "access_denied", state, iss, redirectTo}`. It needs no sign-in, and it answers only
+  for a registered browser client and its exact registered callback.
+
+`redirectTo` is always the exact registered callback with `error`, `error_description`, `state`
+and `iss` added. The schemas are `BrowserLoginRequiredResponse`,
+`BrowserAuthorizationErrorResponse` and `AuthorizeCancelRequest` in `browser-contracts.ts`. See
+the server README's re-authentication section for `auth_time` and the claims a relying party
+checks.
+
 ## Interactive browser client discovery
 
 Native discovery is served at

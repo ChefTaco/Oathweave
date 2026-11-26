@@ -5,9 +5,14 @@ import {
   browserClientPolicies,
 } from '../services/browser-policies.js'
 import {
-  browserAuthorization,
+  optionalBrowserAuthorization,
   requireBrowserOrigin,
 } from '../middleware/browser-session.js'
+import {
+  authorizationErrorResponse,
+  evaluatePrompt,
+  loginRequiredBody,
+} from '../services/authorization-prompt.js'
 /**
  * oauth.ts — OAuth2 Authorization Code Flow + PKCE routes.
  *
@@ -26,10 +31,11 @@ import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { parseBody } from '../utils/validate.js'
 import { getClientIp } from '../utils/ip.js'
-import { ApiError } from '../types/index.js'
+import { ApiError, type Principal } from '../types/index.js'
 import {
   AuthorizeQuerySchema,
   AuthorizeConsentSchema,
+  AuthorizeCancelSchema,
   TokenExchangeSchema,
 } from '../schemas/oauth.js'
 import {
@@ -54,7 +60,9 @@ import {
 export const oauthRouter = new Hono()
 
 // ── GET /authorize — Validate request and return client info for consent screen ──
-oauthRouter.get('/authorize', browserAuthorization, async (c) => {
+// Honours OpenID Connect prompt (none, login, consent, select_account) and max_age; see
+// services/authorization-prompt.ts.
+oauthRouter.get('/authorize', optionalBrowserAuthorization, async (c) => {
   const query = c.req.query()
 
   const parsed = AuthorizeQuerySchema.safeParse(query)
@@ -78,11 +86,31 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
     nonce: params.nonce,
   })
 
+  const binding = {
+    clientId: params.client_id,
+    redirectUri: params.redirect_uri,
+    state: params.state,
+    nonce: params.nonce,
+    codeChallenge: params.code_challenge,
+  }
+  const principal = c.get('principal') as Principal | undefined
+  const outcome = await evaluatePrompt(principal, { prompt: params.prompt, maxAge: params.max_age, loginTicket: params.login_ticket }, binding)
+  if (!outcome.ok) {
+    c.header('Cache-Control', 'no-store')
+    // prompt=none: the error goes back to the (validated) client callback.
+    if (outcome.prompts.has('none'))
+      return c.redirect(authorizationErrorResponse(binding, 'login_required', 'Sign-in is required').redirectTo, 302)
+    return c.json(await loginRequiredBody(outcome.reason, binding), 401)
+  }
+  const signedIn = principal!
+  const forceConsent = outcome.prompts.has('consent')
+  if (outcome.prompts.has('none') && (!result.skipConsent || forceConsent))
+    return c.redirect(authorizationErrorResponse(binding, 'consent_required', 'Consent is required').redirectTo, 302)
+
   // If first-party client, auto-approve and redirect immediately
-  if (result.skipConsent) {
-    const principal = c.get('principal')
+  if (result.skipConsent && !forceConsent) {
     const codeResult = await createAuthorizationCode(
-      principal.sub,
+      signedIn.sub,
       {
         clientId: params.client_id,
         redirectUri: params.redirect_uri,
@@ -92,9 +120,9 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
         scope: params.scope,
         state: params.state,
         browserSessionId: browserClientPolicies[params.client_id]
-          ? principal.sessionId
+          ? signedIn.sessionId
           : undefined,
-        authSessionId: principal.sessionId,
+        authSessionId: signedIn.sessionId,
         nonce: params.nonce,
       },
       getClientIp(c),
@@ -123,31 +151,62 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
       scope: params.scope,
       state: params.state,
       nonce: params.nonce,
+      ...(params.prompt !== undefined ? { prompt: params.prompt } : {}),
+      ...(params.max_age !== undefined ? { maxAge: params.max_age } : {}),
+      ...(params.login_ticket !== undefined ? { loginTicket: params.login_ticket } : {}),
     },
   })
 })
 
 // ── POST /authorize — User approves consent, generate code and redirect ──
-oauthRouter.post('/authorize', browserAuthorization, async (c) => {
+// Honours prompt and max_age as GET does. A request that must end at the client (prompt=none
+// needing an interaction, or declined consent) carries `redirectTo`, the validated callback
+// with the OAuth error, state and iss.
+oauthRouter.post('/authorize', optionalBrowserAuthorization, async (c) => {
   const body = await parseBody(c, AuthorizeConsentSchema)
-  const principal = c.get('principal')
   const ip = getClientIp(c)
 
   // A browser preflight must not allocate a usable code before consent. Native
   // clients retain their existing explicit POST approval flow.
   const browser =
     c.req.header('x-oathweave-browser') === 'true' &&
-    browserClientPolicies[body.clientId]
-  if (browser) {
-    requireBrowserOrigin(c)
-    const request = await validateAuthorizeRequest(body)
+    Boolean(browserClientPolicies[body.clientId])
+  if (browser) requireBrowserOrigin(c)
+  const request = await validateAuthorizeRequest(body)
+  const binding = {
+    clientId: body.clientId,
+    redirectUri: body.redirectUri,
+    state: body.state,
+    nonce: body.nonce,
+    codeChallenge: body.codeChallenge,
+  }
+  const principal = c.get('principal') as Principal | undefined
+  const outcome = await evaluatePrompt(principal, body, binding)
+  if (!outcome.ok) {
     c.header('Cache-Control', 'no-store')
-    if (body.consent === 'deny')
-      return c.json(
-        { error: 'ACCESS_DENIED', message: 'Authorization declined' },
-        403,
-      )
-    if (!request.skipConsent && body.consent !== 'approve') {
+    if (outcome.prompts.has('none'))
+      return c.json(authorizationErrorResponse(binding, 'login_required', 'Sign-in is required'), 400)
+    return c.json(await loginRequiredBody(outcome.reason, binding), 401)
+  }
+  const signedIn = principal!
+  // A declined authorization never allocates a code, for browser and native callers alike.
+  if (body.consent === 'deny') {
+    c.header('Cache-Control', 'no-store')
+    return c.json(
+      {
+        error: 'ACCESS_DENIED',
+        message: 'Authorization declined',
+        redirectTo: authorizationErrorResponse(binding, 'access_denied', 'The user declined access').redirectTo,
+      },
+      403,
+    )
+  }
+  if (browser) {
+    c.header('Cache-Control', 'no-store')
+    const consentNeeded = !request.skipConsent || outcome.prompts.has('consent')
+    if (consentNeeded && body.consent !== 'approve') {
+      if (outcome.prompts.has('none'))
+        return c.json(authorizationErrorResponse(binding, 'consent_required', 'Consent is required'), 400)
       return c.json(
         {
           error: 'CONSENT_REQUIRED',
@@ -158,8 +217,8 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
           audience: browserClientPolicies[body.clientId]!.audience,
           permissions: browserClientPolicies[body.clientId]!.permissions.filter(
             (permission) =>
-              principal.permissions.includes(permission) ||
-              principal.permissions.includes('*'),
+              signedIn.permissions.includes(permission) ||
+              signedIn.permissions.includes('*'),
           ),
         },
         403,
@@ -168,7 +227,7 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
   }
 
   const codeResult = await createAuthorizationCode(
-    principal.sub,
+    signedIn.sub,
     {
       clientId: body.clientId,
       redirectUri: body.redirectUri,
@@ -179,20 +238,16 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
       state: body.state,
       nonce: body.nonce,
       browserSessionId: browserClientPolicies[body.clientId]
-        ? principal.sessionId
+        ? signedIn.sessionId
         : undefined,
-      authSessionId: principal.sessionId,
+      authSessionId: signedIn.sessionId,
     },
     ip,
   )
 
   // Same-origin first-party SPA clients receive the authorization response
   // directly. The code still requires its registered redirect URI and PKCE.
-  if (
-    c.req.header('x-oathweave-browser') === 'true' &&
-    browserClientPolicies[body.clientId]
-  ) {
-    requireBrowserOrigin(c)
+  if (browser) {
     c.header('Cache-Control', 'no-store')
     return c.json({
       code: codeResult.code,
@@ -210,6 +265,27 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
     code: codeResult.code,
     state: codeResult.state,
   })
+})
+
+// ── POST /authorize/cancel — The user abandoned sign-in or consent ──
+// Needs no sign-in: it creates nothing and answers only for a registered client and its exact
+// redirect URI, with `redirectTo` carrying error=access_denied, the state and iss.
+oauthRouter.post('/authorize/cancel', clientEndpointRateLimit('rl:authorize-cancel'), async (c) => {
+  if (c.req.header('x-oathweave-browser') !== 'true')
+    throw new ApiError(400, 'INVALID_REQUEST', 'Cancellation is a browser request')
+  requireBrowserOrigin(c)
+  const body = await parseBody(c, AuthorizeCancelSchema)
+  if (!browserClientPolicies[body.clientId])
+    throw new ApiError(400, 'INVALID_CLIENT', 'Select a registered public browser client')
+  await validateAuthorizeRequest(body)
+  c.header('Cache-Control', 'no-store')
+  return c.json(
+    authorizationErrorResponse(
+      { clientId: body.clientId, redirectUri: body.redirectUri, state: body.state },
+      'access_denied',
+      'The user cancelled sign-in',
+    ),
+  )
 })
 
 // ── POST /token — Exchange code for tokens (or refresh) ──

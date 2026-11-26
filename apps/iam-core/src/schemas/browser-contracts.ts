@@ -86,8 +86,13 @@ export const PasswordlessOptionsResponseSchema = OwnedPasswordlessOptionsRespons
 export const MfaStatusSchema = OwnedMfaStatusSchema
 export const RecoveryCodesSchema = OwnedRecoveryCodesSchema
 
-import { AuthorizeConsentSchema as OwnedAuthorizeConsentRequestSchema,TokenExchangeSchema as OwnedTokenExchangeRequestSchema } from './oauth.js'
+import { AuthorizeConsentSchema as OwnedAuthorizeConsentRequestSchema,AuthorizeCancelSchema as OwnedAuthorizeCancelRequestSchema,TokenExchangeSchema as OwnedTokenExchangeRequestSchema } from './oauth.js'
 export const AuthorizeConsentRequestSchema = OwnedAuthorizeConsentRequestSchema
+export const AuthorizeCancelRequestSchema = OwnedAuthorizeCancelRequestSchema
+/** 401 from POST /oauth/authorize: sign in, then repeat the same request with loginTicket. */
+export const BrowserLoginRequiredResponseSchema = z.object({ error:z.literal('LOGIN_REQUIRED'),message:string,reason:z.enum(['no_session','prompt_login','max_age']),loginTicket:string.min(1),loginTicketExpiresIn:z.number().int().positive() })
+/** An authorization that ends at the client: navigate to redirectTo (the validated callback with error, state and iss). */
+export const BrowserAuthorizationErrorResponseSchema = z.object({ error:z.enum(['access_denied','login_required','consent_required']),error_description:string,state:string.optional(),iss:string,redirectTo:string.min(1) })
 export const TokenExchangeRequestSchema = OwnedTokenExchangeRequestSchema
 
 import { EnrollmentRequestSchema as OwnedEnrollmentRequestSchema,EnrollmentLifecycleSchema as OwnedEnrollmentLifecycleRequestSchema,EnrollmentResultSchema as OwnedEnrollmentResultSchema,EnrollmentInventorySchema as OwnedEnrollmentInventorySchema,EnrollmentInstallationsSchema as OwnedEnrollmentInstallationsSchema,LegacyEnrollmentReceiptSchema as OwnedLegacyEnrollmentReceiptSchema } from './enrollments.js'

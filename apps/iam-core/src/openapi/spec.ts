@@ -5,6 +5,7 @@ import { EnrollmentRequestSchema, EnrollmentLifecycleSchema, EnrollmentResultSch
 import {
   AuthorizeQuerySchema,
   AuthorizeConsentSchema,
+  AuthorizeCancelSchema,
   TokenExchangeSchema,
 } from '../schemas/oauth.js'
 import { IAM_VERSION } from '../config/version.js'
@@ -424,9 +425,15 @@ export function buildOpenApiSpec() {
         ),
         responses: {
           200: { description: 'Consent request' },
-          302: { description: 'Authorization response' },
+          302: {
+            description:
+              'Authorization response; with prompt=none, an OAuth error (login_required or consent_required) with state and iss at the registered callback',
+          },
           400: err400,
-          401: err401,
+          401: {
+            description:
+              'LOGIN_REQUIRED: no sign-in, prompt=login, or a sign-in older than max_age. Sign in, then repeat the request with login_ticket.',
+          },
         },
       },
       post: {
@@ -442,8 +449,41 @@ export function buildOpenApiSpec() {
         },
         responses: {
           200: { description: 'Authorization response' },
+          400: {
+            description:
+              'Invalid request; or, with prompt=none, an OAuth error (login_required or consent_required) whose redirectTo is the registered callback carrying it',
+            content: { 'application/json': { schema: zod(browserContracts.BrowserAuthorizationErrorResponseSchema) } },
+          },
+          401: {
+            description:
+              'LOGIN_REQUIRED: no sign-in, prompt=login, or a sign-in older than max_age. Sign in, then repeat the same request with loginTicket.',
+            content: { 'application/json': { schema: zod(browserContracts.BrowserLoginRequiredResponseSchema) } },
+          },
+          403: {
+            description:
+              'CONSENT_REQUIRED, or ACCESS_DENIED after a declined consent (with redirectTo, the callback carrying error=access_denied)',
+          },
+        },
+      },
+    },
+    '/api/v1/oauth/authorize/cancel': {
+      post: {
+        tags: ['Auth'],
+        operationId: 'oauthCancelAuthorization',
+        summary:
+          'The user cancelled browser sign-in: return error=access_denied with the state and issuer to the registered callback. Needs no sign-in and creates nothing.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: zod(AuthorizeCancelSchema) },
+          },
+        },
+        responses: {
+          200: {
+            description: 'The OAuth error and redirectTo, the registered callback carrying it',
+            content: { 'application/json': { schema: zod(browserContracts.BrowserAuthorizationErrorResponseSchema) } },
+          },
           400: err400,
-          401: err401,
           403: err403,
         },
       },

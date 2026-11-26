@@ -42,7 +42,7 @@ vi.mock('../services/browser-policies.js', () => ({
 }))
 vi.mock('../middleware/browser-session.js', () => ({
   requireBrowserOrigin: vi.fn(),
-  browserAuthorization: (async (c, next) => {
+  optionalBrowserAuthorization: (async (c, next) => {
     c.set('principal', {
       sub: 'fake-user',
       actorType: 'USER',
