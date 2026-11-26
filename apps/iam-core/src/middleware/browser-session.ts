@@ -1,7 +1,7 @@
+import { sha256Hex } from '@hivemagnus/hive-common/secrets'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { SignJWT, jwtVerify, createLocalJWKSet } from 'jose'
-import { createHash } from 'node:crypto'
 import { env } from '../config/env.js'
 import { prisma } from '../db/client.js'
 import {
@@ -63,7 +63,7 @@ export const establishBrowserSession: MiddlewareHandler = async (c, next) => {
     .sign(await getPrivateKey())
   await prisma.refreshToken.deleteMany({
     where: {
-      tokenHash: createHash('sha256').update(body.refreshToken).digest('hex'),
+      tokenHash: sha256Hex(body.refreshToken),
     },
   })
   delete body.accessToken

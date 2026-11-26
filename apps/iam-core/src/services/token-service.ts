@@ -3,6 +3,7 @@ import { clientCredentialsPolicy } from './client-policies.js';
 import { createLocalJWKSet, SignJWT, jwtVerify, type JWTPayload } from 'jose'
 import { nanoid } from 'nanoid'
 import { createHash } from 'node:crypto'
+import { sha256Hex } from '@hivemagnus/hive-common/secrets'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
 import {
@@ -28,9 +29,7 @@ export interface AccessTokenPayload extends JWTPayload {
   jti: string
 }
 
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex')
-}
+const hashToken = sha256Hex
 
 /** Every permission a client_credentials token for this client could ever carry. */
 export function clientCredentialsPermissionCeiling(clientId: string): string[] {

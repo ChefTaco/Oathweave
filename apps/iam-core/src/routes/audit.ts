@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { streamText } from 'hono/streaming'
-import { timingSafeEqual } from 'node:crypto'
+import { timingSafeEqualString } from '@hivemagnus/hive-common/secrets'
 import type { AuditEvent } from '../db/generated/index.js'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
@@ -13,10 +13,8 @@ import type { AuditCategory, ActorType, AuditOutcome } from '../types/index.js'
 
 export const auditRouter = new Hono()
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
+// Byte-length safe: a multi-byte value of the same string length no longer throws.
+const constantTimeEqual = timingSafeEqualString
 
 const AUDIT_CATEGORIES: [AuditCategory, ...AuditCategory[]] = [
   'AUTHENTICATION', 'AUTHORIZATION', 'USER_MANAGEMENT', 'ROLE_MANAGEMENT',

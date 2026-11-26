@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && node --test scripts/check-node-runtime.test.mjs",
+    "test": "npm run test --workspaces --if-present && node --test scripts/check-node-runtime.test.mjs scripts/workflow-pins.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "iam-core:build": "npm --workspace @hivemagnus/oathweave run build",
     "iam-core:test": "npm --workspace @hivemagnus/oathweave test",

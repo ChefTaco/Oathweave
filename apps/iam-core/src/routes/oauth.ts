@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { sha256Hex } from '@hivemagnus/hive-common/secrets'
 import { getBrowserOpenIdConfiguration } from '../services/browser-discovery.js'
 import {
   issuerForClient,
@@ -448,9 +448,7 @@ oauthRouter.post('/token', clientEndpointRateLimit('rl:token'), async (c) => {
     if (browserClientPolicies[clientId]) {
       await prisma.refreshToken.deleteMany({
         where: {
-          tokenHash: createHash('sha256')
-            .update(result.refreshToken)
-            .digest('hex'),
+          tokenHash: sha256Hex(result.refreshToken),
         },
       })
       delete response.refresh_token
