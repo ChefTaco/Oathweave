@@ -66,6 +66,7 @@ groupsRouter.post('/', requirePermission('iam:groups:write'), async (c) => {
 groupsRouter.patch('/:id', requirePermission('iam:groups:write'), async (c) => {
   const principal = c.get('principal')
   const body = await parseBody(c, UpdateGroupSchema)
+  await assertMayManageGroup(await resolveActor(c), c.req.param('id'), 'change this group')
   const group = await updateGroup(c.req.param('id'), body)
 
   await logAuditEvent({
@@ -88,6 +89,8 @@ groupsRouter.patch('/:id', requirePermission('iam:groups:write'), async (c) => {
 groupsRouter.delete('/:id', requirePermission('iam:groups:write'), async (c) => {
   const principal = c.get('principal')
   const id = c.req.param('id')
+  // Deleting a group takes its roles from every member: the same standing as changing them.
+  await assertMayManageGroup(await resolveActor(c), id, 'delete this group')
 
   await deleteGroup(id)
 
