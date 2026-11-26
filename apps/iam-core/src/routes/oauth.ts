@@ -508,13 +508,14 @@ oauthRouter.get('/.well-known/openid-configuration', async (c) => {
     if (clients.length !== 1 || !clients[0]) throw new ApiError(400, 'INVALID_CLIENT', 'Select one registered public browser client')
     return c.json(await getBrowserOpenIdConfiguration(clients[0]))
   }
-  const proto = c.req.header('x-forwarded-proto') ?? 'https'
-  const host =
-    c.req.header('x-forwarded-host') ?? c.req.header('host') ?? 'localhost:4200'
-  const issuerUrl = `${proto}://${host}`
-
-  c.header('Cache-Control', 'public, max-age=86400')
-  return c.json(getOpenIdConfiguration(issuerUrl))
+  const configuration = getOpenIdConfiguration()
+  if (!configuration) {
+    c.header('Cache-Control', 'no-store')
+    throw new ApiError(503, 'DISCOVERY_UNCONFIGURED', 'Set IAM_PUBLIC_URL to the public HTTPS URL of this server to publish discovery metadata')
+  }
+  // Built from configuration alone, so a short shared cache is safe; a URL change shows within minutes.
+  c.header('Cache-Control', 'public, max-age=300')
+  return c.json(configuration)
 })
 
 // ── GET /jwks — JSON Web Key Set ──

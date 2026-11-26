@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
     deleteMany: vi.fn(),
   },
   verifyPassword: vi.fn(async () => false),
+  dummyVerify: vi.fn(async () => false as const),
   publish: vi.fn(async () => {}),
   audit: vi.fn(async () => {}),
 }))
@@ -67,6 +68,7 @@ vi.mock('../services/mfa-service.js', () => ({
 }))
 vi.mock('../services/password-service.js', () => ({
   verifyPassword: state.verifyPassword,
+  verifyAgainstDummyHash: state.dummyVerify,
   hashPassword: vi.fn(),
 }))
 vi.mock('../services/audit-service.js', () => ({ logAuditEvent: state.audit }))
@@ -77,7 +79,6 @@ vi.mock('../services/token-service.js', () => ({
   issueTokenPair: vi.fn(),
   rotateRefreshToken: vi.fn(),
   revokeRefreshToken: vi.fn(),
-  introspectToken: vi.fn(),
 }))
 vi.mock('../services/session-service.js', () => ({
   createSession: vi.fn(),
@@ -213,14 +214,32 @@ describe('failed passwords by default', () => {
     )
   })
 
-  it('refuse a failure-locked account before checking its password', async () => {
+  it('refuse a failure-locked account even with the right password, at the cost of a real check', async () => {
     const app = await application(false)
+    state.verifyPassword.mockResolvedValue(true)
     state.user.findFirst.mockResolvedValue({
       ...account,
       lockedUntil: new Date(Date.now() + 60_000),
     })
     expect((await badPassword(app)).status).toBe(401)
-    expect(state.verifyPassword).not.toHaveBeenCalled()
+    // The password is verified anyway, so a locked account answers as slowly as a usable one.
+    expect(state.verifyPassword).toHaveBeenCalledTimes(1)
+    expect(state.user.update).not.toHaveBeenCalled()
+  })
+
+  it('lock with the stored policy, not the rate-limit settings', async () => {
+    const app = await application(false)
+    state.passwordPolicy.findFirst.mockResolvedValue({ ...storedPolicy, lockoutAttempts: 3, lockoutDurationMin: 45 })
+    state.user.findFirst.mockResolvedValue({ ...account, failedAttempts: 1 })
+    await badPassword(app)
+    expect(state.user.update).toHaveBeenLastCalledWith({ where: { id: 'fake-user' }, data: { failedAttempts: 2 } })
+    state.user.findFirst.mockResolvedValue({ ...account, failedAttempts: 2 })
+    const before = Date.now()
+    await badPassword(app)
+    const data = (state.user.update.mock.calls.at(-1) as unknown as [{ data: { failedAttempts: number; lockedUntil: Date } }])[0].data
+    expect(data.failedAttempts).toBe(3)
+    expect(data.lockedUntil.getTime() - before).toBeGreaterThanOrEqual(45 * 60_000 - 1000)
+    expect(data.lockedUntil.getTime() - before).toBeLessThanOrEqual(45 * 60_000 + 5000)
   })
 
   it('throttle the sixth sign-in attempt', async () => {
@@ -228,6 +247,22 @@ describe('failed passwords by default', () => {
     for (let index = 1; index <= 5; index++)
       expect((await badPassword(app)).status).toBe(401)
     expect((await badPassword(app)).status).toBe(429)
+  })
+})
+
+describe('sign-in timing', () => {
+  it('spends a password verification on unknown, disabled and locked accounts alike', async () => {
+    const app = await application(false)
+    state.user.findFirst.mockResolvedValue(null)
+    expect((await badPassword(app)).status).toBe(401)
+    expect(state.dummyVerify).toHaveBeenCalledTimes(1)
+    expect(state.verifyPassword).not.toHaveBeenCalled()
+
+    state.user.findFirst.mockResolvedValue({ ...account, active: false })
+    expect((await badPassword(app)).status).toBe(401)
+    state.user.findFirst.mockResolvedValue({ ...account, lockedUntil: new Date(Date.now() + 60_000) })
+    expect((await badPassword(app)).status).toBe(401)
+    expect(state.verifyPassword).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -268,14 +303,17 @@ describe('failed passwords when relaxed', () => {
       lockedUntil: new Date(Date.now() + 60_000),
     })
     await badPassword(app)
-    expect(state.verifyPassword).toHaveBeenCalledTimes(1)
+    // Past the lock, the wrong password is judged (and audited) as such.
+    expect(state.audit).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'auth.login.failed', detail: expect.objectContaining({ reason: 'invalid_password' }) }))
+    state.audit.mockClear()
 
     state.user.findFirst.mockResolvedValue({
       ...account,
       lockedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     })
+    state.verifyPassword.mockResolvedValue(true)
     expect((await badPassword(app)).status).toBe(401)
-    expect(state.verifyPassword).toHaveBeenCalledTimes(1)
+    expect(state.audit).not.toHaveBeenCalledWith(expect.objectContaining({ eventType: 'auth.login' }))
   })
 })
 

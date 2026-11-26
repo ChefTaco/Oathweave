@@ -10,11 +10,13 @@ import { validateBrowserAuthorization } from './browser-policies.js'
 import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '../db/client.js'
 import { env } from '../config/env.js'
+import { discoveryMetadataUrl } from '../config/browser-discovery.js'
 import { ApiError } from '../types/index.js'
 import { getPublishedSigningJwks } from '../utils/keys.js'
 import { issueTokenPair } from './token-service.js'
 import { createSession } from './session-service.js'
-import { userTokenGrants } from './effective-grants.js'
+import { parsePermissionList, userTokenGrants } from './effective-grants.js'
+import { checkIpAllowlist } from '../utils/ip-allowlist.js'
 import { logAuditEvent } from './audit-service.js'
 import { assertClientAuthAllowed, recordClientAuthFailure, verifyClientSecret } from './client-auth-guard.js'
 
@@ -233,10 +235,17 @@ export async function authenticateTokenClient(
   const client = await prisma.client.findUnique({ where: { id: clientId } })
   if (!client || !client.active) return refuse('Unknown or inactive client')
   const confidential = client.clientType !== 'public'
+  // A client's address allowlist applies to the token endpoint as it does to introspection.
+  const allowed = (): void => {
+    if (!checkIpAllowlist(parsePermissionList(client.allowedIps), ipAddress)) {
+      throw new ApiError(401, 'INVALID_CLIENT', 'This client is not allowed from this address')
+    }
+  }
   if (presentedSecret === undefined || presentedSecret === '') {
     if (confidential) {
       return refuse('Client authentication required: this confidential client must send its client secret')
     }
+    allowed()
     return { clientType: client.clientType, authenticated: false }
   }
   if (!client.secretHash) {
@@ -249,6 +258,7 @@ export async function authenticateTokenClient(
   if (!(await verifyClientSecret(ipAddress, clientId, client.secretHash, presentedSecret))) {
     throw new ApiError(401, 'INVALID_CLIENT', 'Invalid client secret')
   }
+  allowed()
   return { clientType: client.clientType, authenticated: true }
 }
 
@@ -468,15 +478,32 @@ export async function exchangeClientCredentials(
 // ── OIDC Discovery ──
 
 /**
- * Return the OpenID Connect Discovery document.
+ * Where native clients reach this server's `/api/v1` routes, from configuration only: request
+ * `Host` and `X-Forwarded-*` headers never shape the metadata, so a cached document cannot be
+ * poisoned. `IAM_PUBLIC_URL` (the URL `/api/v1` hangs off) wins, then `JWT_ISSUER` when it is an
+ * HTTPS URL. The browser API base is not used: a suite ingress may expose only browser routes.
  */
-export function getOpenIdConfiguration(issuerUrl: string): Record<string, unknown> {
+export function nativeApiBaseUrl(): string | undefined {
+  const usable = (value: string | undefined) => value !== undefined && discoveryMetadataUrl.safeParse(value).success
+  const trim = (value: string) => value.replace(/\/+$/, '')
+  if (usable(env.IAM_PUBLIC_URL)) return `${trim(env.IAM_PUBLIC_URL!)}/api/v1`
+  if (usable(env.JWT_ISSUER)) return `${trim(env.JWT_ISSUER)}/api/v1`
+  return undefined
+}
+
+/**
+ * Return the native OpenID Connect Discovery document, or undefined when no public URL is
+ * configured. `issuer` is `JWT_ISSUER`, the `iss` native tokens carry.
+ */
+export function getOpenIdConfiguration(): Record<string, unknown> | undefined {
+  const api = nativeApiBaseUrl()
+  if (!api) return undefined
   return {
     issuer: env.JWT_ISSUER,
-    authorization_endpoint: `${issuerUrl}/api/v1/oauth/authorize`,
-    token_endpoint: `${issuerUrl}/api/v1/oauth/token`,
-    userinfo_endpoint: `${issuerUrl}/api/v1/oauth/userinfo`,
-    jwks_uri: `${issuerUrl}/api/v1/oauth/jwks`,
+    authorization_endpoint: `${api}/oauth/authorize`,
+    token_endpoint: `${api}/oauth/token`,
+    userinfo_endpoint: `${api}/oauth/userinfo`,
+    jwks_uri: `${api}/oauth/jwks`,
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
     subject_types_supported: ['public'],

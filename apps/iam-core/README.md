@@ -65,7 +65,7 @@ docker run -d --name oathweave --network oathweave -p 127.0.0.1:4200:4200 \
 
 # 4. Once it reports healthy
 curl http://127.0.0.1:4200/api/v1/health/ready
-curl http://127.0.0.1:4200/api/v1/oauth/.well-known/openid-configuration
+curl http://127.0.0.1:4200/api/v1/oauth/.well-known/openid-configuration  # needs IAM_PUBLIC_URL
 ```
 
 This serves plain HTTP, so keep it on loopback or behind a TLS-terminating reverse

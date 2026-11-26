@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { IpAllowlistEntrySchema } from './ip-allowlist.js'
 
 export const CreateServiceAccountSchema = z.object({
   operationId: z.string().min(16).max(128).optional(),
@@ -7,12 +8,12 @@ export const CreateServiceAccountSchema = z.object({
   clientId: z.string().min(1),
   roleIds: z.array(z.string()).default([]),
   expiresAt: z.iso.datetime().optional(),
-  allowedIps: z.array(z.ipv4()).default([]),
+  allowedIps: z.array(IpAllowlistEntrySchema).default([]),
 })
 
 export const UpdateServiceAccountSchema = z.object({
   description: z.string().optional(),
   active: z.boolean().optional(),
   expiresAt: z.iso.datetime().nullable().optional(),
-  allowedIps: z.array(z.ipv4()).optional(),
+  allowedIps: z.array(IpAllowlistEntrySchema).optional(),
 })

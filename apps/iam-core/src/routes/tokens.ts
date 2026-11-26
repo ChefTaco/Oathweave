@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { clientAuthMiddleware } from '../middleware/client-auth.js'
 import { clientEndpointRateLimit } from '../services/client-auth-guard.js'
 import { authMiddleware } from '../middleware/auth.js'
-import { introspectToken, revokeRefreshToken, verifyAccessToken } from '../services/token-service.js'
+import { revokeRefreshToken, verifyAccessToken } from '../services/token-service.js'
+import { introspectForClient, revokeForClient, tokenClientAuthority } from '../services/token-introspection.js'
 import { revokeSession } from '../services/session-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
 import { getClientIp } from '../utils/ip.js'
@@ -19,99 +20,68 @@ const OAuthRevokeSchema = z.object({
   token_type_hint: z.enum(['access_token', 'refresh_token']).optional(),
 })
 
-// POST /tokens/introspect — callable by registered clients (RFC 7662 compliant)
+// POST /tokens/introspect — callable by registered clients (RFC 7662). A client sees the tokens
+// issued to it; seeing any token needs iam:tokens:introspect (see token-introspection.ts).
 tokensRouter.post('/introspect', clientEndpointRateLimit('rl:introspect'), clientAuthMiddleware, async (c) => {
   const { token } = await parseBody(c, IntrospectSchema)
   const clientId = c.get('clientId')
-  const result = await introspectToken(token)
+  c.header('Cache-Control', 'no-store')
+  const result = await introspectForClient(tokenClientAuthority(clientId), token)
 
-  if (result.valid) {
+  if (result.active) {
     await logAuditEvent({
       eventType: 'token.introspect',
       category: 'TOKEN',
-      actorId: result.principal.sub,
-      actorType: result.principal.actorType,
+      actorId: String(result['sub'] ?? ''),
+      actorType: result['actor_type'] as ActorType,
       clientId,
       ipAddress: getClientIp(c),
       action: 'introspect',
       outcome: 'SUCCESS',
       source: 'iam-api',
     })
-
-    // RFC 7662 compliant response
-    return c.json({
-      active: true,
-      sub: result.principal.sub,
-      token_type: 'Bearer',
-      scope: result.principal.permissions?.join(' ') ?? '',
-      client_id: result.principal.clientId ?? clientId,
-      email: result.principal.email,
-      username: result.principal.username,
-      roles: result.principal.roles,
-      permissions: result.principal.permissions,
-      session_id: result.principal.sessionId,
-      actor_type: result.principal.actorType,
-    })
   }
-
-  // RFC 7662: inactive token
-  return c.json({ active: false })
+  return c.json(result)
 })
 
-// POST /tokens/revoke — RFC 7009 token revocation (client-authenticated)
+// POST /tokens/revoke — RFC 7009 token revocation (client-authenticated). A client revokes the
+// tokens issued to it; revoking any token needs iam:tokens:revoke.
 tokensRouter.post('/revoke', clientEndpointRateLimit('rl:revoke'), clientAuthMiddleware, async (c) => {
   const { token, token_type_hint } = await parseBody(c, OAuthRevokeSchema)
   const clientId = c.get('clientId')
+  const result = await revokeForClient(tokenClientAuthority(clientId), token, token_type_hint)
 
-  // Try access token first if hinted, otherwise try both
-  if (token_type_hint === 'access_token' || !token_type_hint) {
-    try {
-      const payload = await verifyAccessToken(token)
-      if (payload.sessionId) {
-        await revokeSession(payload.sessionId, payload.sub)
-      }
-
-      await logAuditEvent({
-        eventType: 'token.revoked',
-        category: 'TOKEN',
-        actorId: payload.sub ?? '',
-        actorType: (payload.actorType as ActorType) ?? 'USER',
-        clientId,
-        ipAddress: getClientIp(c),
-        action: 'revoke',
-        outcome: 'SUCCESS',
-        detail: { tokenType: 'access_token' },
-        source: 'iam-api',
-      })
-
-      // RFC 7009: always return 200
-      return c.json({ success: true })
-    } catch {
-      // Not a valid access token, continue
-    }
-  }
-
-  // Try refresh token
-  try {
-    await revokeRefreshToken(token)
-
+  if (result.outcome === 'forbidden') {
     await logAuditEvent({
-      eventType: 'token.revoked',
+      eventType: 'token.revoke_denied',
       category: 'TOKEN',
-      actorId: clientId ?? 'unknown',
+      actorId: clientId,
       actorType: 'SERVICE_ACCOUNT',
       clientId,
       ipAddress: getClientIp(c),
       action: 'revoke',
-      outcome: 'SUCCESS',
-      detail: { tokenType: 'refresh_token' },
+      outcome: 'DENIED',
+      detail: { reason: 'token_issued_to_another_client' },
       source: 'iam-api',
     })
-  } catch {
-    // RFC 7009: silently ignore invalid tokens
+    return c.json({ error: 'unauthorized_client', error_description: 'The token was not issued to this client' }, 400)
+  }
+  if (result.outcome === 'revoked') {
+    await logAuditEvent({
+      eventType: 'token.revoked',
+      category: 'TOKEN',
+      actorId: result.subject,
+      actorType: result.actorType as ActorType,
+      clientId,
+      ipAddress: getClientIp(c),
+      action: 'revoke',
+      outcome: 'SUCCESS',
+      detail: { tokenType: result.tokenType },
+      source: 'iam-api',
+    })
   }
 
-  // RFC 7009: always return 200
+  // RFC 7009: an unknown or already invalid token is answered with 200 too.
   return c.json({ success: true })
 })
 
@@ -131,8 +101,8 @@ tokensRouter.post('/revoke-own', authMiddleware, async (c) => {
       await revokeSession(payload.sessionId, principal.sub)
     }
   } catch {
-    // If the token is invalid / expired, treat as a refresh token
-    await revokeRefreshToken(token)
+    // If the token is invalid / expired, treat it as one of the caller's refresh tokens
+    await revokeRefreshToken(token, { userId: principal.sub })
     return c.json({ success: true })
   }
 

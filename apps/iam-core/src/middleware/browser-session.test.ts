@@ -32,6 +32,13 @@ vi.mock('../services/token-service.js', () => ({
     permissions: [],
   }),
 }))
+vi.mock('../services/effective-grants.js', () => ({
+  // The real list parser: the stored role permissions as the session's tokens carry them.
+  userTokenGrants: async () => {
+    const { parsePermissionList } = await vi.importActual<typeof import('../services/effective-grants.js')>('../services/effective-grants.js')
+    return { roles: ['viewer'], permissions: parsePermissionList(mocks.permissionsJson) }
+  },
+}))
 vi.mock('./auth.js', () => ({
   authMiddleware: (c: { json: (body: object, status: number) => Response }) =>
     c.json({ error: 'invalid bearer' }, 401),
@@ -82,7 +89,7 @@ function app() {
     })
   })
   app.get('/authorize', browserAuthorization, (c) =>
-    c.json({ sub: c.get('principal').sub }),
+    c.json({ sub: c.get('principal').sub, permissions: c.get('principal').permissions }),
   )
   app.post('/logout', async (c) => {
     await clearBrowserSession(c)
@@ -163,14 +170,18 @@ describe('browser SSO session transport', () => {
         .status,
     ).toBe(401)
   })
-  it('rejects malformed stored role permissions instead of trusting a typed JSON assertion', async () => {
+  it('never turns malformed stored role permissions into grants', async () => {
     const response = await login()
     const cookie = response.headers.get('set-cookie')?.split(';')[0]
     if (!cookie) throw new Error('Missing fixture SSO cookie')
     mocks.permissionsJson = '["embermend:read"]'
-    expect((await app().request('/authorize', { headers: { Cookie: cookie } })).status).toBe(200)
+    const valid = await app().request('/authorize', { headers: { Cookie: cookie } })
+    expect(valid.status).toBe(200)
+    expect((await valid.json()).permissions).toEqual(['embermend:read'])
     mocks.permissionsJson = '[{"permission":"embermend:approve"}]'
-    expect((await app().request('/authorize', { headers: { Cookie: cookie } })).status).toBe(401)
+    const malformed = await app().request('/authorize', { headers: { Cookie: cookie } })
+    expect(malformed.status).toBe(200)
+    expect((await malformed.json()).permissions).toEqual([])
   })
   it('requires an allowed origin for logout and revokes the exact session', async () => {
     const response = await login()

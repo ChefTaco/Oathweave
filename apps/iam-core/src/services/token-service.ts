@@ -14,7 +14,7 @@ import { createSession, revokeSession } from '../services/session-service.js'
 import { logAuditEvent } from './audit-service.js'
 import { userTokenGrants } from './effective-grants.js'
 import { ApiError } from '../types/index.js'
-import type { Principal, TokenPair } from '../types/index.js'
+import type { TokenPair } from '../types/index.js'
 
 export interface AccessTokenPayload extends JWTPayload {
   sub: string
@@ -453,33 +453,31 @@ function parseGrantTypes(value: unknown): string[] {
   }
 }
 
-export async function revokeRefreshToken(rawToken: string): Promise<void> {
+/**
+ * Revoke a refresh token. `owner` narrows it to a token of that user or client, so a caller can
+ * only revoke what is theirs; the count says whether a live token matched.
+ */
+export async function revokeRefreshToken(
+  rawToken: string,
+  owner: { userId?: string; clientId?: string } = {},
+): Promise<number> {
   const hash = hashToken(rawToken)
-  await prisma.refreshToken.updateMany({
-    where: { tokenHash: hash, revokedAt: null },
+  const result = await prisma.refreshToken.updateMany({
+    where: {
+      tokenHash: hash,
+      revokedAt: null,
+      ...(owner.userId !== undefined ? { userId: owner.userId } : {}),
+      ...(owner.clientId !== undefined ? { clientId: owner.clientId } : {}),
+    },
     data: { revokedAt: new Date() },
   })
+  return result.count
 }
 
-export async function introspectToken(
-  token: string,
-): Promise<{ valid: true; principal: Principal } | { valid: false; reason: string }> {
-  try {
-    const payload = await verifyAccessToken(token)
-    return {
-      valid: true,
-      principal: {
-        sub: payload.sub ?? '',
-        actorType: payload.actorType as Principal['actorType'],
-        email: payload.email,
-        username: payload.username,
-        roles: payload.roles,
-        permissions: payload.permissions,
-        sessionId: payload.sessionId,
-        clientId: payload.clientId,
-      },
-    }
-  } catch (err) {
-    return { valid: false, reason: err instanceof Error ? err.message : 'Unknown' }
-  }
+/** The stored binding of a refresh token, without consuming it. */
+export async function findRefreshToken(rawToken: string): Promise<{ userId: string; clientId: string | null; sessionId: string | null; revokedAt: Date | null; expiresAt: Date } | null> {
+  return prisma.refreshToken.findUnique({
+    where: { tokenHash: hashToken(rawToken) },
+    select: { userId: true, clientId: true, sessionId: true, revokedAt: true, expiresAt: true },
+  })
 }

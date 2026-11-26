@@ -16,10 +16,33 @@ export function authAttemptCeiling(configured: number): number {
 }
 
 /**
+ * The longest lock a failed sign-in can set: the password policy's `lockoutDurationMin` is at most
+ * 1440 minutes (see schemas/password-policy.ts). Administrator locks last a year.
+ */
+export const MAX_FAILURE_LOCK_MS = 1440 * 60_000
+
+/**
+ * When the stored password policy locks an account after `attempts` consecutive failures, the
+ * time the lock ends; otherwise undefined. Sign-in and the MFA challenge both use it, so the
+ * policy's `lockoutAttempts` and `lockoutDurationMin` are what an administrator edits.
+ */
+export function lockoutAfterFailure(
+  policy: { lockoutAttempts: number; lockoutDurationMin: number },
+  attempts: number,
+  now: Date = new Date(),
+): Date | undefined {
+  const threshold = Math.max(1, Math.trunc(policy.lockoutAttempts))
+  if (attempts < threshold) return undefined
+  const minutes = Math.min(Math.max(1, Math.trunc(policy.lockoutDurationMin)), MAX_FAILURE_LOCK_MS / 60_000)
+  return new Date(now.getTime() + minutes * 60_000)
+}
+
+/**
  * Whether an account lock currently denies access. Failed credentials lock an
- * account for at most one rate-limit window, so relaxed mode ignores only those
- * locks. Longer locks are administrator actions and are always enforced. The
- * stored lock is left untouched, so normal enforcement resumes with the flag off.
+ * account for at most MAX_FAILURE_LOCK_MS (older releases used one rate-limit
+ * window), so relaxed mode ignores only locks that short. Longer locks are
+ * administrator actions and are always enforced. The stored lock is left
+ * untouched, so normal enforcement resumes with the flag off.
  */
 export function accountLockActive(
   lockedUntil: Date | null | undefined,
@@ -27,7 +50,7 @@ export function accountLockActive(
 ): boolean {
   if (!lockedUntil || lockedUntil <= now) return false
   if (!authLimitsRelaxed()) return true
-  return lockedUntil.getTime() - now.getTime() > env.RATE_LIMIT_WINDOW_MS
+  return lockedUntil.getTime() - now.getTime() > Math.max(env.RATE_LIMIT_WINDOW_MS, MAX_FAILURE_LOCK_MS)
 }
 
 export function relaxedAuthLimitsWarning(): string {

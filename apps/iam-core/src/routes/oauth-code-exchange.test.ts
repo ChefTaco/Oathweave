@@ -115,7 +115,8 @@ vi.mock('../services/token-service.js', () => ({
     store.grants.push({ roles: args[3], permissions: args[4] })
     return { accessToken: 'fake-access', refreshToken: 'fake-refresh', expiresIn: 900 }
   },
-  introspectToken: vi.fn(async () => ({ valid: false, reason: 'fixture' })),
+  clientCredentialsPermissionCeiling: () => [],
+  findRefreshToken: async () => null,
   revokeRefreshToken: vi.fn(),
   verifyAccessToken: vi.fn(),
 }))

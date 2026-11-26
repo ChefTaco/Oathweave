@@ -90,7 +90,6 @@ vi.mock('../services/token-service.js', () => ({
   }),
   rotateRefreshToken: vi.fn(),
   revokeRefreshToken: vi.fn(),
-  introspectToken: vi.fn(),
 }))
 vi.mock('../services/session-service.js', () => ({
   createSession: vi.fn(async () => ({ sessionId: 'fake-session', riskScore: 0, riskFactors: [] })),
