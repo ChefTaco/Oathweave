@@ -2,48 +2,60 @@
 
 ## [Unreleased]
 
-**Upgrade notes.** Account lockout now follows the stored password
-policy (`lockoutAttempts`, default 5, and `lockoutDurationMin`, default 15) instead of
-`RATE_LIMIT_MAX_ATTEMPTS` and `RATE_LIMIT_WINDOW_MS`, which keep setting the per-address sign-in
-throttle; an installation that changed those variables to tune lockout should set the policy
-(`PATCH /api/v1/password-policy`) instead. Native discovery no longer derives URLs from the
-request: set `IAM_PUBLIC_URL` to the server's public HTTPS URL (unless `JWT_ISSUER` already is
-one), or `GET /api/v1/oauth/.well-known/openid-configuration` answers 503. Hive suite installs
-(non-URL `JWT_ISSUER` `oathweave-<installation>`) are affected only in that native discovery
-answers 503: nothing in the suite reads it, and `/oauth/jwks`, sign-in, UserInfo and every grant
-work without `IAM_PUBLIC_URL`. The suite controller should set `IAM_PUBLIC_URL` to the Oathweave
-endpoint the suite products use, `https://oathweave:4200` by default (not the ingress origin,
-which serves `/api/v1` at `/api/oathweave`); see the README's "Managed upgrades". `POST /tokens/introspect`
-and `POST /tokens/revoke` act only on tokens issued to the calling client unless its machine
-client policy grants `iam:tokens:introspect` or `iam:tokens:revoke`; introspection's `scope`
-member is now the token's OAuth scope rather than its permissions (still in `permissions`). A
-client's `allowedIps` now also applies at the token endpoint.
+## [2.5.0] - 2026-11-26
 
-**Migrations.** Two database migrations, applied on start under `HIVE_AUTO_MIGRATE=true` (suite
-upgrades: `--allow-migrations`): `20261126000000_drop_legacy_encrypted_password` drops the
-always-NULL `users.encryptedPassword` column, and `20261126000100_authorization_code_session` adds
-`authorization_codes.issuedSessionId`. Older releases cannot open the migrated database; roll back
-by restoring the pre-migration backup. A write made with the built-in `hive-router` client's token
-must name the console operator in `x-hive-operator` (the model gateway always does); without it
-the token is read-only.
+**Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.5.0`. This release
+applies database migrations (see **Migrations** below) and cannot be rolled back without the
+pre-migration backup.
 
-**OIDC conformance.** `20261126000200_token_scope_and_auth_time` adds `refresh_tokens.scope` and
-`authorization_codes.authTime`. id_tokens and UserInfo now return the standard claims the granted
-scope asks for: a relying party that requests only `openid` no longer receives `email` or
-`preferred_username` (HiveXUI requests `openid profile`, the model gateway `openid profile email`).
-Tokens issued without a scope, such as native sign-in, keep every claim.
+- **Lockout.** Account lockout now follows the stored password policy (`lockoutAttempts`,
+  default 5, and `lockoutDurationMin`, default 15) instead of `RATE_LIMIT_MAX_ATTEMPTS` and
+  `RATE_LIMIT_WINDOW_MS`, which keep setting the per-address sign-in throttle; an installation
+  that changed those variables to tune lockout should set the policy
+  (`PATCH /api/v1/password-policy`) instead.
+- **Native discovery needs `IAM_PUBLIC_URL`.** It no longer derives URLs from the request: set
+  `IAM_PUBLIC_URL` to the server's public HTTPS URL (unless `JWT_ISSUER` already is one), or
+  `GET /api/v1/oauth/.well-known/openid-configuration` answers 503. Hive suite installs (non-URL
+  `JWT_ISSUER` `oathweave-<installation>`) are affected only in that native discovery answers
+  503: nothing in the suite reads it, and `/oauth/jwks`, sign-in, UserInfo and every grant work
+  without `IAM_PUBLIC_URL`. The suite controller should set `IAM_PUBLIC_URL` to the Oathweave
+  endpoint the suite products use, `https://oathweave:4200` by default (not the ingress origin,
+  which serves `/api/v1` at `/api/oathweave`); see the README's "Managed upgrades".
+- **Introspection and revocation are scoped to the issuing client.** `POST /tokens/introspect`
+  and `POST /tokens/revoke` act only on tokens issued to the calling client unless its machine
+  client policy grants `iam:tokens:introspect` or `iam:tokens:revoke`; introspection's `scope`
+  member is now the token's OAuth scope rather than its permissions (still in `permissions`).
+- **A client's `allowedIps` now also applies at the token endpoint.**
+- **`hive-router` writes need an operator.** A write made with the built-in `hive-router`
+  client's token must name the console operator in `x-hive-operator` (the model gateway always
+  does); without it the token is read-only.
+- **id_token and UserInfo claims follow the granted scope.** A relying party that requests only
+  `openid` no longer receives `email` or `preferred_username` (HiveXUI requests
+  `openid profile`, the model gateway `openid profile email`). Tokens issued without a scope,
+  such as native sign-in, keep every claim.
+- **Relying-party tokens are audience-bound.** A person's access token issued to a client other
+  than a HiveXUI browser-policy client (the authorization code and device grants) now carries an
+  `aud`: the audience the client's machine policy names, otherwise the client's id. Oathweave
+  accepts it only at `GET /oauth/userinfo` and `POST /auth/logout`; anything else answers 401
+  `INVALID_AUDIENCE`. Native sign-in tokens, service tokens and the `hivexui-oathweave` token are
+  unchanged. An integration that called the management API with a token from its own
+  authorization code or device sign-in must call it with a native sign-in, a
+  `hivexui-oathweave` or a service token instead (no suite product does).
+- **New settings, all optional.** `IAM_PUBLIC_URL` (above), `IAM_DEVICE_VERIFICATION_URL` (the
+  device grant is off until it is set), `IAM_TOKEN_EXCHANGE_POLICIES` (token exchange is off
+  without a policy) and `IAM_PASSWORDLESS_PASSKEYS` (on by default; `false` turns passwordless
+  passkey sign-in off).
 
-**Device authorization grant.** `20261126000300_device_authorization` adds the
-`device_authorizations` table. The grant is off until `IAM_DEVICE_VERIFICATION_URL` is set.
+**Migrations.** Four database migrations, applied on start under `HIVE_AUTO_MIGRATE=true` or by
+`migrate`; a Hive suite upgrade to this release needs `--allow-migrations`:
 
-**Relying-party tokens.** A person's access token issued to a client other than a HiveXUI
-browser-policy client (the authorization code and device grants) now carries an `aud`: the
-audience the client's machine policy names, otherwise the client's id. Oathweave accepts it
-only at `GET /oauth/userinfo` and `POST /auth/logout`; anything else answers 401
-`INVALID_AUDIENCE`. Native sign-in tokens, service tokens and the
-`hivexui-oathweave` token are unchanged. An integration that called the management API with a
-token from its own authorization code or device sign-in must call it with a native sign-in, a
-`hivexui-oathweave` or a service token instead (no suite product does).
+- `20261126000000_drop_legacy_encrypted_password` drops the always-NULL
+  `users.encryptedPassword` column. This one is one-way: older releases cannot open the
+  migrated database, so roll back only by restoring the pre-migration backup.
+- `20261126000100_authorization_code_session` adds `authorization_codes.issuedSessionId`.
+- `20261126000200_token_scope_and_auth_time` adds `refresh_tokens.scope` and
+  `authorization_codes.authTime`.
+- `20261126000300_device_authorization` adds the `device_authorizations` table.
 
 ### Security
 
