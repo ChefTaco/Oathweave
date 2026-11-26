@@ -2,11 +2,27 @@
 
 ## [Unreleased]
 
-**Upgrade notes.** This release applies the migration `20261126000400_revocation_events` (a new
-`revocation_events` table; rolling back needs the pre-migration backup, as before).
-Deactivating a user now also revokes their sessions and refresh tokens: reactivating the account
-no longer revives sign-ins from before, so the person signs in again. Browser sign-out
-(`POST /api/v1/browser/logout`) now also revokes the session's refresh tokens. Passwords, tokens and sign-in are otherwise unchanged.
+## [2.6.0] - 2026-11-26
+
+**Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.6.0`. This release
+applies a database migration (see **Migrations** below) and cannot be rolled back without the
+pre-migration backup.
+
+- **Deactivation ends sign-ins.** Deactivating a user (`PATCH /api/v1/users/:id` with
+  `active: false`) now also revokes their sessions and refresh tokens: reactivating the account
+  no longer revives sign-ins from before, so the person signs in again.
+- **Browser sign-out revokes refresh tokens.** `POST /api/v1/browser/logout` now also revokes the
+  session's refresh tokens.
+- **New revocation feed.** `GET /api/v1/hive/events` (below) is new and needs no configuration;
+  suite products follow it with HiveCommon's `followOathweaveRevocations()` (HiveCommon 0.8.0).
+- Passwords, tokens and sign-in are otherwise unchanged; there are no new settings.
+
+**Migrations.** One database migration, applied on start under `HIVE_AUTO_MIGRATE=true` or by
+`migrate`; a Hive suite upgrade to this release needs `--allow-migrations`:
+
+- `20261126000400_revocation_events` adds the `revocation_events` table. Oathweave 2.5.0 and
+  older refuse to start on a database that has it (unknown migration), so roll back only by
+  restoring the pre-migration backup.
 
 ### Added
 
@@ -19,7 +35,7 @@ no longer revives sign-ins from before, so the person signs in again. Browser si
   Events hold identifiers only. Readable with `iam:tokens:introspect` or `iam:sessions:revoke`;
   kept seven days and pruned hourly. Each revocation records its event in the same transaction,
   once however often the session is revoked. Suite products follow it with HiveCommon's
-  `followOathweaveRevocations()` (in the release after HiveCommon 0.7.0).
+  `followOathweaveRevocations()` (HiveCommon 0.8.0 and later).
 
 ### Changed
 
