@@ -35,6 +35,8 @@ export async function verifyStepUpPasskey(
   if (!credential)
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Unknown passkey')
   const { verifyAuthentication } = await import('./webauthn-service.js')
+  // A refused assertion (wrong challenge, no user verification, bad signature) is a failed
+  // verification, not a server error.
   const result = await verifyAuthentication(
     userId,
     response,
@@ -44,7 +46,9 @@ export async function verifyStepUpPasskey(
       transports: JSON.parse(credential.transports) as string[],
     },
     sessionId + ':step-up',
-  )
+  ).catch(() => {
+    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid passkey assertion')
+  })
   if (!result.verified)
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid passkey assertion')
   const changed = await prisma.webAuthnCredential.updateMany({

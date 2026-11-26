@@ -4378,9 +4378,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "password"
-        ],
         "type": "object"
       },
       "TokenExchangeRequest": {
@@ -6182,6 +6179,16 @@
           "200": {
             "description": "Session re-authenticated"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
           "401": {
             "content": {
               "application/json": {
@@ -6211,7 +6218,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Verify the password and an enabled MFA method for the current session",
+        "summary": "Re-authenticate the current session: the password and an enabled MFA method, or a user-verified passkey of the same user alone (from step-up/options). 400 PASSWORD_REQUIRED for a passkey alone when IAM_PASSWORDLESS_PASSKEYS=false",
         "tags": [
           "Auth"
         ]

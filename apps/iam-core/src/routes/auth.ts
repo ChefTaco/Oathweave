@@ -1217,25 +1217,7 @@ authRouter.post(
     if (!user?.active || accountLockActive(user.lockedUntil)) {
       throw new ApiError(403, 'FORBIDDEN', 'User not found')
     }
-    if (
-      isPasswordExpired(
-        user.passwordChangedAt,
-        (await getDefaultPolicy()).maxAgeDays,
-      )
-    )
-      throw new ApiError(403, 'PASSWORD_EXPIRED', 'Your password has expired')
-
-    // Verify password
-    if (!body.password) {
-      throw new ApiError(
-        400,
-        'VALIDATION_ERROR',
-        'Password is required for step-up verification',
-      )
-    }
-
-    const passwordValid = await verifyPassword(user.passwordHash, body.password)
-    if (!passwordValid) {
+    const stepUpFailed = async (reason: string): Promise<void> => {
       await logAuditEvent({
         eventType: 'auth.step_up_failed',
         category: 'AUTHENTICATION',
@@ -1246,45 +1228,66 @@ authRouter.post(
         action: 'step_up_failed',
         outcome: 'FAILURE',
         source: 'iam-api',
-        detail: { reason: 'Invalid password' },
+        detail: { reason },
       })
-      throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
     }
 
-    // If MFA is enabled, also verify TOTP
-    if (user.mfaEnabled && body.assertion) {
-      await verifyStepUpPasskey(user.id, principal.sessionId, body.assertion)
-    } else if (user.mfaEnabled) {
-      if (!user.mfaSecret || !user.mfaVerifiedAt)
-        return c.json(
-          {
-            error: 'MFA_REQUIRED',
-            message: 'A passkey assertion is required for step-up',
-            methods: ['webauthn'],
-          },
-          403,
+    if (body.password === undefined) {
+      // A user-verified passkey alone, as passwordless sign-in accepts it. The ceremony is bound
+      // to this session and the passkey must belong to the session's user, so the step-up can
+      // only ever re-authenticate the person already signed in. The password policy does not
+      // apply: no password is used.
+      if (!env.IAM_PASSWORDLESS_PASSKEYS || !body.assertion)
+        throw new ApiError(
+          400,
+          'PASSWORD_REQUIRED',
+          'Password is required for step-up verification',
         )
-      if (!body.totpCode) {
-        return c.json(
-          { error: 'MFA_REQUIRED', message: 'TOTP code required for step-up' },
-          403,
-        )
+      try {
+        await verifyStepUpPasskey(user.id, principal.sessionId, body.assertion)
+      } catch (error) {
+        await stepUpFailed('Invalid passkey')
+        throw error
       }
-      const mfaValid = await consumeTotpCode(user.id, user.mfaSecret, body.totpCode)
-      if (!mfaValid) {
-        await logAuditEvent({
-          eventType: 'auth.step_up_failed',
-          category: 'AUTHENTICATION',
-          actorId: user.id,
-          actorType: 'USER',
-          actorEmail: user.email,
-          ipAddress: ip,
-          action: 'step_up_failed',
-          outcome: 'FAILURE',
-          source: 'iam-api',
-          detail: { reason: 'Invalid TOTP code' },
-        })
-        throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid MFA code')
+    } else {
+      if (
+        isPasswordExpired(
+          user.passwordChangedAt,
+          (await getDefaultPolicy()).maxAgeDays,
+        )
+      )
+        throw new ApiError(403, 'PASSWORD_EXPIRED', 'Your password has expired')
+
+      const passwordValid = await verifyPassword(user.passwordHash, body.password)
+      if (!passwordValid) {
+        await stepUpFailed('Invalid password')
+        throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
+      }
+
+      // If MFA is enabled, also verify TOTP
+      if (user.mfaEnabled && body.assertion) {
+        await verifyStepUpPasskey(user.id, principal.sessionId, body.assertion)
+      } else if (user.mfaEnabled) {
+        if (!user.mfaSecret || !user.mfaVerifiedAt)
+          return c.json(
+            {
+              error: 'MFA_REQUIRED',
+              message: 'A passkey assertion is required for step-up',
+              methods: ['webauthn'],
+            },
+            403,
+          )
+        if (!body.totpCode) {
+          return c.json(
+            { error: 'MFA_REQUIRED', message: 'TOTP code required for step-up' },
+            403,
+          )
+        }
+        const mfaValid = await consumeTotpCode(user.id, user.mfaSecret, body.totpCode)
+        if (!mfaValid) {
+          await stepUpFailed('Invalid TOTP code')
+          throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid MFA code')
+        }
       }
     }
 

@@ -304,6 +304,13 @@ authenticated after the ticket was issued satisfies `prompt=login`: a new sign-i
 verification of the same session. Repeating the request with the old session's cookie gets
 `LOGIN_REQUIRED` again.
 
+A step-up keeps the session and its user: `POST /api/v1/auth/step-up` takes the password with the
+account's second factor (`totpCode`, or a passkey `assertion`), or a user-verified passkey
+`assertion` alone (options from `POST /api/v1/auth/step-up/options`, bound to the session; the
+passkey must be the session user's). The passkey-alone form follows `IAM_PASSWORDLESS_PASSKEYS`
+and answers `400 PASSWORD_REQUIRED` when it is off. A new sign-in can be a different account, so
+a relying party that re-authenticates a known person also checks that `sub` is unchanged.
+
 Claims a relying party checks in the ID token:
 
 - `auth_time` is in seconds since the epoch: the session's latest interactive authentication.

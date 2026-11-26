@@ -163,10 +163,13 @@ var ChangePasswordSchema = z8.object({
   newPassword: z8.string().min(8).max(256)
 });
 var StepUpSchema = z8.object({
-  password: z8.string().min(1).max(256),
+  password: z8.string().min(1).max(256).optional(),
   totpCode: z8.string().regex(/^[0-9]{6}$/).optional(),
   assertion: z8.record(z8.string(), z8.unknown()).optional()
-}).strict();
+}).strict().refine((body) => body.password !== void 0 || body.assertion !== void 0, {
+  message: "Send the password, or a passkey assertion",
+  path: ["password"]
+});
 var MfaVerifySchema = z8.object({
   code: z8.string().min(6).max(6)
 });

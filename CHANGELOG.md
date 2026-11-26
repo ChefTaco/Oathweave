@@ -6,7 +6,9 @@
 are unchanged when they carry no `prompt` or `max_age`. Two behaviour notes:
 `POST /api/v1/oauth/authorize` now validates the client and redirect URI before checking the
 sign-in, so an invalid request without a session answers `400` where it answered `401`. Its `401
-LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`.
+LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`. `StepUpRequest`'s
+`password` is optional (a passkey assertion alone is accepted); browser clients re-vendor the
+contract.
 
 ### Added
 
@@ -22,6 +24,14 @@ LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`.
 - **Cancelled sign-in returns to the client.** `POST /api/v1/oauth/authorize/cancel` (browser,
   no sign-in needed) returns `error=access_denied` with the state and `iss` for the registered
   callback as `redirectTo`. A declined consent's `ACCESS_DENIED` also carries `redirectTo`.
+- **Step-up with a passkey alone.** `POST /api/v1/auth/step-up` accepts a user-verified passkey
+  assertion without the password (options from `POST /api/v1/auth/step-up/options`), the same
+  strength passwordless sign-in accepts, so a passkey-only account can complete a re-authentication
+  (`prompt=login`, `max_age`) on its own session: the step-up time becomes the ID token's
+  `auth_time`. The ceremony is bound to the session and the passkey must belong to the session's
+  user, so it re-authenticates only the person already signed in. The password expiry policy does
+  not apply, as no password is used. With `IAM_PASSWORDLESS_PASSKEYS=false` it answers
+  `400 PASSWORD_REQUIRED` and the password stays required.
 - Browser contracts `BrowserLoginRequiredResponse`, `BrowserAuthorizationErrorResponse` and
   `AuthorizeCancelRequest`. The README documents the re-authentication parameters and the ID
   token claims a relying party checks.
@@ -36,6 +46,8 @@ LOGIN_REQUIRED` body now also carries `message`, `reason` and `loginTicket`.
 
 ### Fixed
 
+- A refused step-up passkey assertion (for example one without user verification) answers `401
+  INVALID_CREDENTIALS` instead of a server error.
 - A native `POST /api/v1/oauth/authorize` with `consent: "deny"` no longer issues a code. It
   answers `403 ACCESS_DENIED` with `redirectTo`, as the browser flow already did.
 

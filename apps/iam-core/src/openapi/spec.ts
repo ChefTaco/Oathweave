@@ -1469,11 +1469,12 @@ export function buildOpenApiSpec() {
         tags: ['Auth'],
         operationId: 'completeStepUp',
         summary:
-          'Verify the password and an enabled MFA method for the current session',
+          'Re-authenticate the current session: the password and an enabled MFA method, or a user-verified passkey of the same user alone (from step-up/options). 400 PASSWORD_REQUIRED for a passkey alone when IAM_PASSWORDLESS_PASSKEYS=false',
         security: [{ BrowserSession: [] }, { BearerAuth: [] }],
         requestBody: jsonBody(ref('StepUpRequest')),
         responses: {
           200: { description: 'Session re-authenticated' },
+          400: err400,
           401: err401,
           403: err403,
         },

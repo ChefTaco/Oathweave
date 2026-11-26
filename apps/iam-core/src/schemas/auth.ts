@@ -14,9 +14,14 @@ export const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8).max(256),
 })
 
+/**
+ * Step-up verification of the current session: the password with the account's second factor
+ * (TOTP code or passkey assertion), or a user-verified passkey assertion alone, as passwordless
+ * sign-in accepts it (IAM_PASSWORDLESS_PASSKEYS).
+ */
 export const StepUpSchema = z
   .object({
-    password: z.string().min(1).max(256),
+    password: z.string().min(1).max(256).optional(),
     totpCode: z
       .string()
       .regex(/^[0-9]{6}$/)
@@ -24,6 +29,10 @@ export const StepUpSchema = z
     assertion: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
+  .refine((body) => body.password !== undefined || body.assertion !== undefined, {
+    message: 'Send the password, or a passkey assertion',
+    path: ['password'],
+  })
 
 export const MfaVerifySchema = z.object({
   code: z.string().min(6).max(6),
