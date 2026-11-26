@@ -18,7 +18,8 @@ append-only audit trail. It is the identity service of the
 ## Features
 
 - RS256 access tokens, rotating refresh tokens, JWKS and OIDC discovery
-- OAuth 2.0 Authorization Code + PKCE, Client Credentials and Device Authorization (RFC 8628) flows
+- OAuth 2.0 Authorization Code + PKCE, Client Credentials and Device Authorization (RFC 8628) flows,
+  and Token Exchange (RFC 8693) delegation for suite services (`IAM_TOKEN_EXCHANGE_POLICIES`)
 - Users, roles, groups, service accounts and per-client permission allowlists
 - TOTP and WebAuthn/FIDO2 multi-factor authentication, step-up and device trust
 - Passwordless sign-in with a discoverable passkey (`POST /api/v1/mfa/webauthn/passwordless/options`,
@@ -268,6 +269,14 @@ request with `GET /api/v1/oauth/device?user_code=` and approves or denies it wit
 `POST /api/v1/oauth/device` for the signed-in person.
 The OpenAPI document is served at `/api/docs/openapi.json`, with Swagger UI at
 `/api/docs`.
+
+Token exchange (RFC 8693) lets a suite service that received a person's access token trade it
+at `POST /api/v1/oauth/token` (`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`,
+`subject_token`, `subject_token_type=urn:ietf:params:oauth:token-type:access_token`, `audience`)
+for a short-lived token addressed to one downstream service, narrowed to the permissions
+`IAM_TOKEN_EXCHANGE_POLICIES` lists for that audience which the person still holds. The token
+names the service in `act.sub`, shares the person's session (signing out revokes it), never
+outlives the subject token, has no refresh token and cannot be exchanged again.
 
 Services that trust Oathweave tokens verify them locally with the Oathweave verifier in
 [`@hivemagnus/hive-common`](https://github.com/ChefTaco/HiveCommon).

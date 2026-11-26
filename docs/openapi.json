@@ -669,7 +669,8 @@
                 "authorization_code",
                 "refresh_token",
                 "client_credentials",
-                "urn:ietf:params:oauth:grant-type:device_code"
+                "urn:ietf:params:oauth:grant-type:device_code",
+                "urn:ietf:params:oauth:grant-type:token-exchange"
               ],
               "type": "string"
             },
@@ -759,7 +760,8 @@
                 "authorization_code",
                 "refresh_token",
                 "client_credentials",
-                "urn:ietf:params:oauth:grant-type:device_code"
+                "urn:ietf:params:oauth:grant-type:device_code",
+                "urn:ietf:params:oauth:grant-type:token-exchange"
               ],
               "type": "string"
             },
@@ -4166,6 +4168,15 @@
       "TokenExchangeRequest": {
         "additionalProperties": false,
         "properties": {
+          "actor_token": {
+            "type": "string"
+          },
+          "actor_token_type": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "string"
+          },
           "client_id": {
             "type": "string"
           },
@@ -4186,7 +4197,8 @@
               "authorization_code",
               "refresh_token",
               "client_credentials",
-              "urn:ietf:params:oauth:grant-type:device_code"
+              "urn:ietf:params:oauth:grant-type:device_code",
+              "urn:ietf:params:oauth:grant-type:token-exchange"
             ],
             "type": "string"
           },
@@ -4199,7 +4211,19 @@
           "refresh_token": {
             "type": "string"
           },
+          "requested_token_type": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
           "scope": {
+            "type": "string"
+          },
+          "subject_token": {
+            "type": "string"
+          },
+          "subject_token_type": {
             "type": "string"
           }
         },
@@ -4285,7 +4309,8 @@
                 "authorization_code",
                 "refresh_token",
                 "client_credentials",
-                "urn:ietf:params:oauth:grant-type:device_code"
+                "urn:ietf:params:oauth:grant-type:device_code",
+                "urn:ietf:params:oauth:grant-type:token-exchange"
               ],
               "type": "string"
             },
@@ -4350,7 +4375,8 @@
                 "authorization_code",
                 "refresh_token",
                 "client_credentials",
-                "urn:ietf:params:oauth:grant-type:device_code"
+                "urn:ietf:params:oauth:grant-type:device_code",
+                "urn:ietf:params:oauth:grant-type:token-exchange"
               ],
               "type": "string"
             },
@@ -8465,6 +8491,15 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "actor_token": {
+                    "type": "string"
+                  },
+                  "actor_token_type": {
+                    "type": "string"
+                  },
+                  "audience": {
+                    "type": "string"
+                  },
                   "client_id": {
                     "type": "string"
                   },
@@ -8485,7 +8520,8 @@
                       "authorization_code",
                       "refresh_token",
                       "client_credentials",
-                      "urn:ietf:params:oauth:grant-type:device_code"
+                      "urn:ietf:params:oauth:grant-type:device_code",
+                      "urn:ietf:params:oauth:grant-type:token-exchange"
                     ],
                     "type": "string"
                   },
@@ -8498,7 +8534,19 @@
                   "refresh_token": {
                     "type": "string"
                   },
+                  "requested_token_type": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string"
+                  },
                   "scope": {
+                    "type": "string"
+                  },
+                  "subject_token": {
+                    "type": "string"
+                  },
+                  "subject_token_type": {
                     "type": "string"
                   }
                 },
@@ -8512,6 +8560,15 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "actor_token": {
+                    "type": "string"
+                  },
+                  "actor_token_type": {
+                    "type": "string"
+                  },
+                  "audience": {
+                    "type": "string"
+                  },
                   "client_id": {
                     "type": "string"
                   },
@@ -8532,7 +8589,8 @@
                       "authorization_code",
                       "refresh_token",
                       "client_credentials",
-                      "urn:ietf:params:oauth:grant-type:device_code"
+                      "urn:ietf:params:oauth:grant-type:device_code",
+                      "urn:ietf:params:oauth:grant-type:token-exchange"
                     ],
                     "type": "string"
                   },
@@ -8545,7 +8603,19 @@
                   "refresh_token": {
                     "type": "string"
                   },
+                  "requested_token_type": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string"
+                  },
                   "scope": {
+                    "type": "string"
+                  },
+                  "subject_token": {
+                    "type": "string"
+                  },
+                  "subject_token_type": {
                     "type": "string"
                   }
                 },

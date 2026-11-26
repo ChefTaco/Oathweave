@@ -45,6 +45,7 @@ import { rotateRefreshToken, issueIdToken, scopeTokens } from '../services/token
 import { env } from '../config/env.js'
 import { userTokenGrants } from '../services/effective-grants.js'
 import { clientAllowsDeviceGrant, DEVICE_CODE_GRANT, exchangeDeviceCode } from '../services/device-authorization.js'
+import { ACCESS_TOKEN_TYPE, exchangeToken, TOKEN_EXCHANGE_GRANT } from '../services/token-exchange.js'
 import {
   CLIENT_AUTH_FAILURE_WINDOW_MS,
   clientEndpointRateLimit,
@@ -423,6 +424,39 @@ oauthRouter.post('/token', clientEndpointRateLimit('rl:token'), async (c) => {
       if (err instanceof ApiError) {
         return c.json({ error: err.code.toLowerCase(), error_description: err.message }, err.status as 400)
       }
+      throw err
+    }
+  }
+
+  // ── Handle token exchange (RFC 8693) ──
+  if (params.grant_type === TOKEN_EXCHANGE_GRANT) {
+    if (!clientId) return c.json({ error: 'invalid_request', error_description: 'client_id is required' }, 400)
+    const auth = await authenticate(clientId)
+    if (auth instanceof Response) return auth
+    try {
+      const client = await prisma.client.findUnique({ where: { id: clientId }, select: { clientType: true } })
+      const result = await exchangeToken(
+        { clientId, clientType: client?.clientType ?? 'public', authenticated: auth.authenticated },
+        {
+          subjectToken: params.subject_token,
+          subjectTokenType: params.subject_token_type,
+          audience: params.audience,
+          resource: params.resource,
+          scope: params.scope,
+          requestedTokenType: params.requested_token_type,
+          actorToken: params.actor_token,
+        },
+        ip,
+      )
+      return c.json({
+        access_token: result.accessToken,
+        issued_token_type: ACCESS_TOKEN_TYPE,
+        token_type: 'Bearer',
+        expires_in: result.expiresIn,
+        scope: result.scope,
+      })
+    } catch (err) {
+      if (err instanceof ApiError) return c.json({ error: err.code.toLowerCase(), error_description: err.message }, err.status as 400)
       throw err
     }
   }
