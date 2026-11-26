@@ -6,7 +6,7 @@ import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { userTokenGrants } from '../services/effective-grants.js'
-import { verifyPassword, hashPassword } from '../services/password-service.js'
+import { verifyPassword, hashPassword, verifyAgainstDummyHash } from '../services/password-service.js'
 import {
   issueTokenPair,
   rotateRefreshToken,
@@ -35,7 +35,7 @@ import {
 } from '../schemas/auth.js'
 import { ApiError } from '../types/index.js'
 import { env } from '../config/env.js'
-import { accountLockActive, authLimitsRelaxed } from '../config/auth-limits.js'
+import { accountLockActive, authLimitsRelaxed, lockoutAfterFailure } from '../config/auth-limits.js'
 import { checkIpAllowlist } from '../utils/ip-allowlist.js'
 import {
   getDefaultPolicy,
@@ -84,6 +84,8 @@ authRouter.post(
     })
 
     if (!user) {
+      // Same verification cost as a real account, so timing does not reveal unknown usernames.
+      await verifyAgainstDummyHash(password)
       await logAuditEvent({
         eventType: 'auth.login.failed',
         category: 'AUTHENTICATION',
@@ -102,6 +104,10 @@ authRouter.post(
       )
     }
 
+    // A locked or disabled account is refused after the same password verification a usable
+    // account costs, so neither state can be told from a wrong password by timing.
+    const valid = await verifyPassword(user.passwordHash, password)
+
     // Check lockout
     if (accountLockActive(user.lockedUntil)) {
       throw new ApiError(
@@ -119,25 +125,21 @@ authRouter.post(
       )
     }
 
-    const valid = await verifyPassword(user.passwordHash, password)
     if (!valid) {
       // Increment failure count. Relaxed mode records nothing against the
       // account, so disabling it cannot lock on a counter inflated by testing.
       const relaxed = authLimitsRelaxed()
       const attempts = user.failedAttempts + 1
-      const lockUpdate =
-        attempts >= env.RATE_LIMIT_MAX_ATTEMPTS
-          ? {
-              failedAttempts: attempts,
-              lockedUntil: new Date(Date.now() + env.RATE_LIMIT_WINDOW_MS),
-            }
-          : { failedAttempts: attempts }
+      const lockout = lockoutAfterFailure(await getDefaultPolicy(), attempts)
+      const lockUpdate = lockout
+        ? { failedAttempts: attempts, lockedUntil: lockout }
+        : { failedAttempts: attempts }
 
       if (!relaxed)
         await prisma.user.update({ where: { id: user.id }, data: lockUpdate })
 
       // Emit lockout notification when account gets locked
-      if (!relaxed && attempts >= env.RATE_LIMIT_MAX_ATTEMPTS) {
+      if (!relaxed && lockout) {
         eventBus
           .publish('auth.lockout', {
             userId: user.id,
@@ -146,9 +148,7 @@ authRouter.post(
             ipAddress: ip,
             userAgent,
             attempts,
-            lockedUntil: new Date(
-              Date.now() + env.RATE_LIMIT_WINDOW_MS,
-            ).toISOString(),
+            lockedUntil: lockout.toISOString(),
           })
           .catch(() => {})
       }
@@ -340,7 +340,7 @@ authRouter.post('/logout', authMiddleware, async (c) => {
     await revokeSession(principal.sessionId, principal.sub)
   }
   if (refreshToken) {
-    await revokeRefreshToken(refreshToken)
+    await revokeRefreshToken(refreshToken, { userId: principal.sub })
   }
   deleteCookie(c, 'iam_refresh', { path: '/api/v1/auth' })
 
@@ -799,18 +799,13 @@ authRouter.post(
       const matchIdx = await verifyBackupCode(code, backupCodes)
       if (matchIdx === -1) {
         const attempts = user.failedAttempts + 1
+        const lockout = lockoutAfterFailure(await getDefaultPolicy(), attempts)
         if (!authLimitsRelaxed())
           await prisma.user.update({
             where: { id: userId },
             data: {
               failedAttempts: attempts,
-              ...(attempts >= env.RATE_LIMIT_MAX_ATTEMPTS
-                ? {
-                    lockedUntil: new Date(
-                      Date.now() + env.RATE_LIMIT_WINDOW_MS,
-                    ),
-                  }
-                : {}),
+              ...(lockout ? { lockedUntil: lockout } : {}),
             },
           })
         await logAuditEvent({

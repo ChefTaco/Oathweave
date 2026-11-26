@@ -47,8 +47,10 @@ denial and logout revocation. It never uses production credentials.
 
 ## Interactive browser client discovery
 
-Native discovery remains unchanged at
-`GET /api/v1/oauth/.well-known/openid-configuration` without a client selection.
+Native discovery is served at
+`GET /api/v1/oauth/.well-known/openid-configuration` without a client selection. Its endpoint
+URLs come from `IAM_PUBLIC_URL` (or `JWT_ISSUER` when that is an HTTPS URL), never from the
+request's `Host` or `X-Forwarded-*` headers; without either it answers 503.
 For an interactive relying party, explicitly select its registered public client:
 `GET /api/v1/oauth/.well-known/openid-configuration?client_id=hivexui-security-console`.
 The selected ID must exist in `IAM_BROWSER_CLIENT_POLICIES` and in the database as

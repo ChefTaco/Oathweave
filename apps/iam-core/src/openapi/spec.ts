@@ -1071,7 +1071,7 @@ export function buildOpenApiSpec() {
     '/api/v1/tokens/introspect': {
       post: {
         tags: ['Tokens'],
-        summary: 'Introspect a JWT token',
+        summary: 'Introspect an access token (RFC 7662): a client sees the tokens issued to it, or any token with iam:tokens:introspect; others answer active:false',
         operationId: 'introspectToken',
         security: [{ BearerAuth: [] }],
         responses: { ...success(ref('TokenInfo')), 401: err401, 429: err429 },
@@ -1421,7 +1421,7 @@ export function buildOpenApiSpec() {
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody(ref('PasskeyRegisterRequest')),
         responses: {
-          200: { description: 'Passkey registered' },
+          200: { description: 'Passkey registered. The first authentication factor also returns its one-time recovery codes in backupCodes (empty otherwise).' },
           400: err400,
           403: err403,
         },
@@ -1516,9 +1516,9 @@ export function buildOpenApiSpec() {
     summary: 'Native discovery by default; select an active registered public browser client for configured interactive metadata',
     parameters: [qp('client_id','Explicit IAM_BROWSER_CLIENT_POLICIES client identifier; never inferred from headers',false,{type:'string',pattern:'^hivexui-[a-z0-9-]+$'})],
     responses: {
-      200: { description: 'Without client_id the native discovery document is unchanged. With client_id this is BrowserOpenIdConfiguration, with no-store caching.', content: { 'application/json': { schema: { anyOf: [ref('BrowserOpenIdConfiguration'), {type:'object',description:'Retained native discovery metadata',additionalProperties:true}] } } } },
+      200: { description: 'Without client_id the native discovery document, with endpoints under IAM_PUBLIC_URL (or an HTTPS JWT_ISSUER) and a 5-minute cache; request Host and forwarding headers are never used. With client_id this is BrowserOpenIdConfiguration, with no-store caching.', content: { 'application/json': { schema: { anyOf: [ref('BrowserOpenIdConfiguration'), {type:'object',description:'Retained native discovery metadata',additionalProperties:true}] } } } },
       400: { description: 'Unknown, inactive, non-public, empty or repeated browser client selection' },
-      503: { description: 'Explicit browser issuer, authorization portal and API base are not configured' },
+      503: { description: 'Without client_id: no IAM_PUBLIC_URL and JWT_ISSUER is not an HTTPS URL. With client_id: the browser issuer, authorization portal and API base are not configured' },
     },
   } }
   const browserResponses: Array<[string,string,string,number]> = [

@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { SignJWT, jwtVerify, createLocalJWKSet } from 'jose'
@@ -12,6 +11,7 @@ import {
 } from '../utils/keys.js'
 import { verifyAccessToken } from '../services/token-service.js'
 import { authMiddleware } from './auth.js'
+import { userTokenGrants } from '../services/effective-grants.js'
 import { ApiError, type Principal } from '../types/index.js'
 
 const COOKIE = '__Host-oathweave_sso'
@@ -112,18 +112,18 @@ export async function browserPrincipal(c: Context): Promise<Principal | null> {
         expiresAt: { gt: new Date() },
         user: { active: true },
       },
-      include: { user: { include: { roles: { include: { role: true } } } } },
+      include: { user: { select: { email: true, username: true } } },
     })
     if (!session) return null
+    // Direct and group roles, as the access tokens of this session carry them.
+    const { roles, permissions } = await userTokenGrants(session.userId)
     return {
       sub: session.userId,
       actorType: 'USER',
       email: session.user.email,
       username: session.user.username,
-      roles: session.user.roles.map((value) => value.role.name),
-      permissions: session.user.roles.flatMap(
-        (value) => z.array(z.string()).parse(JSON.parse(value.role.permissions) as unknown),
-      ),
+      roles,
+      permissions,
       sessionId: session.id,
       clientId: undefined,
     }

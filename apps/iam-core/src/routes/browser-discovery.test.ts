@@ -41,8 +41,22 @@ it('fails closed on missing or invalid configuration with no metadata or redirec
   const response=await app.request(url+'?client_id=hivexui-fixture');expect(response.status).toBe(503);expect(await response.json()).toMatchObject({error:'BROWSER_DISCOVERY_UNCONFIGURED'});expect(response.headers.has('location')).toBe(false);Object.assign(fixtures.env,original)
  }
 })
-it('retains the original native issuer, paths, grants and caching without client selection',async()=>{
- const response=await app.request(url,{headers:{host:'native.example.com','x-forwarded-proto':'https'}});expect(response.status).toBe(200)
- expect(await response.json()).toMatchObject({issuer:'native-issuer',authorization_endpoint:'https://native.example.com/api/v1/oauth/authorize',token_endpoint:'https://native.example.com/api/v1/oauth/token',grant_types_supported:['authorization_code','refresh_token','client_credentials']})
- expect(response.headers.get('cache-control')).toBe('public, max-age=86400');expect(fixtures.client).not.toHaveBeenCalled()
+it('builds native metadata from configuration, never from Host or forwarding headers',async()=>{
+ fixtures.env.IAM_PUBLIC_URL='https://native.example.com'
+ try {
+  const response=await app.request(url,{headers:{host:'attacker.example.com','x-forwarded-host':'attacker.example.com','x-forwarded-proto':'http'}});expect(response.status).toBe(200)
+  const body=await response.json()
+  expect(body).toMatchObject({issuer:'native-issuer',authorization_endpoint:'https://native.example.com/api/v1/oauth/authorize',token_endpoint:'https://native.example.com/api/v1/oauth/token',grant_types_supported:['authorization_code','refresh_token','client_credentials']})
+  expect(JSON.stringify(body)).not.toContain('attacker')
+  expect(response.headers.get('cache-control')).toBe('public, max-age=300');expect(fixtures.client).not.toHaveBeenCalled()
+ } finally { delete fixtures.env.IAM_PUBLIC_URL }
+})
+it('falls back to an HTTPS JWT_ISSUER, and refuses to publish metadata with no public URL',async()=>{
+ const unconfigured=await app.request(url,{headers:{host:'native.example.com'}})
+ expect(unconfigured.status).toBe(503);expect(unconfigured.headers.get('cache-control')).toBe('no-store');expect(await unconfigured.json()).toMatchObject({error:'DISCOVERY_UNCONFIGURED'})
+ fixtures.env.JWT_ISSUER='https://issuer.example.com/'
+ try {
+  const response=await app.request(url,{headers:{host:'attacker.example.com'}});expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({issuer:'https://issuer.example.com/',jwks_uri:'https://issuer.example.com/api/v1/oauth/jwks'})
+ } finally { fixtures.env.JWT_ISSUER='native-issuer' }
 })

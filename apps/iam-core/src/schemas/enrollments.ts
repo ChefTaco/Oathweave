@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { IpAllowlistEntrySchema } from './ip-allowlist.js'
 
 export const EnrollmentRequestSchema = z.object({
   agentId: z.string().min(2).max(32).regex(/^[a-z0-9_-]+$/),
@@ -12,7 +13,7 @@ export const EnrollmentRequestSchema = z.object({
   workspaceId: z.string().min(1).max(100).regex(/^[a-z0-9_-]+$/).default('default'),
   owningProject: z.string().max(100).default(''),
   expiresHours: z.number().int().min(1).max(720).default(24),
-  allowedIps: z.array(z.ipv4()).max(50).default([]),
+  allowedIps: z.array(IpAllowlistEntrySchema).max(50).default([]),
 }).strict()
 export const EnrollmentLifecycleSchema = z.object({ operationId: z.uuid() }).strict()
 export const EnrollmentInventorySchema = z.object({ installationId: z.string(), data: z.array(z.object({

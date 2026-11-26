@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+**Upgrade notes.** No database migration. Account lockout now follows the stored password
+policy (`lockoutAttempts`, default 5, and `lockoutDurationMin`, default 15) instead of
+`RATE_LIMIT_MAX_ATTEMPTS` and `RATE_LIMIT_WINDOW_MS`, which keep setting the per-address sign-in
+throttle; an installation that changed those variables to tune lockout should set the policy
+(`PATCH /api/v1/password-policy`) instead. Native discovery no longer derives URLs from the
+request: set `IAM_PUBLIC_URL` to the server's public HTTPS URL (unless `JWT_ISSUER` already is
+one), or `GET /api/v1/oauth/.well-known/openid-configuration` answers 503. `POST /tokens/introspect`
+and `POST /tokens/revoke` act only on tokens issued to the calling client unless its machine
+client policy grants `iam:tokens:introspect` or `iam:tokens:revoke`; introspection's `scope`
+member is now the token's OAuth scope rather than its permissions (still in `permissions`). A
+client's `allowedIps` now also applies at the token endpoint.
+
+### Security
+
+- **Revocation and introspection are limited to the issuing client (RFC 7009 §2.1, RFC 7662
+  §2.2).** Any authenticated client could revoke any user's token, which ended that user's whole
+  session, and could read any token's email, roles and permissions. A client now revokes and
+  introspects the tokens issued to it; `iam:tokens:revoke` and `iam:tokens:introspect` in its
+  permission ceiling (the built-in `hive-router` client holds `iam:tokens:introspect`) reach other
+  tokens. Other tokens introspect as `{"active":false}` and refuse revocation with
+  `unauthorized_client`. Introspection adds the standard `exp`, `iat`, `iss`, `aud`, `jti` and
+  `scope` members and is not cached.
+- **Native discovery no longer trusts request headers.** Its endpoint URLs came from
+  `X-Forwarded-Host`/`Host` and were cached publicly for a day, so a forged header could poison a
+  shared cache. URLs now come from `IAM_PUBLIC_URL` or an HTTPS `JWT_ISSUER`, and the document is
+  cached for five minutes.
+- **The stored lockout policy is enforced.** `lockoutAttempts` and `lockoutDurationMin` were
+  editable and published but ignored. Relaxed mode (`RELAX_AUTH_LIMITS`) still looks past failure
+  locks (now up to the policy's 24-hour maximum) and enforces administrator locks.
+- **Sign-in timing no longer reveals usernames.** An unknown, locked or disabled account returned
+  before any password hashing; each now costs one password verification, like a wrong password.
+- **Signing another user out needs standing over that user.** `DELETE /sessions/:id` and
+  `DELETE /sessions/user/:userId` apply the privilege guard used for other user management, so a
+  holder of `iam:sessions:revoke` can no longer sign out a `SUPER_ADMIN`.
+- **Client address allowlists apply at the token endpoint**, not only to introspection and
+  revocation.
+- **Passkey sign-in and browser sessions carry group roles.** The passkey MFA step and the browser
+  SSO session built roles and permissions from directly assigned roles only.
+
+### Fixed
+
+- **The first passkey issues recovery codes.** Registering a passkey turned MFA on without backup
+  codes or an audit record. The first factor now returns ten one-time recovery codes in
+  `backupCodes` and records `auth.webauthn_registered` and `auth.mfa_enabled`.
+- **`allowedIps` accepts CIDR ranges, IPv6 and IPv4 wildcards** for clients, service accounts and
+  enrollments, matching what the allowlist check already supported.
+
 ## [2.4.0] - 2026-11-26
 
 **Upgrade notes.** No database migration and no settings change. Replace the image with

@@ -32,6 +32,8 @@ import { requireRecentSession } from '../middleware/recent-session.js'
 import { createSession } from '../services/session-service.js'
 import { issueTokenPair } from '../services/token-service.js'
 import { logAuditEvent } from '../services/audit-service.js'
+import { generateBackupCodes } from '../services/mfa-service.js'
+import { userTokenGrants } from '../services/effective-grants.js'
 import {
   getRegistrationOptions,
   verifyRegistration,
@@ -137,13 +139,56 @@ webauthnRouter.post(
       },
     })
 
-    // Enable MFA on the user if not already
+    // Enable MFA on the user if not already. The first factor also gets recovery codes, the
+    // same as enabling TOTP does, so losing the passkey does not lock the account out.
+    const before = await prisma.user.findUnique({
+      where: { id: principal.sub },
+      select: { mfaEnabled: true, mfaBackupCodes: true, email: true },
+    })
+    const hasRecoveryCodes = (JSON.parse(before?.mfaBackupCodes || '[]') as string[]).some(Boolean)
+    const issued = hasRecoveryCodes ? undefined : await generateBackupCodes()
     await prisma.user.update({
       where: { id: principal.sub },
-      data: { mfaEnabled: true },
+      data: {
+        mfaEnabled: true,
+        ...(issued ? { mfaBackupCodes: JSON.stringify(issued.hashedCodes) } : {}),
+      },
     })
+    await logAuditEvent({
+      eventType: 'auth.webauthn_registered',
+      category: 'AUTHENTICATION',
+      actorId: principal.sub,
+      actorType: 'USER',
+      actorEmail: before?.email,
+      ipAddress: getClientIp(c),
+      action: 'webauthn_register',
+      outcome: 'SUCCESS',
+      detail: { deviceType: credentialDeviceType, recoveryCodesIssued: Boolean(issued) },
+      source: 'iam-api',
+    })
+    if (!before?.mfaEnabled) {
+      await logAuditEvent({
+        eventType: 'auth.mfa_enabled',
+        category: 'AUTHENTICATION',
+        actorId: principal.sub,
+        actorType: 'USER',
+        actorEmail: before?.email,
+        ipAddress: getClientIp(c),
+        action: 'mfa_enable',
+        outcome: 'SUCCESS',
+        detail: { method: 'webauthn' },
+        source: 'iam-api',
+      })
+    }
 
-    return c.json({ success: true, message: 'WebAuthn credential registered' })
+    c.header('Cache-Control', 'no-store')
+    return c.json({
+      success: true,
+      message: issued
+        ? 'WebAuthn credential registered. Save your recovery codes in a safe place — they will not be shown again.'
+        : 'WebAuthn credential registered',
+      backupCodes: issued?.plaintextCodes ?? [],
+    })
   },
 )
 
@@ -294,23 +339,11 @@ webauthnRouter.post(
       )
     await consumeLoginChallenge(body.mfaToken)
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { roles: { include: { role: true } } },
-    })
+    const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user || !user.active || !user.mfaEnabled)
       throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
-    const roles = user.roles.map((assignment) => assignment.role.name)
-    const permissions = [
-      ...new Set(
-        user.roles.flatMap((assignment) => {
-          const value = assignment.role.permissions
-          return (
-            typeof value === 'string' ? JSON.parse(value) : value
-          ) as string[]
-        }),
-      ),
-    ]
+    // Same grants as every other sign-in path: direct and group roles.
+    const { roles, permissions } = await userTokenGrants(userId)
     const ip = getClientIp(c)
     const userAgent = c.req.header('user-agent')
     const { sessionId, riskScore, riskFactors } = await createSession(

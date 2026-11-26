@@ -8,6 +8,7 @@ vi.mock('./env.js', () => ({ env }))
 
 const {
   accountLockActive,
+  lockoutAfterFailure,
   authAttemptCeiling,
   authLimitsRelaxed,
   relaxedAuthLimitsWarning,
@@ -34,6 +35,20 @@ describe('default authentication limits', () => {
   })
 })
 
+describe('the stored lockout policy', () => {
+  it('locks at lockoutAttempts for lockoutDurationMin minutes', () => {
+    const policy = { lockoutAttempts: 3, lockoutDurationMin: 45 }
+    expect(lockoutAfterFailure(policy, 2, now)).toBeUndefined()
+    expect(lockoutAfterFailure(policy, 3, now)).toEqual(inMinutes(45))
+    expect(lockoutAfterFailure(policy, 7, now)).toEqual(inMinutes(45))
+  })
+
+  it('stays within the range the policy schema allows', () => {
+    expect(lockoutAfterFailure({ lockoutAttempts: 0, lockoutDurationMin: 0 }, 1, now)).toEqual(inMinutes(1))
+    expect(lockoutAfterFailure({ lockoutAttempts: 5, lockoutDurationMin: 99_999 }, 5, now)).toEqual(inMinutes(1440))
+  })
+})
+
 describe('relaxed authentication limits', () => {
   beforeEach(() => {
     env.RELAX_AUTH_LIMITS = true
@@ -47,6 +62,9 @@ describe('relaxed authentication limits', () => {
 
   it('ignore failure locks but still enforce administrator locks', () => {
     expect(accountLockActive(inMinutes(15), now)).toBe(false)
+    // The password policy may lock for up to 1440 minutes; that is still a failure lock.
+    expect(accountLockActive(inMinutes(1440), now)).toBe(false)
+    expect(accountLockActive(inMinutes(1441), now)).toBe(true)
     expect(accountLockActive(inMinutes(60 * 24 * 365), now)).toBe(true)
   })
 

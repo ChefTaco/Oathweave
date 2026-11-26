@@ -1,5 +1,5 @@
 import { z } from 'zod'
-
+import { IpAllowlistEntrySchema } from './ip-allowlist.js'
 const VALID_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_credentials'] as const
 
 export const CreateClientSchema = z.object({
@@ -10,7 +10,7 @@ export const CreateClientSchema = z.object({
   redirectUris: z.array(z.url()).default([]),
   grantTypes: z.array(z.enum(VALID_GRANT_TYPES)).default(['authorization_code', 'refresh_token']),
   firstParty: z.boolean().default(false),
-  allowedIps: z.array(z.ipv4()).default([]),
+  allowedIps: z.array(IpAllowlistEntrySchema).default([]),
 }).refine(
   (data) => data.clientType === 'public' || data.secret,
   { error: 'Confidential clients must provide a secret', path: ['secret'] },
@@ -25,7 +25,7 @@ export const UpdateClientSchema = z.object({
   redirectUris: z.array(z.url()).optional(),
   grantTypes: z.array(z.enum(VALID_GRANT_TYPES)).optional(),
   firstParty: z.boolean().optional(),
-  allowedIps: z.array(z.ipv4()).optional(),
+  allowedIps: z.array(IpAllowlistEntrySchema).optional(),
 })
 
 export const RotateClientSecretSchema = z.object({
