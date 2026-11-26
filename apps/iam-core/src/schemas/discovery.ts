@@ -7,6 +7,7 @@ export const BrowserOpenIdConfigurationSchema = z.object({
   token_endpoint: z.url(),
   userinfo_endpoint: z.url(),
   jwks_uri: z.url(),
+  end_session_endpoint: z.url().optional(),
   response_types_supported: z.tuple([z.literal('code')]),
   grant_types_supported: z.tuple([z.literal('authorization_code')]),
   subject_types_supported: z.tuple([z.literal('public')]),

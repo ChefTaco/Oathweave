@@ -398,6 +398,50 @@ authRouter.post('/refresh', async (c) => {
   })
 })
 
+// ── Self-service sessions: the caller's own sign-ins ──
+authRouter.get('/sessions', browserAuthorization, async (c) => {
+  const principal = c.get('principal')
+  if (principal.actorType !== 'USER')
+    throw new ApiError(403, 'FORBIDDEN', 'Interactive identity required')
+  const sessions = await prisma.session.findMany({
+    where: { userId: principal.sub, revokedAt: null, expiresAt: { gt: new Date() } },
+    select: { id: true, createdAt: true, expiresAt: true, ipAddress: true, userAgent: true, stepUpVerifiedAt: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  c.header('Cache-Control', 'no-store')
+  return c.json({
+    sessions: sessions.map((session) => ({ ...session, current: session.id === principal.sessionId })),
+  })
+})
+
+authRouter.delete('/sessions/:id', browserAuthorization, async (c) => {
+  const principal = c.get('principal')
+  if (principal.actorType !== 'USER')
+    throw new ApiError(403, 'FORBIDDEN', 'Interactive identity required')
+  const sessionId = c.req.param('id')
+  // Another user's session answers like a missing one.
+  const session = await prisma.session.findFirst({
+    where: { id: sessionId, userId: principal.sub, revokedAt: null },
+    select: { id: true },
+  })
+  if (!session) throw new ApiError(404, 'NOT_FOUND', 'Session not found')
+  await revokeSession(session.id, principal.sub)
+  await logAuditEvent({
+    eventType: 'session.revoked',
+    category: 'AUTHENTICATION',
+    actorId: principal.sub,
+    actorType: 'USER',
+    actorEmail: principal.email,
+    ipAddress: getClientIp(c),
+    resourceType: 'session',
+    resourceId: session.id,
+    action: 'revoke_own',
+    detail: { current: session.id === principal.sessionId },
+    source: 'iam-api',
+  })
+  return c.json({ success: true, current: session.id === principal.sessionId })
+})
+
 // GET /me
 authRouter.get('/me', authMiddleware, async (c) => {
   const principal = c.get('principal')

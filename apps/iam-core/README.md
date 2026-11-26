@@ -146,6 +146,7 @@ directory; prefer absolute paths.
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | | `$IAM_DATA_DIR/keys/iam-*.pem` | RS256 signing key pair |
 | `AUDIT_LOG_DIR` | | `$IAM_DATA_DIR/audit-logs` | Daily JSONL audit files |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_RP_ORIGIN` | | `localhost` / `https://localhost` | WebAuthn relying party, e.g. `hive.example.com` / `https://hive.example.com` |
+| `IAM_PUBLIC_URL` | | | Public HTTPS URL of this server; discovery metadata names endpoints under it (falls back to an HTTPS `JWT_ISSUER`; 503 otherwise) |
 | `TRUSTED_PROXY_IPS` | | | Reverse proxies whose `X-Forwarded-For` is believed: comma-separated addresses, CIDR ranges or IPv4 wildcards. See [Client addresses](#client-addresses) |
 
 `hive-iam-server env-schema` prints the full list as JSON. Further options
@@ -244,6 +245,17 @@ Oathweave 2.x.
 `/api/v1/tokens`, `/api/v1/sessions`, `/api/v1/system-users`,
 `/api/v1/devices`, `/api/v1/password-policy`, `/api/v1/audit`,
 `/api/v1/enrollments`, `/api/v1/browser`, `/api/v1/oauth/*` (including `/.well-known/openid-configuration` and `/jwks`).
+
+For generic OAuth 2.0 / OpenID Connect relying parties, discovery is also served at the issuer
+(`/.well-known/openid-configuration` and `/.well-known/oauth-authorization-server`, under an
+HTTPS `JWT_ISSUER`'s path too) and advertises `revocation_endpoint` (`/api/v1/oauth/revoke`),
+`introspection_endpoint` (`/api/v1/oauth/introspect`) and `end_session_endpoint`
+(`/api/v1/oauth/logout`, RP-initiated logout). These take standard client authentication
+(`client_secret_basic` or `client_secret_post`). For the metadata to validate in a relying party,
+set `JWT_ISSUER` and `IAM_PUBLIC_URL` to the same HTTPS URL. id_tokens carry `auth_time`, `sid`,
+and the `profile` (`preferred_username`, `name`) and `email` (`email`, `email_verified`) claims
+the granted scope asks for; UserInfo follows the same scope. Users list and end their own
+sessions with `GET /api/v1/auth/sessions` and `DELETE /api/v1/auth/sessions/:id`.
 The OpenAPI document is served at `/api/docs/openapi.json`, with Swagger UI at
 `/api/docs`.
 

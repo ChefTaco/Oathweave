@@ -92,6 +92,7 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/qrcode": "^1.5.6",
+    "oauth4webapi": "3.8.8",
     "prisma": "^7.0.0",
     "tsx": "^4.19.4",
     "typescript": "6.0.3",
@@ -301,6 +302,14 @@
         "impact": "fast",
         "readableBy": "^1.2.2",
         "note": "Record the session an authorization code issued tokens for, so a replayed code revokes them. Older binaries reject this migration history; retain verified recovery backups."
+      },
+      {
+        "component": "iam",
+        "id": "20261126000200_token_scope_and_auth_time",
+        "checksum": "36854b5e2e271edc08a509c8cb1d1ca06689a35235280ce18b6b374c5ab08ec5",
+        "impact": "fast",
+        "readableBy": "^1.2.2",
+        "note": "Record the OAuth scope of refresh tokens and the authentication time of authorization codes. Older binaries reject this migration history; retain verified recovery backups."
       }
     ],
     "wireCompatibility": {

@@ -34,6 +34,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
       permissions: payload.permissions,
       sessionId: payload.sessionId,
       clientId: payload.clientId,
+      ...(typeof payload['scope'] === 'string' ? { scope: payload['scope'] as string } : {}),
     })
     const principal = c.get('principal')
     if (

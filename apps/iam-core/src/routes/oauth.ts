@@ -21,7 +21,7 @@ import {
  *   GET  /oauth/jwks            — JSON Web Key Set
  */
 
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { prisma } from '../db/client.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { parseBody } from '../utils/validate.js'
@@ -41,8 +41,9 @@ import {
   getOpenIdConfiguration,
   getJwks,
 } from '../services/oauth-service.js'
-import { rotateRefreshToken, issueIdToken } from '../services/token-service.js'
+import { rotateRefreshToken, issueIdToken, scopeTokens } from '../services/token-service.js'
 import { env } from '../config/env.js'
+import { userTokenGrants } from '../services/effective-grants.js'
 import {
   CLIENT_AUTH_FAILURE_WINDOW_MS,
   clientEndpointRateLimit,
@@ -91,6 +92,7 @@ oauthRouter.get('/authorize', browserAuthorization, async (c) => {
         browserSessionId: browserClientPolicies[params.client_id]
           ? principal.sessionId
           : undefined,
+        authSessionId: principal.sessionId,
         nonce: params.nonce,
       },
       getClientIp(c),
@@ -177,6 +179,7 @@ oauthRouter.post('/authorize', browserAuthorization, async (c) => {
       browserSessionId: browserClientPolicies[body.clientId]
         ? principal.sessionId
         : undefined,
+      authSessionId: principal.sessionId,
     },
     ip,
   )
@@ -437,6 +440,7 @@ oauthRouter.post('/token', clientEndpointRateLimit('rl:token'), async (c) => {
         clientId,
         result.nonce,
         result.accessToken,
+        { sessionId: result.sessionId, authTime: result.authTime, scope: result.scope },
       )
       response['id_token'] = idToken
     }
@@ -483,7 +487,6 @@ oauthRouter.get('/userinfo', authMiddleware, async (c) => {
       email: true,
       username: true,
       displayName: true,
-      roles: { include: { role: { select: { name: true } } } },
     },
   })
 
@@ -491,12 +494,17 @@ oauthRouter.get('/userinfo', authMiddleware, async (c) => {
     throw new ApiError(404, 'NOT_FOUND', 'User not found')
   }
 
+  // OpenID Connect Core §5.4: `profile` and `email` select the standard claims. A token issued
+  // without a scope (native sign-in) answers with all of them, as it always has.
+  const scopes = principal.scope === undefined ? undefined : scopeTokens(principal.scope)
+  const wants = (scope: string) => !scopes || scopes.includes(scope)
+  c.header('Cache-Control', 'no-store')
   return c.json({
     sub: user.id,
-    email: user.email,
-    preferred_username: user.username,
-    name: user.displayName,
-    roles: user.roles.map((r) => r.role.name),
+    ...(wants('email') ? { email: user.email, email_verified: false } : {}),
+    ...(wants('profile') ? { preferred_username: user.username, name: user.displayName } : {}),
+    // Direct and group roles, as the user's tokens carry them.
+    roles: (await userTokenGrants(user.id)).roles,
   })
 })
 
@@ -508,6 +516,11 @@ oauthRouter.get('/.well-known/openid-configuration', async (c) => {
     if (clients.length !== 1 || !clients[0]) throw new ApiError(400, 'INVALID_CLIENT', 'Select one registered public browser client')
     return c.json(await getBrowserOpenIdConfiguration(clients[0]))
   }
+  return nativeDiscovery(c)
+})
+
+/** The native discovery document, also served at the issuer's own `.well-known` paths. */
+export function nativeDiscovery(c: Context): Response {
   const configuration = getOpenIdConfiguration()
   if (!configuration) {
     c.header('Cache-Control', 'no-store')
@@ -516,7 +529,7 @@ oauthRouter.get('/.well-known/openid-configuration', async (c) => {
   // Built from configuration alone, so a short shared cache is safe; a URL change shows within minutes.
   c.header('Cache-Control', 'public, max-age=300')
   return c.json(configuration)
-})
+}
 
 // ── GET /jwks — JSON Web Key Set ──
 oauthRouter.get('/jwks', async (c) => {

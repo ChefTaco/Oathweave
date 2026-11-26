@@ -179,6 +179,7 @@ model RefreshToken {
   ipAddress   String?
   userAgent   String?
   clientId    String?
+  scope       String?   // OAuth scope granted with the token; refreshed access tokens keep it
   issuedAt    DateTime  @default(now())
   expiresAt   DateTime
   revokedAt   DateTime?
@@ -394,6 +395,7 @@ model AuthorizationCode {
   expiresAt     DateTime  // 10-minute validity
   usedAt        DateTime?
   issuedSessionId String? // Session the exchange issued tokens for; a replay revokes it
+  authTime      DateTime? // When the user last authenticated (id_token auth_time)
   createdAt     DateTime  @default(now())
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
