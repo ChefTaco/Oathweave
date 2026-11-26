@@ -26,6 +26,15 @@ export async function startServer(): Promise<void> {
   startAuditRetention()
   console.log('  ✓ Audit retention started')
 
+  // Hourly: drop expired authorization codes and device sign-ins (expired rows grant nothing).
+  // The modules load on first use; the app has them loaded by then.
+  const pruneGrants = async () => {
+    const { cleanupExpiredCodes } = await import('./services/oauth-service.js')
+    const { cleanupExpiredDeviceAuthorizations } = await import('./services/device-authorization.js')
+    await Promise.all([cleanupExpiredCodes(), cleanupExpiredDeviceAuthorizations()])
+  }
+  setInterval(() => void pruneGrants().catch(() => undefined), 3_600_000).unref()
+
   const app = createApp()
 
   // TLS config (optional — use a reverse proxy in production)

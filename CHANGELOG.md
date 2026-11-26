@@ -28,6 +28,9 @@ scope asks for: a relying party that requests only `openid` no longer receives `
 `preferred_username` (HiveXUI requests `openid profile`, the model gateway `openid profile email`).
 Tokens issued without a scope, such as native sign-in, keep every claim.
 
+**Device authorization grant.** `20261126000300_device_authorization` adds the
+`device_authorizations` table. The grant is off until `IAM_DEVICE_VERIFICATION_URL` is set.
+
 ### Security
 
 - **The `hive-router` client token is read-only without an operator.** A `client_credentials`
@@ -66,6 +69,15 @@ Tokens issued without a scope, such as native sign-in, keep every claim.
 
 ### Added
 
+- **Device authorization grant (RFC 8628)** for CLIs and headless agents: a client with the
+  `urn:ietf:params:oauth:grant-type:device_code` grant requests a code pair at
+  `POST /oauth/device_authorization`, a signed-in person reviews and approves or denies the user
+  code (`GET` / `POST /oauth/device`), and the device polls the token endpoint
+  (`authorization_pending`, `slow_down`, `access_denied`, `expired_token`). Device codes are
+  256-bit and stored as digests, user codes are eight consonants, both live ten minutes and
+  exchange once; code entry is rate-limited. Discovery advertises the endpoint when it is on.
+  Managing a client with this grant needs `SUPER_ADMIN`, as for sign-in clients. Expired codes and
+  device sign-ins are pruned hourly.
 - **Standard endpoints for generic relying parties.** Discovery at the issuer root
   (`/.well-known/openid-configuration`, `/.well-known/oauth-authorization-server`), RFC 7009
   `POST /oauth/revoke` and RFC 7662 `POST /oauth/introspect` with `client_secret_basic` /

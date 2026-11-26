@@ -668,7 +668,8 @@
               "enum": [
                 "authorization_code",
                 "refresh_token",
-                "client_credentials"
+                "client_credentials",
+                "urn:ietf:params:oauth:grant-type:device_code"
               ],
               "type": "string"
             },
@@ -757,7 +758,8 @@
               "enum": [
                 "authorization_code",
                 "refresh_token",
-                "client_credentials"
+                "client_credentials",
+                "urn:ietf:params:oauth:grant-type:device_code"
               ],
               "type": "string"
             },
@@ -4176,11 +4178,15 @@
           "code_verifier": {
             "type": "string"
           },
+          "device_code": {
+            "type": "string"
+          },
           "grant_type": {
             "enum": [
               "authorization_code",
               "refresh_token",
-              "client_credentials"
+              "client_credentials",
+              "urn:ietf:params:oauth:grant-type:device_code"
             ],
             "type": "string"
           },
@@ -4278,7 +4284,8 @@
               "enum": [
                 "authorization_code",
                 "refresh_token",
-                "client_credentials"
+                "client_credentials",
+                "urn:ietf:params:oauth:grant-type:device_code"
               ],
               "type": "string"
             },
@@ -4342,7 +4349,8 @@
               "enum": [
                 "authorization_code",
                 "refresh_token",
-                "client_credentials"
+                "client_credentials",
+                "urn:ietf:params:oauth:grant-type:device_code"
               ],
               "type": "string"
             },
@@ -8023,6 +8031,203 @@
         ]
       }
     },
+    "/api/v1/oauth/device": {
+      "get": {
+        "operationId": "describeDeviceAuthorization",
+        "parameters": [
+          {
+            "description": "The code the device shows; case and dashes are ignored",
+            "in": "query",
+            "name": "user_code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "userCode, clientId, clientName, clientDescription, scope, expiresAt"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "For a signed-in person: the client and scope a pending user code asks for",
+        "tags": [
+          "Auth"
+        ]
+      },
+      "post": {
+        "operationId": "decideDeviceAuthorization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "decision": {
+                    "enum": [
+                      "approve",
+                      "deny"
+                    ],
+                    "type": "string"
+                  },
+                  "userCode": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userCode",
+                  "decision"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Decided"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "A signed-in person approves or denies a pending device sign-in",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/device_authorization": {
+      "post": {
+        "operationId": "deviceAuthorization",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "client_secret": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval"
+          },
+          "400": {
+            "description": "unauthorized_client"
+          },
+          "401": {
+            "description": "invalid_client"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          },
+          "503": {
+            "description": "IAM_DEVICE_VERIFICATION_URL is not set"
+          }
+        },
+        "summary": "RFC 8628 device authorization request (device_authorization_endpoint) for a client with the urn:ietf:params:oauth:grant-type:device_code grant. The device polls POST /oauth/token with that grant_type and its device_code. 503 without IAM_DEVICE_VERIFICATION_URL",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/oauth/introspect": {
       "post": {
         "operationId": "oauthIntrospect",
@@ -8272,11 +8477,15 @@
                   "code_verifier": {
                     "type": "string"
                   },
+                  "device_code": {
+                    "type": "string"
+                  },
                   "grant_type": {
                     "enum": [
                       "authorization_code",
                       "refresh_token",
-                      "client_credentials"
+                      "client_credentials",
+                      "urn:ietf:params:oauth:grant-type:device_code"
                     ],
                     "type": "string"
                   },
@@ -8315,11 +8524,15 @@
                   "code_verifier": {
                     "type": "string"
                   },
+                  "device_code": {
+                    "type": "string"
+                  },
                   "grant_type": {
                     "enum": [
                       "authorization_code",
                       "refresh_token",
-                      "client_credentials"
+                      "client_credentials",
+                      "urn:ietf:params:oauth:grant-type:device_code"
                     ],
                     "type": "string"
                   },

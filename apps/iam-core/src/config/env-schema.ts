@@ -35,6 +35,8 @@ export const envSchema = z.object({
   IAM_BROWSER_API_BASE_URL: z.string().optional(),
   // Public HTTPS URL this server's /api/v1 routes are reached at; native discovery metadata uses it.
   IAM_PUBLIC_URL: z.string().optional(),
+  // HTTPS page where a person enters a device sign-in's user code (RFC 8628 verification_uri).
+  IAM_DEVICE_VERIFICATION_URL: z.string().optional(),
   JWT_ACCESS_TTL: z.coerce.number().default(900),
   JWT_REFRESH_TTL: z.coerce.number().default(604800),
 
@@ -105,6 +107,8 @@ export const envSchema = z.object({
       context.addIssue({ code: 'custom', path: ['IAM_MACHINE_CLIENT_SECRETS'], message: error instanceof Error ? error.message : 'is invalid' })
     }
   }
+  if (source.IAM_DEVICE_VERIFICATION_URL !== undefined && !discoveryMetadataUrl.safeParse(source.IAM_DEVICE_VERIFICATION_URL).success)
+    context.addIssue({ code: 'custom', path: ['IAM_DEVICE_VERIFICATION_URL'], message: 'must be an HTTPS URL without credentials, query, fragment or whitespace' })
   if (source.IAM_PUBLIC_URL !== undefined && !discoveryMetadataUrl.safeParse(source.IAM_PUBLIC_URL).success)
     context.addIssue({ code: 'custom', path: ['IAM_PUBLIC_URL'], message: 'must be an HTTPS URL without credentials, query, fragment or whitespace' })
   if (source.IAM_BROWSER_AUTHORIZATION_URL === undefined && source.IAM_BROWSER_API_BASE_URL === undefined) return

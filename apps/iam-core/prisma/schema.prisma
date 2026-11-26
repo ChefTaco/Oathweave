@@ -475,3 +475,23 @@ model EnrollmentMigration {
   importedAt DateTime
   provenanceJson String
 }
+
+// ─── Device Authorization Grant (RFC 8628) ───
+
+model DeviceAuthorization {
+  id             String    @id @default(cuid())
+  deviceCodeHash String    @unique // SHA-256 of the device_code; the code itself is never stored
+  userCode       String    @unique // Normalized user_code the person enters
+  clientId       String
+  scope          String?
+  status         String    @default("pending") // pending | approved | denied | consumed
+  userId         String?   // The person who approved or denied
+  authTime       DateTime? // When that person last authenticated
+  interval       Int       @default(5) // Seconds between polls; slow_down adds 5
+  lastPolledAt   DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("device_authorizations")
+}

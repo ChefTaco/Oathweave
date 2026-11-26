@@ -18,7 +18,7 @@ append-only audit trail. It is the identity service of the
 ## Features
 
 - RS256 access tokens, rotating refresh tokens, JWKS and OIDC discovery
-- OAuth 2.0 Authorization Code + PKCE and Client Credentials flows
+- OAuth 2.0 Authorization Code + PKCE, Client Credentials and Device Authorization (RFC 8628) flows
 - Users, roles, groups, service accounts and per-client permission allowlists
 - TOTP and WebAuthn/FIDO2 multi-factor authentication, step-up and device trust
 - Passwordless sign-in with a discoverable passkey (`POST /api/v1/mfa/webauthn/passwordless/options`,
@@ -258,6 +258,14 @@ set `JWT_ISSUER` and `IAM_PUBLIC_URL` to the same HTTPS URL. id_tokens carry `au
 and the `profile` (`preferred_username`, `name`) and `email` (`email`, `email_verified`) claims
 the granted scope asks for; UserInfo follows the same scope. Users list and end their own
 sessions with `GET /api/v1/auth/sessions` and `DELETE /api/v1/auth/sessions/:id`.
+
+The device authorization grant (RFC 8628) signs a person in on a CLI or headless agent without
+the device seeing a password. Give the client the
+`urn:ietf:params:oauth:grant-type:device_code` grant and set `IAM_DEVICE_VERIFICATION_URL` to the
+page where people enter the code. The device calls `POST /api/v1/oauth/device_authorization`,
+shows `user_code` and `verification_uri`, and polls `POST /api/v1/oauth/token`; the page reads the
+request with `GET /api/v1/oauth/device?user_code=` and approves or denies it with
+`POST /api/v1/oauth/device` for the signed-in person.
 The OpenAPI document is served at `/api/docs/openapi.json`, with Swagger UI at
 `/api/docs`.
 

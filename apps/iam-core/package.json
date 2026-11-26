@@ -311,6 +311,14 @@
         "impact": "fast",
         "readableBy": "^1.2.2",
         "note": "Record the OAuth scope of refresh tokens and the authentication time of authorization codes. Older binaries reject this migration history; retain verified recovery backups."
+      },
+      {
+        "component": "iam",
+        "id": "20261126000300_device_authorization",
+        "checksum": "9921cc9bb640301b46c171c7bd059249a520d37ae3364cf156a4d73db8d8635b",
+        "impact": "fast",
+        "readableBy": "^1.2.2",
+        "note": "Add the device authorization grant table. Older binaries reject this migration history; retain verified recovery backups."
       }
     ],
     "wireCompatibility": {
