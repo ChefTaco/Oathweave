@@ -16,6 +16,21 @@ const mocks = vi.hoisted(() => ({
   audit: vi.fn(),
 }))
 vi.mock('../db/client.js', () => ({ prisma: {} }))
+// The token endpoint's per-address limiter; this suite never reaches its ceiling.
+vi.mock('../queue/audit-queue.js', () => ({
+  redisConnection: {
+    pipeline: () => {
+      const chain = {
+        zremrangebyscore: () => chain,
+        zadd: () => chain,
+        zcard: () => chain,
+        pexpire: () => chain,
+        exec: async () => [null, null, [null, 1], null],
+      }
+      return chain
+    },
+  },
+}))
 vi.mock('../config/env.js', () => ({
   env: { JWT_ISSUER: 'https://identity.example.com' },
 }))
