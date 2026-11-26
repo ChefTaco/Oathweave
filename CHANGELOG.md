@@ -82,6 +82,12 @@ Tokens issued without a scope, such as native sign-in, keep every claim.
 - **A conformance test in CI.** `oauth4webapi`, which validates responses strictly, runs the
   discovery, code + PKCE, id_token, UserInfo, refresh, introspection, revocation and logout flows
   against the real server.
+- **Passwordless passkey sign-in.** `POST /mfa/webauthn/passwordless/options` returns options
+  for a discoverable passkey (no `allowCredentials`, user verification required) bound to a
+  random `ceremonyId`; `POST /mfa/webauthn/passwordless/authenticate` verifies the assertion and
+  signs its owner in, with the browser SSO cookie when `X-Oathweave-Browser` is sent. Disabled
+  and locked accounts and the user's IP allowlist are refused as at password sign-in; the
+  passkey's counter advances as for MFA. `IAM_PASSWORDLESS_PASSKEYS=false` turns it off.
 
 ### Changed
 

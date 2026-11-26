@@ -21,6 +21,8 @@ append-only audit trail. It is the identity service of the
 - OAuth 2.0 Authorization Code + PKCE and Client Credentials flows
 - Users, roles, groups, service accounts and per-client permission allowlists
 - TOTP and WebAuthn/FIDO2 multi-factor authentication, step-up and device trust
+- Passwordless sign-in with a discoverable passkey (`POST /api/v1/mfa/webauthn/passwordless/options`,
+  then `/passwordless/authenticate`); `IAM_PASSWORDLESS_PASSKEYS=false` turns it off
 - Argon2id password hashing, password policy and breach checks
 - Append-only daily JSONL audit files plus queryable audit APIs
 - Liveness and readiness endpoints; SQLite storage, no external database

@@ -3838,6 +3838,48 @@
         ],
         "type": "object"
       },
+      "PasswordlessAuthenticationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "ceremonyId": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          },
+          "response": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "ceremonyId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "PasswordlessOptionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ceremonyId": {
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "success": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "ceremonyId"
+        ],
+        "type": "object"
+      },
       "PasswordPolicy": {
         "properties": {
           "historyCount": {
@@ -7571,6 +7613,112 @@
             "BearerAuth": []
           }
         ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/passwordless/authenticate": {
+      "post": {
+        "operationId": "passwordlessPasskeySignIn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordlessAuthenticationRequest"
+              }
+            }
+          },
+          "description": "",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          }
+        },
+        "summary": "Sign in with the passkey alone. The response is the passkey sign-in response; with X-Oathweave-Browser the browser SSO cookie is set instead of returning tokens",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/mfa/webauthn/passwordless/options": {
+      "post": {
+        "operationId": "passwordlessPasskeyOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordlessOptionsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Too many requests, or too many failed client authentications from this address; see Retry-After"
+          }
+        },
+        "summary": "Start a passwordless sign-in: options for a discoverable passkey (user verification required), bound to the returned ceremonyId. 404 when IAM_PASSWORDLESS_PASSKEYS=false",
         "tags": [
           "Auth"
         ]

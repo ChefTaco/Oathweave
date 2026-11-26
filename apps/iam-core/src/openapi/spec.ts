@@ -46,6 +46,8 @@ import {
   PasskeyAuthenticationOptionsSchema,
   PasskeyOptionsResponseSchema,
   PasskeyCredentialSchema,
+  PasswordlessAuthenticationSchema,
+  PasswordlessOptionsResponseSchema,
   MfaStatusSchema,
   RecoveryCodesSchema,
 } from '../schemas/webauthn.js'
@@ -176,6 +178,8 @@ export function buildOpenApiSpec() {
     ),
     PasskeyOptionsResponse: zod(PasskeyOptionsResponseSchema),
     PasskeyCredential: zod(PasskeyCredentialSchema),
+    PasswordlessAuthenticationRequest: zod(PasswordlessAuthenticationSchema),
+    PasswordlessOptionsResponse: zod(PasswordlessOptionsResponseSchema),
     MfaStatus: zod(MfaStatusSchema),
     RecoveryCodes: zod(RecoveryCodesSchema),
     AuthorizeConsentRequest: zod(AuthorizeConsentSchema),
@@ -1555,6 +1559,17 @@ export function buildOpenApiSpec() {
     tags: ['Auth'], operationId: path.includes('openid') ? 'issuerOpenIdConfiguration' : 'issuerAuthorizationServerMetadata',
     summary: 'Native discovery at the issuer (also under an HTTPS JWT_ISSUER\'s path); the same document as /api/v1/oauth/.well-known/openid-configuration',
     responses: { 200: { description: 'Native discovery metadata' }, 503: { description: 'No IAM_PUBLIC_URL and JWT_ISSUER is not an HTTPS URL' } },
+  } }
+  paths['/api/v1/mfa/webauthn/passwordless/options'] = { post: {
+    tags: ['Auth'], operationId: 'passwordlessPasskeyOptions',
+    summary: 'Start a passwordless sign-in: options for a discoverable passkey (user verification required), bound to the returned ceremonyId. 404 when IAM_PASSWORDLESS_PASSKEYS=false',
+    responses: { ...success(ref('PasswordlessOptionsResponse')), 404: err404, 429: err429 },
+  } }
+  paths['/api/v1/mfa/webauthn/passwordless/authenticate'] = { post: {
+    tags: ['Auth'], operationId: 'passwordlessPasskeySignIn',
+    summary: 'Sign in with the passkey alone. The response is the passkey sign-in response; with X-Oathweave-Browser the browser SSO cookie is set instead of returning tokens',
+    requestBody: jsonBody(ref('PasswordlessAuthenticationRequest')),
+    responses: { 200: { description: 'Signed in' }, 400: err400, 401: err401, 404: err404, 429: err429 },
   } }
   paths['/api/v1/oauth/.well-known/openid-configuration'] = { get: {
     tags: ['Auth'], operationId: 'discoverOpenIdConfiguration',

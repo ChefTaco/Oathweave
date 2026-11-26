@@ -75,6 +75,13 @@ export const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
 
+  // Sign in with a discoverable passkey alone (user verification required). `false` keeps
+  // passkeys a second factor after the password.
+  IAM_PASSWORDLESS_PASSKEYS: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+
   IAM_AGENT_SECRET: z.string().min(16),
   IAM_MACHINE_CLIENT_POLICIES: z.string().optional(),
   IAM_MACHINE_CLIENT_SECRETS: z.string().optional(),
