@@ -29,8 +29,8 @@ advisory will credit you unless you ask not to be named.
 - Guard the `hive-router` client secret like an administrator password. A `client_credentials`
   token for it can hold `iam:users:*`, `iam:roles:write`, `iam:groups:write`, `iam:clients:write`,
   `iam:policy:write` and `iam:sessions:revoke`: whoever holds the secret can read and change every
-  account, role, group and client. The model gateway's console proxy uses it on behalf of a signed-in console operator,
-  whom it names in `x-hive-operator`. Oathweave refuses a write made with this token that names
+  account, role, group and client. The model gateway's console proxy uses it on behalf of a
+  signed-in console operator, whom it names in `x-hive-operator`. Oathweave refuses a write made with this token that names
   no operator (the token alone is read-only), and checks operators signed in through Oathweave
   (`authMode: "iam-oidc"`) as themselves. Operators the gateway signs in by host account
   (`authMode: "os"`) act unrestricted, so restrict who can reach that console.

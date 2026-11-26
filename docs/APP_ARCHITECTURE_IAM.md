@@ -33,7 +33,7 @@ The shared secret for this flow is stored in IAM env as `SEED_HIVE_ROUTER_CLIENT
 - A first install writes the seed value into `/opt/hive-iam/.env`.
 - Existing hosts missing `SEED_HIVE_ROUTER_CLIENT_SECRET` fail deployment rather than silently replacing an unrecoverable credential. Recovery or rotation must use the audited IAM client lifecycle.
 - Router deploy recovers the value from `HIVE_ROUTER_IAM_CLIENT_SECRET` or protected `/opt/hive-iam/.env` using sudo.
-- `HIVE_ROUTER_IAM_PROXY_SCOPES` controls the permissions requested for `/api/iam/*`. IAM grants only those within the `hive-router` client policy (`apps/iam-core/src/services/client-policies.ts`): user, role, group, service account and client reads and writes, `iam:policy:write`, `iam:audit:read`, `iam:sessions:revoke`, `iam:system:login` and `iam:tokens:introspect`.
+- `HIVE_ROUTER_IAM_PROXY_SCOPES` controls the permissions requested for `/api/iam/*`. IAM grants only those within the `hive-router` client policy (`apps/iam-core/src/services/client-policies.ts`): reads and writes of users, roles, groups, service accounts and clients, deletes of users and service accounts, `iam:policy:write`, `iam:audit:read`, `iam:sessions:revoke`, `iam:system:login` and `iam:tokens:introspect`.
 
 Routine seed is metadata-idempotent and preserves every existing confidential
 client hash even when a seed secret is supplied. Credential rotation is an
