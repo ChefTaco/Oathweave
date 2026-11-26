@@ -8,7 +8,12 @@ policy (`lockoutAttempts`, default 5, and `lockoutDurationMin`, default 15) inst
 throttle; an installation that changed those variables to tune lockout should set the policy
 (`PATCH /api/v1/password-policy`) instead. Native discovery no longer derives URLs from the
 request: set `IAM_PUBLIC_URL` to the server's public HTTPS URL (unless `JWT_ISSUER` already is
-one), or `GET /api/v1/oauth/.well-known/openid-configuration` answers 503. `POST /tokens/introspect`
+one), or `GET /api/v1/oauth/.well-known/openid-configuration` answers 503. Hive suite installs
+(non-URL `JWT_ISSUER` `oathweave-<installation>`) are affected only in that native discovery
+answers 503: nothing in the suite reads it, and `/oauth/jwks`, sign-in, UserInfo and every grant
+work without `IAM_PUBLIC_URL`. The suite controller should set `IAM_PUBLIC_URL` to the Oathweave
+endpoint the suite products use, `https://oathweave:4200` by default (not the ingress origin,
+which serves `/api/v1` at `/api/oathweave`); see the README's "Managed upgrades". `POST /tokens/introspect`
 and `POST /tokens/revoke` act only on tokens issued to the calling client unless its machine
 client policy grants `iam:tokens:introspect` or `iam:tokens:revoke`; introspection's `scope`
 member is now the token's OAuth scope rather than its permissions (still in `permissions`). A
