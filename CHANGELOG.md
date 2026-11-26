@@ -1,5 +1,53 @@
 # Changelog
 
+## [Unreleased]
+
+**Upgrade notes.** No database migration and no settings change. Group role assignments now
+reach tokens, so a user who is a member of a group gains that group's roles and permissions at
+their next sign-in or refresh; review group role assignments before upgrading. A confidential
+client must now send its client secret on the `refresh_token` grant, as it already must for code
+exchange. Refresh tokens stop working at their session's hard expiry (`JWT_REFRESH_TTL` after
+sign-in). HTTP Basic client credentials are form-URL-decoded as RFC 6749 requires: a client that
+sends a secret containing `%` or `+` unencoded in Basic must encode it, or send it in the body.
+
+### Security
+
+- **Group role assignments grant permissions.** Sign-in, the MFA challenge, authorization-code
+  exchange and refresh built a token's `roles` and `permissions` from directly assigned roles only,
+  so roles assigned through a group had no effect on tokens, while the privilege guard counted
+  them. All of these, the privilege guard (including Router operators signed in through IAM) and
+  `getEffectivePermissions` now share one effective-grants path: direct roles plus group roles.
+- **The token endpoint and client-authenticated token routes are throttled.** `POST /oauth/token`,
+  `POST /tokens/introspect` and `POST /tokens/revoke` are rate-limited per address (300 requests a
+  minute). Failed client authentications (unknown or inactive client, missing or wrong secret) are
+  counted per address and per client from that address; past 10 failures for one client or 30 for
+  the address within five minutes, the address is refused with 429 before any secret is verified.
+  Successful authentications are not counted. `RELAX_AUTH_LIMITS` raises these ceilings, and
+  `scripts/reset-iam-locks.sh` clears them.
+- **Refresh stops at the session's hard expiry.** Rotation refused a revoked session but not an
+  expired one, and every rotation issued a refresh token with a fresh lifetime, so a session past
+  its expiry kept minting access tokens that offline verifiers accept. Rotation now refuses an
+  expired session and never issues a refresh token that outlives its session. It also refuses a
+  token whose client is inactive, deleted or no longer has the `refresh_token` grant.
+- **Confidential clients authenticate on refresh (RFC 6749 §6).** The `refresh_token` grant now
+  requires a confidential client's secret. Every binding and client check runs before the token is
+  consumed, so a request with the wrong `client_id` no longer burns the rightful holder's token.
+- **Refresh-token replay revokes the session.** Presenting a refresh token that was already rotated
+  or revoked now revokes its session and every refresh token in it, and records a
+  `token.refresh_reuse` audit event (RFC 9700 §4.14.2).
+- **TOTP codes are single-use (RFC 6238 §5.2).** Sign-in MFA, step-up, MFA confirmation and MFA
+  disable claim the code's time step per user; the same code, or a code from an earlier step, is
+  refused once a step was accepted.
+
+### Fixed
+
+- **`client_secret_basic` works on its own.** The token endpoint takes the client id from the
+  Basic username, so a client no longer has to repeat `client_id` in the body; a body `client_id`
+  that differs from the Basic username is refused. Both values are form-URL-decoded.
+- **`id_token` is issued only for an exact `openid` scope token**, not for any scope containing the
+  substring. A `client_credentials` response now reports the scope that was granted (the requested
+  permissions the client may hold), not the scope that was requested.
+
 ## [2.3.3] - 2026-11-24
 
 **Upgrade notes.** No database migration and no settings change. Replace the image with

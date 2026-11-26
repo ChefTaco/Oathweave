@@ -14,8 +14,9 @@ import { ApiError } from '../types/index.js'
 import { getPublishedSigningJwks } from '../utils/keys.js'
 import { issueTokenPair } from './token-service.js'
 import { createSession } from './session-service.js'
+import { userTokenGrants } from './effective-grants.js'
 import { logAuditEvent } from './audit-service.js'
-import argon2 from 'argon2'
+import { assertClientAuthAllowed, recordClientAuthFailure, verifyClientSecret } from './client-auth-guard.js'
 
 // ── Constants ──
 
@@ -204,44 +205,48 @@ export async function validateAuthorizeRequest(params: AuthorizeParams): Promise
 // ── Token Exchange ──
 
 /** A client as the token endpoint knows it once its credentials have been checked. */
-export interface CodeExchangeClient {
+export interface TokenEndpointClient {
   clientType: string
   /** True when the request carried this client's secret and it verified. */
   authenticated: boolean
 }
 
 /**
- * Identify the client of an authorization-code exchange and check the credentials it presented.
+ * Identify the client of a token request and check the credentials it presented.
  *
- * A confidential client must authenticate: without its secret the exchange is refused, whether or
- * not the code carries a PKCE challenge. A public client has no secret and is bound to its code by
- * PKCE alone, which `exchangeAuthorizationCode` requires. Every refusal is `invalid_client` (401).
+ * A confidential client must authenticate: without its secret the request is refused. A public
+ * client has no secret; an authorization-code exchange binds it to its code by PKCE alone, which
+ * `exchangeAuthorizationCode` requires. Every refusal is `invalid_client` (401) and counts as a
+ * failed client authentication; an address over its failure ceiling is refused (429) before any
+ * secret is verified.
  */
-export async function authenticateCodeExchangeClient(
+export async function authenticateTokenClient(
   clientId: string,
   presentedSecret: string | undefined,
-): Promise<CodeExchangeClient> {
-  const client = await prisma.client.findUnique({ where: { id: clientId } })
-  if (!client || !client.active) {
-    throw new ApiError(401, 'INVALID_CLIENT', 'Unknown or inactive client')
+  ipAddress: string,
+): Promise<TokenEndpointClient> {
+  await assertClientAuthAllowed(ipAddress, clientId)
+  const refuse = async (message: string): Promise<never> => {
+    await recordClientAuthFailure(ipAddress, clientId)
+    throw new ApiError(401, 'INVALID_CLIENT', message)
   }
+  const client = await prisma.client.findUnique({ where: { id: clientId } })
+  if (!client || !client.active) return refuse('Unknown or inactive client')
   const confidential = client.clientType !== 'public'
   if (presentedSecret === undefined || presentedSecret === '') {
     if (confidential) {
-      throw new ApiError(401, 'INVALID_CLIENT', 'Client authentication required: this confidential client must send its client secret')
+      return refuse('Client authentication required: this confidential client must send its client secret')
     }
     return { clientType: client.clientType, authenticated: false }
   }
   if (!client.secretHash) {
-    throw new ApiError(
-      401,
-      'INVALID_CLIENT',
+    return refuse(
       confidential
-        ? 'This confidential client has no secret; set one before it exchanges authorization codes'
+        ? 'This confidential client has no secret; set one before it uses the token endpoint'
         : 'Public clients cannot authenticate with a secret',
     )
   }
-  if (!(await argon2.verify(client.secretHash, presentedSecret))) {
+  if (!(await verifyClientSecret(ipAddress, clientId, client.secretHash, presentedSecret))) {
     throw new ApiError(401, 'INVALID_CLIENT', 'Invalid client secret')
   }
   return { clientType: client.clientType, authenticated: true }
@@ -278,7 +283,7 @@ export async function exchangeAuthorizationCode(
   const authCode = await prisma.authorizationCode.findUnique({
     where: { code: params.code },
     include: {
-      user: { include: { roles: { include: { role: true } } } },
+      user: true,
       client: true,
     },
   })
@@ -364,15 +369,7 @@ export async function exchangeAuthorizationCode(
   }
 
   // Issue tokens
-  const roles = authCode.user.roles.map((r) => r.role.name)
-  const permissions: string[] = [
-    ...new Set(
-      authCode.user.roles.flatMap((r) => {
-        const perms = r.role.permissions
-        return (typeof perms === 'string' ? JSON.parse(perms) : perms) as string[]
-      }),
-    ),
-  ]
+  const { roles, permissions } = await userTokenGrants(authCode.userId)
 
   const sessionId = authCode.browserSessionId ?? (await createSession(authCode.userId, ipAddress)).sessionId
   const tokenPair = await issueTokenPair(
@@ -443,8 +440,10 @@ export async function exchangeClientCredentials(
     throw new ApiError(400, 'UNAUTHORIZED_CLIENT', 'Client is not authorized for client_credentials grant')
   }
 
-  const { issueClientCredentialsToken, lifetimeForClientCredentials } = await import('./token-service.js')
+  const { issueClientCredentialsToken, lifetimeForClientCredentials, permissionsForClientCredentials } = await import('./token-service.js')
   const accessToken = await issueClientCredentialsToken(clientId, client.name, scope)
+  // The response names the scope that was granted: the requested permissions this client may hold.
+  const granted = permissionsForClientCredentials(clientId, scope).join(' ')
 
   await logAuditEvent({
     eventType: 'oauth.client_credentials',
@@ -462,7 +461,7 @@ export async function exchangeClientCredentials(
     accessToken,
     expiresIn: lifetimeForClientCredentials(clientId),
     tokenType: 'Bearer',
-    ...(scope !== undefined ? { scope } : {}),
+    ...(granted ? { scope: granted } : {}),
   }
 }
 

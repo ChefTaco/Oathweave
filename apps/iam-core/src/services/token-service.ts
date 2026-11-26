@@ -10,7 +10,9 @@ import {
   getPublishedSigningJwks,
   getSigningKeyId,
 } from '../utils/keys.js'
-import { createSession } from '../services/session-service.js'
+import { createSession, revokeSession } from '../services/session-service.js'
+import { logAuditEvent } from './audit-service.js'
+import { userTokenGrants } from './effective-grants.js'
 import { ApiError } from '../types/index.js'
 import type { Principal, TokenPair } from '../types/index.js'
 
@@ -124,6 +126,8 @@ export async function issueTokenPair(
   ipAddress?: string,
   clientId?: string,
   userAgent?: string,
+  /** The session's hard expiry: the refresh token never outlives it. */
+  refreshNotAfter?: Date,
 ): Promise<TokenPair> {
   const privateKey = await getPrivateKey()
   const signingKeyId = await getSigningKeyId()
@@ -164,7 +168,9 @@ export async function issueTokenPair(
       ipAddress: ipAddress ?? null,
       clientId: clientId ?? null,
       userAgent: userAgent ?? null,
-      expiresAt: new Date(Date.now() + env.JWT_REFRESH_TTL * 1000),
+      expiresAt: new Date(
+        Math.min(Date.now() + env.JWT_REFRESH_TTL * 1000, refreshNotAfter?.getTime() ?? Infinity),
+      ),
     },
   })
 
@@ -302,65 +308,117 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
   }
 }
 
+export interface RefreshClientContext {
+  /** True when the token request authenticated its client with the client's secret. */
+  clientAuthenticated?: boolean
+}
+
+function invalidRefreshToken(message = 'Refresh token is invalid or expired'): ApiError {
+  return new ApiError(401, 'INVALID_REFRESH_TOKEN', message)
+}
+
+/**
+ * A refresh token that was already rotated or revoked was presented again. Either its rightful
+ * client or whoever copied it is replaying it, and the server cannot tell which, so the session
+ * (and with it every refresh token of the family) is revoked (RFC 9700 §4.14.2).
+ */
+async function revokeReplayedRefreshSession(
+  token: { userId: string; sessionId: string | null; clientId: string | null },
+  ipAddress?: string,
+): Promise<void> {
+  if (!token.sessionId) return
+  const live = await prisma.session.findFirst({
+    where: { id: token.sessionId, userId: token.userId, revokedAt: null },
+    select: { id: true },
+  })
+  if (!live) return
+  await revokeSession(token.sessionId)
+  await logAuditEvent({
+    eventType: 'token.refresh_reuse',
+    category: 'TOKEN',
+    actorId: token.userId,
+    actorType: 'USER',
+    ipAddress,
+    action: 'refresh_token_reuse',
+    outcome: 'DENIED',
+    detail: { sessionId: token.sessionId, clientId: token.clientId, sessionRevoked: true },
+    source: 'iam-api',
+  })
+}
+
 export async function rotateRefreshToken(
   rawToken: string,
   ipAddress?: string,
   clientId?: string,
   userAgent?: string,
+  context: RefreshClientContext = {},
 ): Promise<TokenPair> {
   const hash = hashToken(rawToken)
+  const now = new Date()
 
-  // Atomic revocation: only revoke if still valid (prevents TOCTOU race)
-  const revoked = await prisma.refreshToken.updateMany({
-    where: { tokenHash: hash, revokedAt: null, expiresAt: { gt: new Date() } },
-    data: { revokedAt: new Date() },
-  })
-
-  if (revoked.count === 0) {
-    throw new ApiError(401, 'INVALID_REFRESH_TOKEN', 'Refresh token is invalid or expired')
-  }
-
-  // Fetch the revoked token to get userId/sessionId
   const existing = await prisma.refreshToken.findUnique({ where: { tokenHash: hash } })
-  if (!existing) {
-    throw new ApiError(401, 'INVALID_REFRESH_TOKEN', 'Refresh token not found')
+  if (!existing) throw invalidRefreshToken()
+  if (existing.revokedAt) {
+    await revokeReplayedRefreshSession(existing, ipAddress)
+    throw invalidRefreshToken()
   }
+  if (existing.expiresAt <= now) throw invalidRefreshToken()
 
-  // Validate token binding: clientId must match if the original token was bound
+  // Every check runs before the token is consumed, so a request that fails one of them (another
+  // client's id, a missing client secret) does not burn the rightful holder's token.
+
+  // Token binding: the clientId must match if the original token was bound.
   if (existing.clientId && existing.clientId !== clientId) {
     throw new ApiError(401, 'TOKEN_BINDING_MISMATCH', 'Refresh token was issued to a different client')
+  }
+  if (existing.clientId) {
+    const client = await prisma.client.findUnique({
+      where: { id: existing.clientId },
+      select: { active: true, clientType: true, grantTypes: true },
+    })
+    if (!client || !client.active) throw new ApiError(401, 'INVALID_CLIENT', 'Unknown or inactive client')
+    // RFC 6749 §6: a confidential client authenticates to refresh.
+    if (client.clientType !== 'public' && context.clientAuthenticated !== true) {
+      throw new ApiError(401, 'INVALID_CLIENT', 'Client authentication required: this confidential client must send its client secret')
+    }
+    if (!parseGrantTypes(client.grantTypes).includes('refresh_token')) {
+      throw new ApiError(400, 'UNAUTHORIZED_CLIENT', 'Client is not authorized for the refresh_token grant')
+    }
   }
 
   // A refresh token dies with its session. Paths that revoke only the session row
   // (administrator password resets, browser sign-out) must not leave a token that
-  // keeps minting access tokens which offline verifiers still accept.
+  // keeps minting access tokens which offline verifiers still accept. Rotation never
+  // extends a session past its hard expiry.
+  let sessionExpiresAt: Date | undefined
   if (existing.sessionId) {
     const session = await prisma.session.findUnique({
       where: { id: existing.sessionId },
-      select: { userId: true, revokedAt: true },
+      select: { userId: true, revokedAt: true, expiresAt: true },
     })
     if (!session || session.userId !== existing.userId || session.revokedAt) {
-      throw new ApiError(401, 'INVALID_REFRESH_TOKEN', 'Refresh token session has been revoked')
+      throw invalidRefreshToken('Refresh token session has been revoked')
     }
+    if (session.expiresAt <= now) throw invalidRefreshToken('Refresh token session has expired')
+    sessionExpiresAt = session.expiresAt
   }
 
-  // Fetch user + roles
   const user = await prisma.user.findUnique({
     where: { id: existing.userId },
-    include: { roles: { include: { role: true } } },
+    select: { id: true, email: true, username: true, active: true },
   })
-
   if (!user || !user.active) {
     throw new ApiError(401, 'USER_INACTIVE', 'User account is disabled')
   }
 
-  const roles = user.roles.map((r) => r.role.name)
-  const permissions: string[] = [
-    ...new Set(user.roles.flatMap((r) => {
-      const perms = r.role.permissions
-      return (typeof perms === 'string' ? JSON.parse(perms) : perms) as string[]
-    })),
-  ]
+  // Atomic consumption: only one request can rotate a given token (prevents TOCTOU races).
+  const consumed = await prisma.refreshToken.updateMany({
+    where: { tokenHash: hash, revokedAt: null, expiresAt: { gt: now } },
+    data: { revokedAt: now },
+  })
+  if (consumed.count === 0) throw invalidRefreshToken()
+
+  const { roles, permissions } = await userTokenGrants(user.id)
 
   // Ensure we have a valid session — create one if orphaned
   let sessionId = existing.sessionId
@@ -382,7 +440,17 @@ export async function rotateRefreshToken(
     // otherwise choose the clientId, audience and issuer of the new access token.
     existing.clientId ?? undefined,
     userAgent,
+    sessionExpiresAt,
   )
+}
+
+function parseGrantTypes(value: unknown): string[] {
+  try {
+    const parsed: unknown = typeof value === 'string' ? JSON.parse(value) : value
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
+  } catch {
+    return []
+  }
 }
 
 export async function revokeRefreshToken(rawToken: string): Promise<void> {

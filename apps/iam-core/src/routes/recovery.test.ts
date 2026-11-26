@@ -48,6 +48,7 @@ vi.mock('../services/login-challenge.js', () => ({
 vi.mock('../services/mfa-service.js', () => ({
   verifyBackupCode: async () => 0,
   verifyTotpCode: () => false,
+  consumeTotpCode: async () => false,
   generateTotpSecret: vi.fn(),
   generateBackupCodes: vi.fn(),
 }))

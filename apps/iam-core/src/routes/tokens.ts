@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { clientAuthMiddleware } from '../middleware/client-auth.js'
+import { clientEndpointRateLimit } from '../services/client-auth-guard.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { introspectToken, revokeRefreshToken, verifyAccessToken } from '../services/token-service.js'
 import { revokeSession } from '../services/session-service.js'
@@ -19,7 +20,7 @@ const OAuthRevokeSchema = z.object({
 })
 
 // POST /tokens/introspect — callable by registered clients (RFC 7662 compliant)
-tokensRouter.post('/introspect', clientAuthMiddleware, async (c) => {
+tokensRouter.post('/introspect', clientEndpointRateLimit('rl:introspect'), clientAuthMiddleware, async (c) => {
   const { token } = await parseBody(c, IntrospectSchema)
   const clientId = c.get('clientId')
   const result = await introspectToken(token)
@@ -58,7 +59,7 @@ tokensRouter.post('/introspect', clientAuthMiddleware, async (c) => {
 })
 
 // POST /tokens/revoke — RFC 7009 token revocation (client-authenticated)
-tokensRouter.post('/revoke', clientAuthMiddleware, async (c) => {
+tokensRouter.post('/revoke', clientEndpointRateLimit('rl:revoke'), clientAuthMiddleware, async (c) => {
   const { token, token_type_hint } = await parseBody(c, OAuthRevokeSchema)
   const clientId = c.get('clientId')
 
