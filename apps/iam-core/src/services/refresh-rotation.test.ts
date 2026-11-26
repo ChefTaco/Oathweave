@@ -41,6 +41,8 @@ vi.stubEnv(
     },
   }),
 )
+// The retry window's store: in memory, empty unless a rotation in the test filled it.
+vi.mock('../queue/audit-queue.js', async () => (await import('../test-support/fake-redis.js')).auditQueueModule)
 vi.mock('../utils/keys.js', () => ({
   getPrivateKey: async () => state.keys.privateKey,
   getSigningKeyId: async () => 'fixture-kid',
