@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && node --test scripts/check-node-runtime.test.mjs scripts/workflow-pins.test.mjs",
+    "test": "npm run test --workspaces --if-present && node --test scripts/check-node-runtime.test.mjs scripts/workflow-pins.test.mjs scripts/check-doc-versions.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "iam-core:build": "npm --workspace @hivemagnus/oathweave run build",
     "iam-core:test": "npm --workspace @hivemagnus/oathweave test",
@@ -22,6 +22,7 @@
     "deploy:iam-core": "bash scripts/deploy-iam-core.sh",
     "scan:secrets": "bash scripts/scan-secrets.sh",
     "check:private": "bash scripts/check-private-data.sh",
+    "check:doc-versions": "node scripts/check-doc-versions.mjs",
     "hooks:install": "git config core.hooksPath .githooks",
     "bootstrap": "npm ci --ignore-scripts && npm --prefix tooling/release ci --ignore-scripts && npm run hooks:install",
     "generate:openapi": "tsx scripts/openapi.ts --write",

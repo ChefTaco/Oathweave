@@ -8,15 +8,21 @@ permissions:
   contents: read
 jobs:
   verify:
+    name: verify (Node ${{ matrix.node-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The image runs on the Node 26 runtime image; 24 is the oldest supported line.
+        node-version: [24.22.3, 26.13.1]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 24.22.3
+          node-version: ${{ matrix.node-version }}
       - run: sudo apt-get update -qq && sudo apt-get install -y ripgrep
       - run: npm run bootstrap
       - run: npm rebuild argon2 --ignore-scripts=false
@@ -25,6 +31,7 @@ jobs:
       - run: npm test
       - run: npm run check:openapi
       - run: npm run check:browser
+      - run: npm run check:doc-versions
       - run: bash scripts/privacy-output.test.sh
       - run: npm run scan:secrets
       - run: npm run check:private

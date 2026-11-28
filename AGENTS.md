@@ -29,7 +29,7 @@ committing run the CI gates:
 
 ```bash
 npm run typecheck && npm run build && npm test
-npm run check:openapi && npm run check:browser
+npm run check:openapi && npm run check:browser && npm run check:doc-versions
 npm run scan:secrets && npm run check:private
 ```
 
