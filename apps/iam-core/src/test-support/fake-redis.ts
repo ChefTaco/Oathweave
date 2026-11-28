@@ -90,6 +90,18 @@ export class FakeRedis extends EventEmitter {
         ops.push(() => set(key).push(Number(score)))
         return chain
       },
+      /** Remove ranks `start..stop` (inclusive, negative counts from the highest score), as Redis. */
+      zremrangebyrank: (key: string, start: number, stop: number) => {
+        ops.push(() => {
+          const scores = set(key).sort((a, b) => a - b)
+          const from = start < 0 ? Math.max(0, scores.length + start) : start
+          const to = stop < 0 ? scores.length + stop : Math.min(stop, scores.length - 1)
+          if (from > to) return 0
+          scores.splice(from, to - from + 1)
+          return to - from + 1
+        })
+        return chain
+      },
       zcard: (key: string) => {
         ops.push(() => set(key).length)
         return chain

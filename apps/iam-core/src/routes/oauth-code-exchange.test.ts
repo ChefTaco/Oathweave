@@ -79,6 +79,14 @@ vi.mock('../queue/audit-queue.js', () => ({
           ops.push(() => set(key).push(score))
           return chain
         },
+        zremrangebyrank: (key: string, start: number, stop: number) => {
+          ops.push(() => {
+            const scores = set(key).sort((a, b) => a - b)
+            const to = stop < 0 ? scores.length + stop : stop
+            return scores.splice(start, Math.max(0, to - start + 1)).length
+          })
+          return chain
+        },
         zcard: (key: string) => {
           ops.push(() => set(key).length)
           return chain

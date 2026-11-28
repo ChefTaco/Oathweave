@@ -41,9 +41,10 @@ vi.mock('../queue/audit-queue.js', () => ({
     pipeline: () => ({
       zremrangebyscore: () => undefined,
       zadd: () => undefined,
+      zremrangebyrank: () => undefined,
       zcard: () => undefined,
       pexpire: () => undefined,
-      exec: async () => [null, null, [null, ++state.redisCount], null],
+      exec: async () => [[null, 0], [null, 1], [null, 0], [null, ++state.redisCount], [null, 1]],
     }),
     set: vi.fn(),
   },

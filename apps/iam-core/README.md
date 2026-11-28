@@ -150,7 +150,7 @@ directory; prefer absolute paths.
 | `AUDIT_LOG_DIR` | | `$IAM_DATA_DIR/audit-logs` | Daily JSONL audit files |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_RP_ORIGIN` | | `localhost` / `https://localhost` | WebAuthn relying party, e.g. `hive.example.com` / `https://hive.example.com` |
 | `IAM_PUBLIC_URL` | | | Public HTTPS URL of this server; discovery metadata names endpoints under it (falls back to an HTTPS `JWT_ISSUER`; 503 otherwise) |
-| `TRUSTED_PROXY_IPS` | | | Reverse proxies whose `X-Forwarded-For` is believed: comma-separated addresses, CIDR ranges or IPv4 wildcards. See [Client addresses](#client-addresses) |
+| `TRUSTED_PROXY_IPS` | | | Reverse proxies whose `X-Forwarded-For` is believed: comma-separated addresses, CIDR ranges, IPv4 wildcards (`10.*.*.*`) or the presets `loopback`, `private`, `linklocal`. See [Client addresses](#client-addresses) |
 
 `hive-iam-server env-schema` prints the full list as JSON. Further options
 (token lifetimes, rate limits, previous signing keys for rotation,
@@ -175,7 +175,10 @@ balancer in front of the reverse proxy): a tier that is not listed is taken to b
 `X-Real-IP` is read only when a trusted proxy sends no `X-Forwarded-For`.
 The walk is HiveCommon's `resolveClientAddress()` (`@hivemagnus/hive-common/rate-limit`): it
 reads at most 32 entries from the right, and addresses are normalised, so an IPv4-mapped peer
-(`::ffff:192.0.2.1`) counts as `192.0.2.1` and IPv6 is lowercase and compressed.
+(`::ffff:192.0.2.1`) counts as `192.0.2.1` and IPv6 is lowercase and compressed. The list is
+parsed by HiveCommon `trustedProxies()`; an entry it cannot use (`10.*`, a host name, an IPv6
+range such as `::/0` that would also cover IPv4 peers) is left out with a startup warning
+`TRUSTED_PROXY_IPS: ignoring "<entry>"` and the rest of the list still applies.
 
 ## TLS
 

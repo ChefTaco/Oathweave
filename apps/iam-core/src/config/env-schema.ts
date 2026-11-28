@@ -70,8 +70,9 @@ export const envSchema = z.object({
   AUDIT_FLUSH_INTERVAL_MS: z.coerce.number().default(5000),
   AUDIT_BATCH_SIZE: z.coerce.number().default(100),
 
-  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
-  RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().default(5),
+  // Whole numbers above zero: the Redis sliding window (HiveCommon) refuses anything else.
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
+  RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   // Testing only. Exactly `true` or `false`, so a typo fails closed at startup.
   RELAX_AUTH_LIMITS: z
     .enum(['true', 'false'])

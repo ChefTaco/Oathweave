@@ -2,9 +2,15 @@
 
 ## [Unreleased]
 
+**Upgrade notes.** No database migration. Check the startup log for `TRUSTED_PROXY_IPS: ignoring`
+lines: each names an entry that is no longer trusted (see Changed) and should be fixed or removed.
+`RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_ATTEMPTS` must now be whole numbers above zero; any
+other value stops the server at startup with a line naming the variable. The defaults (900000
+and 5) and the suite's settings are unaffected.
+
 ### Changed
 
-- **Client addresses use HiveCommon.** `@hivemagnus/hive-common` is now `^0.10.0`, and the
+- **Client addresses use HiveCommon.** `@hivemagnus/hive-common` is now `^0.11.0`, and the
   trusted-proxy walk behind every rate limit, IP allowlist, session risk check and audit record
   is HiveCommon `resolveClientAddress()` (`/rate-limit`). `TRUSTED_PROXY_IPS` keeps its name and
   format (exact addresses, CIDR ranges, IPv4 wildcards), empty `X-Forwarded-For` entries are still
@@ -15,9 +21,32 @@
   server listening on an IPv6 socket (`HOST=::`) sees IPv4-mapped peers; there, each user's first
   sign-in after the upgrade may count once as a new address for session risk. The container image
   and the suite listen on `0.0.0.0` and are not affected.
-- The Redis rate limiter is a HiveCommon `RateLimitStore` (`redisSlidingWindowStore`) with the
-  same sliding window, limits, Redis keys (`<REDIS_PREFIX>:rl:*`), 429 body
-  (`{"error":"RATE_LIMITED",...}`) and `Retry-After`. Refused attempts still count.
+- **The Redis rate limiter is HiveCommon's.** Oathweave's own sliding window is replaced by
+  HiveCommon `createRedisSlidingWindowStore()` (`/rate-limit`, 0.11.0) with the same window,
+  limits, Redis keys (`<REDIS_PREFIX>:rl:*`, still cleared by `scripts/reset-iam-locks.sh`),
+  429 body (`{"error":"RATE_LIMITED",...}`) and whole-window `Retry-After`. Refused attempts still
+  count. Two differences:
+  - each key's sorted set now keeps at most the newest `max + 1` entries, so a flood of refused
+    requests no longer grows Redis memory with every attempt. Which requests are allowed or
+    refused is unchanged;
+  - a Redis command that answers with an error (or an unreadable reply) now fails the request
+    with `500 INTERNAL_ERROR`. Before, such a reply was read as a count of zero and the request
+    was let through. A Redis that cannot be reached behaves as before.
+- **`TRUSTED_PROXY_IPS` is parsed by HiveCommon `trustedProxies()`**, which now accepts IPv4
+  wildcards, so Oathweave's own matcher for it is gone (the client and account IP allowlists keep
+  theirs). Exact addresses, CIDR ranges and wildcards such as `10.*.*.*` match as before. Entries
+  HiveCommon refuses never stop the server: each is left out with a startup warning
+  (`TRUSTED_PROXY_IPS: ignoring "<entry>": <reason>`). Differences:
+  - entries that never matched any address (`10.*`, `10.*.*.*` with a `/8` prefix, `010.*.*.*`,
+    `10.0.0.0/33`, a host name) are still ignored, now with that warning;
+  - a CIDR prefix with trailing characters (`10.0.0.0/8x`, `10.0.0.0/+8`) used to be read as
+    its leading digits and trusted; it is now ignored with the warning. Write it as `10.0.0.0/8`;
+  - an IPv6 range that would also cover IPv4 peers (`::/0` to `::/80`, or an IPv4-mapped network
+    such as `::ffff:10.0.0.0/8`) is ignored with the warning. Oathweave matched these against
+    IPv6 addresses only, and HiveCommon would trust every IPv4 peer for them;
+  - the HiveCommon presets `loopback`, `private` (RFC 1918 and IPv6 unique-local) and
+    `linklocal` are accepted. A list that contained one of these words used to trust nothing
+    for it.
 
 ## [2.7.0] - 2026-11-26
 
