@@ -10,7 +10,7 @@ and 5) and the suite's settings are unaffected.
 
 ### Changed
 
-- **Client addresses use HiveCommon.** `@hivemagnus/hive-common` is now `^0.11.0`, and the
+- **Client addresses use HiveCommon.** `@hivemagnus/hive-common` is now `^0.11.1`, and the
   trusted-proxy walk behind every rate limit, IP allowlist, session risk check and audit record
   is HiveCommon `resolveClientAddress()` (`/rate-limit`). `TRUSTED_PROXY_IPS` keeps its name and
   format (exact addresses, CIDR ranges, IPv4 wildcards), empty `X-Forwarded-For` entries are still
