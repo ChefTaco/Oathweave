@@ -73,6 +73,8 @@ export async function introspectForClient(authority: TokenClientAuthority, token
     permissions: payload.permissions,
     ...(payload.sessionId !== undefined ? { session_id: payload.sessionId } : {}),
     actor_type: payload.actorType,
+    // RFC 8693 §4.1: who acts for the subject of a delegated token.
+    ...(payload['act'] !== undefined ? { act: payload['act'] } : {}),
   }
 }
 

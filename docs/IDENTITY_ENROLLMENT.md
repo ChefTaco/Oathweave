@@ -50,9 +50,14 @@ managed through HiveMem's own API before enrollment.
 
 The server issues a dedicated `oathweave-enrollment` delegation token for each
 receiving product. This identity is server-owned, is not a registered public
-client, and cannot mutate Oathweave APIs. Tokens carry the operator's subject and
-live session, an exact resource audience, a 60-second lifetime and only the
-operation's needed permissions. Current database grants are checked at issuance;
+client, and cannot mutate Oathweave APIs. The token-exchange engine (RFC 8693)
+mints these tokens with a built-in policy for this actor, so they are audited
+like every exchange (`oauth.token_exchange_delegated`, subject token type
+`enrollment_session`) and name the actor in `act.sub`. Tokens carry the operator's subject and
+live session, `clientId` `oathweave-enrollment`, `delegationVersion` 1, an exact
+resource audience, a 60-second lifetime and exactly the operation's needed
+permissions (a missing one refuses the whole delegation). An operator signed in
+with a delegated token (one that has `act`) cannot enroll. Current database grants are checked at issuance;
 a Memory product-admin grant can be downscoped into explicit agent permissions.
 The issued delegation never carries `admin:all`. Every receiver independently
 verifies issuer, signature, audience, lifetime, session revocation, its explicit

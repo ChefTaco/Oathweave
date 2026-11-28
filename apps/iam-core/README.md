@@ -276,13 +276,53 @@ request with `GET /api/v1/oauth/device?user_code=` and approves or denies it wit
 The OpenAPI document is served at `/api/docs/openapi.json`, with Swagger UI at
 `/api/docs`.
 
-Token exchange (RFC 8693) lets a suite service that received a person's access token trade it
-at `POST /api/v1/oauth/token` (`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`,
-`subject_token`, `subject_token_type=urn:ietf:params:oauth:token-type:access_token`, `audience`)
-for a short-lived token addressed to one downstream service, narrowed to the permissions
-`IAM_TOKEN_EXCHANGE_POLICIES` lists for that audience which the person still holds. The token
-names the service in `act.sub`, shares the person's session (signing out revokes it), never
-outlives the subject token, has no refresh token and cannot be exchanged again.
+Token exchange (RFC 8693) lets a suite service that holds a person's token trade it at
+`POST /api/v1/oauth/token` (`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`,
+`subject_token`, `subject_token_type`, `audience`, optional `scope`) for a short-lived token
+addressed to one downstream service, narrowed to the permissions `IAM_TOKEN_EXCHANGE_POLICIES`
+lists for that audience which the person still holds. Only confidential clients with the
+token-exchange grant and a policy may exchange. The token:
+
+- names the person (`sub`), the client it was issued to (`clientId`) and who acts for the person
+  (`act.sub`, RFC 8693 §4.1); it shares the person's session, so signing out revokes it;
+- never carries a permission the policy does not list for that audience or the person no longer
+  holds, never outlives the policy's `lifetimeSeconds` (at most 900) nor the subject or actor
+  token, has no refresh token and cannot be exchanged again (a token with `act` is refused as
+  subject or actor);
+- carries no `auth_time`, so a downstream step-up check never treats it as a recent sign-in.
+
+Subject token types:
+
+| `subject_token_type` | Accepted when |
+| --- | --- |
+| `urn:ietf:params:oauth:token-type:access_token` | A person's session token issued to the client, or addressed to one of the policy's `subjectAudiences` (default) |
+| `urn:ietf:params:oauth:token-type:refresh_token` | The policy lists it in `subjectTokenTypes`, and the refresh token is live, issued to this client, with an active session. It is not rotated; a rotated one is refused |
+| `urn:ietf:params:oauth:token-type:id_token` | Never: an ID token proves a sign-in to its client, travels in browser URLs (`id_token_hint`) and logs, and carries none of the person's authority |
+| `jwt`, `saml1`, `saml2` and anything else | Never: Oathweave exchanges only the tokens it issued, named by their type |
+
+Delegation with an actor (RFC 8693 §4.1): send `actor_token` (a machine client's
+client_credentials token, addressed to the caller like a subject token) with
+`actor_token_type=urn:ietf:params:oauth:token-type:access_token`. When the policy lists that
+client in the audience's `actors`, the new token says `act: {"sub": "<actor>", "act": {"sub":
+"<caller>"}}`: the actor acts now, relayed by the caller. The caller's own token as actor gives
+`act: {"sub": "<caller>"}`, as without one. People are never actors, an inactive client's token is
+refused, and the token never outlives the actor token. Introspection returns `act`.
+
+```json
+{"gateway": {"subjectAudiences": ["gateway"], "subjectTokenTypes": ["access_token", "refresh_token"],
+  "audiences": {"memory": {"permissions": ["memory:read"], "lifetimeSeconds": 120, "actors": ["agent-runner"]}}}}
+```
+
+A refused subject or actor token answers `400 invalid_request` (RFC 8693 §2.2.2) with a description
+that names the token; an unknown audience is `invalid_target` and no delegable permission
+`invalid_scope`.
+
+Every exchange is audited: `oauth.token_exchange_delegated` (the audience, permissions, session,
+subject token type and `act`) or, for an authenticated client, `oauth.token_exchange_refused`
+(the error and reason, never a token). Identity enrollment mints its product delegations with the
+same engine and a built-in policy for the server-owned `oathweave-enrollment` actor (see
+[`docs/IDENTITY_ENROLLMENT.md`](../../docs/IDENTITY_ENROLLMENT.md)); no configured policy may use
+that name.
 
 Services that trust Oathweave tokens verify them locally with the Oathweave verifier in
 [`@hivemagnus/hive-common`](https://github.com/ChefTaco/HiveCommon).

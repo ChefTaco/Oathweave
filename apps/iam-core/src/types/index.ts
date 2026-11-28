@@ -1,3 +1,4 @@
+import type { ActorClaim } from '../services/actor-claim.js'
 export type ActorType = 'USER' | 'SERVICE_ACCOUNT' | 'SYSTEM' | 'AGENT'
 
 export interface Principal {
@@ -11,6 +12,8 @@ export interface Principal {
   readonly clientId: string | undefined
   /** OAuth scope of the access token, when it was issued for one (authorization code, refresh). */
   readonly scope?: string | undefined
+  /** The `act` claim of a delegated (token-exchange) token: who acts for the subject. */
+  readonly act?: ActorClaim | undefined
 }
 
 export interface HealthCheck {

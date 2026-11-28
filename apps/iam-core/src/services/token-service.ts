@@ -13,6 +13,7 @@ import {
 } from '../utils/keys.js'
 import { createSession, revokeSession } from '../services/session-service.js'
 import { logAuditEvent } from './audit-service.js'
+import { isActorClaim } from './actor-claim.js'
 import { userTokenGrants } from './effective-grants.js'
 import { REFRESH_RETRY_GRACE_SECONDS, RefreshGraceStore } from './refresh-grace.js'
 import { ApiError } from '../types/index.js'
@@ -284,6 +285,8 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
     if (payload.iss !== issuerForClient(access.clientId, env.JWT_ISSUER)) throw new Error('Access-token issuer does not match its client')
     if (access.clientId && browserClientPolicies[access.clientId] && payload.aud !== browserClientPolicies[access.clientId]!.audience) throw new Error('Invalid resource audience')
     if (access.clientId === 'oathweave-enrollment' && (payload.delegationVersion !== 1 || typeof payload.aud !== 'string' || !['emberpath','hivemem'].includes(payload.aud) || access.actorType !== 'USER' || !access.sessionId || !access.jti || typeof payload.iat !== 'number' || typeof payload.exp !== 'number' || payload.exp <= payload.iat || payload.exp - payload.iat > 60)) throw new Error('Invalid enrollment delegation')
+    // A delegated token's actor chain must be one Oathweave issues (token-exchange.ts).
+    if (payload['act'] !== undefined && !isActorClaim(payload['act'])) throw new Error('Invalid actor claim')
     if (!access.sub || !access.actorType || !Array.isArray(access.roles) || !Array.isArray(access.permissions)) {
       throw new Error('Required access-token claims are missing')
     }

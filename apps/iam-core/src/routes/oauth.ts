@@ -521,6 +521,7 @@ oauthRouter.post('/token', clientEndpointRateLimit('rl:token'), async (c) => {
           scope: params.scope,
           requestedTokenType: params.requested_token_type,
           actorToken: params.actor_token,
+          actorTokenType: params.actor_token_type,
         },
         ip,
       )
