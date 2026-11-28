@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- CI runs on Node 26.13.1, the runtime the image ships, as well as Node 24.22.3.
+- CI fails when a document names a version that is no longer current (`npm run check:doc-versions`,
+  tests in `npm test`): Oathweave image tags, links into a Hive suite release, and
+  "Hive X.Y.Z pins …" claims, which name no version because the signed suite release manifest is
+  their only source. `CHANGELOG.md` and the retired 1.x launcher's documents are exempt.
+
 ## [2.8.0] - 2026-11-28
 
 **Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.8.0`. No database
