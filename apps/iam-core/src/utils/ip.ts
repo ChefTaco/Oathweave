@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { normalizeIpAddress, resolveClientAddress, type TrustedProxies } from '@hivemagnus/hive-common/rate-limit'
-import { checkIpAllowlist } from './ip-allowlist.js'
+import { normalizeIpAddress, resolveClientAddress, trustedProxies, type TrustedProxies } from '@hivemagnus/hive-common/rate-limit'
 
 function remoteAddress(c: Context): string | undefined {
   try {
@@ -11,18 +10,59 @@ function remoteAddress(c: Context): string | undefined {
   }
 }
 
+/** A `TRUSTED_PROXY_IPS` entry left out of the trusted set, and why. */
+export interface IgnoredTrustedProxy {
+  readonly entry: string
+  readonly reason: string
+}
+
 /**
- * The `TRUSTED_PROXY_IPS` entries as a HiveCommon trusted-proxy set. The entries keep Oathweave's
- * format (exact addresses, CIDR ranges and IPv4 wildcards such as `10.*.*.*`), so they are matched
- * with `checkIpAllowlist` rather than parsed by HiveCommon `trustedProxies()`, which has no
- * wildcards. An empty list trusts no proxy.
+ * The `TRUSTED_PROXY_IPS` entries as a HiveCommon `trustedProxies()` set: exact addresses, CIDR
+ * ranges, IPv4 wildcards such as `10.*.*.*` and the presets `loopback`, `private` and `linklocal`.
+ * An empty list trusts no proxy.
+ *
+ * Entries are checked one at a time and an unusable one is left out (reported in `ignored`, which
+ * the server logs) instead of stopping the server, as Oathweave has always run with them:
+ * - an entry HiveCommon refuses: `10.*`, `010.*.*.*`, a wildcard with a prefix length,
+ *   `10.0.0.0/33`, a host name. Oathweave matched none of these against any address. A CIDR
+ *   prefix written loosely (`10.0.0.0/8x`) used to be read as its leading digits and is now left
+ *   out too;
+ * - a range written as an IPv4-mapped IPv6 network (`::ffff:10.0.0.0/8`), which HiveCommon refuses
+ *   as ambiguous: write the IPv4 range instead.
+ * IPv6 ranges, `::/0` included, are kept: they are matched against IPv6 peers only, as before.
  */
-export function oathweaveTrustedProxies(entries: readonly string[]): TrustedProxies {
-  const patterns = entries.map((entry) => normalizeIpAddress(entry) ?? entry)
-  return {
-    has: (address) => patterns.length > 0 && checkIpAllowlist(patterns, address),
-    entries: patterns,
+export function parseTrustedProxyIps(entries: readonly string[]): { trusted: TrustedProxies; ignored: IgnoredTrustedProxy[] } {
+  const kept: string[] = []
+  const ignored: IgnoredTrustedProxy[] = []
+  for (const entry of entries) {
+    try {
+      trustedProxies([entry])
+    } catch (error) {
+      const mapped = error instanceof Error && /IPv4 form/.test(error.message)
+      ignored.push({ entry, reason: mapped ? 'an IPv4-mapped range; write it in IPv4 form (for example 10.0.0.0/8)' : 'not an address, CIDR range, IPv4 wildcard (four parts) or preset; it never matched' })
+      continue
+    }
+    kept.push(entry)
   }
+  return { trusted: trustedProxies(kept), ignored }
+}
+
+let parsed: { key: string; trusted: TrustedProxies } | undefined
+
+/** The trusted set for these entries, parsed once per distinct list; ignored entries are logged then. */
+function trustedFor(entries: readonly string[]): TrustedProxies {
+  const key = entries.join(',')
+  if (parsed?.key !== key) {
+    const { trusted, ignored } = parseTrustedProxyIps(entries)
+    for (const { entry, reason } of ignored) console.warn(`TRUSTED_PROXY_IPS: ignoring ${JSON.stringify(entry)}: ${reason}`)
+    parsed = { key, trusted }
+  }
+  return parsed.trusted
+}
+
+/** Parse `TRUSTED_PROXY_IPS` now, so an ignored entry is logged at startup rather than on the first request. */
+export function checkTrustedProxyConfig(): void {
+  trustedFor(trustedProxyList())
 }
 
 /**
@@ -46,7 +86,7 @@ export function resolveClientIp(
   remote: string | undefined,
   trustedProxies: readonly string[],
 ): string {
-  const trusted = oathweaveTrustedProxies(trustedProxies)
+  const trusted = trustedFor(trustedProxies)
   // Oathweave has always skipped empty entries (`a, , b`); HiveCommon would stop at them.
   const forwardedFor = (headers.forwarded ?? '').split(',').map((entry) => entry.trim()).filter(Boolean).join(',')
   const client = resolveClientAddress({ peer: remote, forwardedFor, trusted })
@@ -56,7 +96,7 @@ export function resolveClientIp(
   return client.address
 }
 
-/** The configured trusted proxies: exact addresses, CIDR ranges or IPv4 wildcards, comma-separated. */
+/** The configured trusted proxies: exact addresses, CIDR ranges, IPv4 wildcards or presets, comma-separated. */
 export function trustedProxyList(raw: string | undefined = process.env['TRUSTED_PROXY_IPS']): string[] {
   return (raw ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)
 }

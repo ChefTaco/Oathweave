@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { getClientIp, oathweaveTrustedProxies, resolveClientIp, trustedProxyList } from './ip.js'
+import { describe, it, expect, vi } from 'vitest'
+import { getClientIp, parseTrustedProxyIps, resolveClientIp, trustedProxyList } from './ip.js'
 
 function mockContext(headers: Record<string, string | undefined> = {}) {
   return {
@@ -86,7 +86,7 @@ describe('getClientIp', () => {
   })
 
   it('trusts no proxy when the list is empty', () => {
-    expect(oathweaveTrustedProxies([]).has('127.0.0.1')).toBe(false)
+    expect(parseTrustedProxyIps([]).trusted.has('127.0.0.1')).toBe(false)
     expect(resolveClientIp({ forwarded: '198.51.100.7', realIp: '198.51.100.8' }, '127.0.0.1', [])).toBe('127.0.0.1')
   })
 
@@ -113,3 +113,70 @@ describe('getClientIp', () => {
   })
 })
 
+describe('TRUSTED_PROXY_IPS entries', () => {
+  const matches = (entry: string, address: string) => parseTrustedProxyIps([entry]).trusted.has(address)
+
+  it('matches every form Oathweave has accepted as before', () => {
+    expect(matches('127.0.0.1', '127.0.0.1')).toBe(true)
+    expect(matches('::ffff:127.0.0.1', '127.0.0.1')).toBe(true)
+    expect(matches('10.0.0.0/8', '10.200.0.1')).toBe(true)
+    expect(matches('10.1.2.3/8', '10.200.0.1')).toBe(true)
+    expect(matches('10.0.0.0/08', '10.200.0.1')).toBe(true)
+    expect(matches('10.*.*.*', '10.200.0.1')).toBe(true)
+    expect(matches('10.*.0.1', '10.200.0.1')).toBe(true)
+    expect(matches('10.*.0.1', '10.200.0.2')).toBe(false)
+    expect(matches('*.*.*.*', '203.0.113.9')).toBe(true)
+    expect(matches('*.*.*.*', '2001:db8::1')).toBe(false)
+    expect(matches('FD00::/8', 'fd12::1')).toBe(true)
+    expect(matches('fe80::1%eth0', 'fe80::1')).toBe(true)
+    expect(matches('[::1]', '::1')).toBe(true)
+    expect(matches('0.0.0.0/0', '203.0.113.9')).toBe(true)
+    expect(matches('0.0.0.0/0', '2001:db8::1')).toBe(false)
+  })
+
+  // HiveCommon refuses these at parse time; Oathweave never matched them, so they are ignored with
+  // a warning and the server keeps starting with the rest of the list.
+  it('ignores entries that never matched instead of refusing the list', () => {
+    const never = ['10.*', '10.*.*', '010.*.*.*', '10.*.*.*/8', '*', '10.*.*.300', '1*.*.*.*', '10.0.0.0/33', '10.0.0.0/', 'localhost', 'proxy.internal']
+    const { trusted, ignored } = parseTrustedProxyIps([...never, '127.0.0.1'])
+    expect(ignored.map((item) => item.entry)).toEqual(never)
+    expect(trusted.entries).toEqual(['127.0.0.1/32'])
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '127.0.0.1', [...never, '127.0.0.1'])).toBe('198.51.100.7')
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '10.1.2.3', never)).toBe('10.1.2.3')
+  })
+
+  it('does not let an IPv6 range trust IPv4 peers', () => {
+    for (const entry of ['::/0', '::/64', '::/80', '::/96']) {
+      const { trusted, ignored } = parseTrustedProxyIps([entry])
+      expect(ignored).toEqual([])
+      expect(trusted.has('10.1.2.3')).toBe(false)
+      expect(trusted.has('::ffff:10.1.2.3')).toBe(false)
+      expect(trusted.has('2001:db8::1')).toBe(entry === '::/0')
+    }
+    const mapped = parseTrustedProxyIps(['::ffff:10.0.0.0/8'])
+    expect(mapped.ignored.map((item) => item.entry)).toEqual(['::ffff:10.0.0.0/8'])
+    expect(mapped.ignored[0]?.reason).toMatch(/IPv4 form/)
+    expect(mapped.trusted.has('10.1.2.3')).toBe(false)
+    expect(matches('2001:db8::/32', '2001:db8::7')).toBe(true)
+    expect(matches('2001:db8::/32', '10.1.2.3')).toBe(false)
+  })
+
+  it('accepts the HiveCommon presets', () => {
+    expect(matches('loopback', '127.0.0.1')).toBe(true)
+    expect(matches('private', '192.168.1.1')).toBe(true)
+    expect(matches('linklocal', 'fe80::1')).toBe(true)
+  })
+
+  it('logs each ignored entry once per configured list', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const list = ['127.0.0.2', '10.*']
+      resolveClientIp({}, '127.0.0.2', list)
+      resolveClientIp({}, '127.0.0.2', list)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]?.[0]).toContain('TRUSTED_PROXY_IPS: ignoring "10.*"')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+})

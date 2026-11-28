@@ -33,6 +33,17 @@ describe('environment validation', () => {
       expect(line.split('\n')).toHaveLength(1)
     }
   })
+
+  it('needs whole-number rate limits above zero, which the Redis sliding window requires', () => {
+    for (const value of ['0', '-5', '2.5']) {
+      for (const name of ['RATE_LIMIT_WINDOW_MS', 'RATE_LIMIT_MAX_ATTEMPTS']) {
+        const result = validateEnv({ ...valid, [name]: value })
+        expect(result.ok).toBe(false)
+        if (!result.ok) expect(result.errors.join('\n')).toContain(name)
+      }
+    }
+    expect(validateEnv({ ...valid, RATE_LIMIT_WINDOW_MS: '60000', RATE_LIMIT_MAX_ATTEMPTS: '10' }).ok).toBe(true)
+  })
 })
 
 it('requires explicit HTTPS same-origin metadata configuration without reflecting invalid values',()=>{

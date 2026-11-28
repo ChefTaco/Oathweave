@@ -23,9 +23,10 @@ vi.mock('../queue/audit-queue.js', () => ({
       const chain = {
         zremrangebyscore: () => chain,
         zadd: () => chain,
+        zremrangebyrank: () => chain,
         zcard: () => chain,
         pexpire: () => chain,
-        exec: async () => [null, null, [null, 1], null],
+        exec: async () => [[null, 0], [null, 1], [null, 0], [null, 1], [null, 1]],
       }
       return chain
     },

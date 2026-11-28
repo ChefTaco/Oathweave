@@ -1,57 +1,18 @@
 import type { MiddlewareHandler } from 'hono'
-import type { RateLimitResult, RateLimitStore } from '@hivemagnus/hive-common/rate-limit'
+import { createRedisSlidingWindowStore, type SlidingWindowRedis } from '@hivemagnus/hive-common/rate-limit'
 import { redisConnection } from '../queue/audit-queue.js'
 import { env } from '../config/env.js'
 import { authAttemptCeiling } from '../config/auth-limits.js'
 import { getClientIp } from '../utils/ip.js'
 
-/** The Redis commands the sliding window needs (ioredis pipeline). */
-interface SlidingWindowRedis {
-  pipeline(): {
-    zremrangebyscore(key: string, min: string, max: number): unknown
-    zadd(key: string, score: number, member: string): unknown
-    zcard(key: string): unknown
-    pexpire(key: string, ms: number): unknown
-    exec(): Promise<Array<[Error | null, unknown]> | null>
-  }
-}
-
 /**
- * A HiveCommon `RateLimitStore` over Oathweave's Redis sliding window: every request, refused ones
- * included, is recorded in a sorted set per key, and a request is refused while more than `max`
- * fall inside the last `windowMs`. Refused attempts count, so a client that keeps retrying stays
- * refused; the window lives in Redis, so it survives restarts and `scripts/reset-iam-locks.sh`
- * clears it (`<REDIS_PREFIX>:rl:*`). HiveCommon's in-memory token bucket has neither property.
- */
-export function redisSlidingWindowStore(
-  opts: { windowMs: number; max: number; now?: () => number },
-  redis: SlidingWindowRedis = redisConnection as unknown as SlidingWindowRedis,
-): RateLimitStore {
-  return {
-    async consume(key): Promise<RateLimitResult> {
-      const now = opts.now ? opts.now() : Date.now()
-      const pipe = redis.pipeline()
-      pipe.zremrangebyscore(key, '-inf', now - opts.windowMs)
-      pipe.zadd(key, now, `${now}-${Math.random()}`)
-      pipe.zcard(key)
-      pipe.pexpire(key, opts.windowMs)
-      const results = await pipe.exec()
-      const count = (results?.[2]?.[1] as number) ?? 0
-      const allowed = count <= opts.max
-      return {
-        allowed,
-        limit: opts.max,
-        remaining: Math.max(0, opts.max - count),
-        // The newest attempt leaves the window last, so a refusal lasts a whole window.
-        retryAfterMs: allowed ? 0 : opts.windowMs,
-        resetMs: opts.windowMs,
-      }
-    },
-  }
-}
-
-/**
- * Sliding-window rate limiter backed by Redis.
+ * Sliding-window rate limiter backed by Redis: HiveCommon `createRedisSlidingWindowStore()`, one
+ * sorted set per key. Every request, refused ones included, is recorded, so a client that keeps
+ * retrying stays refused; a refusal's `Retry-After` is the whole window (the newest attempt leaves
+ * it last). The window lives in Redis, so it survives restarts and `scripts/reset-iam-locks.sh`
+ * clears it (`<REDIS_PREFIX>:rl:*`); each set keeps at most `max + 1` entries. A Redis command
+ * error is thrown (a 500 from the error handler), never read as allowed.
+ *
  * Keyed by client address (`getClientIp`: HiveCommon `resolveClientAddress()` over
  * `TRUSTED_PROXY_IPS`).
  *
@@ -73,7 +34,12 @@ export function rateLimitMiddleware(
   const configuredMax = opts.max ?? env.RATE_LIMIT_MAX_ATTEMPTS
   const max = opts.authAttempt ? authAttemptCeiling(configuredMax) : configuredMax
   const prefix = opts.keyPrefix ?? 'rl'
-  const store = redisSlidingWindowStore({ windowMs, max })
+  const store = createRedisSlidingWindowStore({
+    redis: () => redisConnection as unknown as SlidingWindowRedis,
+    windowMs,
+    max,
+    retryAfter: 'window',
+  })
 
   return async (c, next) => {
     const result = await store.consume(`${env.REDIS_PREFIX}:${prefix}:${getClientIp(c)}`)
