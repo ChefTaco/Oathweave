@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getClientIp, resolveClientIp, trustedProxyList } from './ip.js'
+import { getClientIp, oathweaveTrustedProxies, resolveClientIp, trustedProxyList } from './ip.js'
 
 function mockContext(headers: Record<string, string | undefined> = {}) {
   return {
@@ -79,4 +79,37 @@ describe('getClientIp', () => {
     expect(trustedProxyList(' 127.0.0.1, ::1 ,10.200.0.0/24,')).toEqual(['127.0.0.1', '::1', '10.200.0.0/24'])
     expect(trustedProxyList('')).toEqual([])
   })
+
+  it('keeps IPv4 wildcard entries in TRUSTED_PROXY_IPS working', () => {
+    expect(resolveClientIp({ forwarded: '198.51.100.7, 10.4.5.6' }, '10.1.2.3', ['10.*.*.*'])).toBe('198.51.100.7')
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '11.1.2.3', ['10.*.*.*'])).toBe('11.1.2.3')
+  })
+
+  it('trusts no proxy when the list is empty', () => {
+    expect(oathweaveTrustedProxies([]).has('127.0.0.1')).toBe(false)
+    expect(resolveClientIp({ forwarded: '198.51.100.7', realIp: '198.51.100.8' }, '127.0.0.1', [])).toBe('127.0.0.1')
+  })
+
+  it('treats an IPv4-mapped peer as its IPv4 address', () => {
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '::ffff:127.0.0.1', proxy)).toBe('198.51.100.7')
+    expect(resolveClientIp({}, '::ffff:203.0.113.10', proxy)).toBe('203.0.113.10')
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '127.0.0.1', ['::ffff:127.0.0.1'])).toBe('198.51.100.7')
+  })
+
+  it('matches IPv6 proxy entries however they are written', () => {
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '2001:db8::1', ['2001:DB8:0:0::1'])).toBe('198.51.100.7')
+    expect(resolveClientIp({ forwarded: '198.51.100.7' }, '2001:db8::1', ['2001:db8::/32'])).toBe('198.51.100.7')
+    expect(resolveClientIp({ forwarded: '2001:DB8::7' }, '127.0.0.1', proxy)).toBe('2001:db8::7')
+  })
+
+  it('skips empty forwarded entries and reads x-real-ip when only blanks were sent', () => {
+    expect(resolveClientIp({ forwarded: '198.51.100.7, , 10.0.0.2,' }, '127.0.0.1', ['127.0.0.1', '10.0.0.2'])).toBe('198.51.100.7')
+    expect(resolveClientIp({ forwarded: ' , ', realIp: '198.51.100.9' }, '127.0.0.1', proxy)).toBe('198.51.100.9')
+  })
+
+  it('reads at most 32 hops of a forwarded chain', () => {
+    const chain = Array.from({ length: 40 }, (_, index) => `10.0.0.${index + 1}`).join(', ')
+    expect(resolveClientIp({ forwarded: `198.51.100.7, ${chain}` }, '127.0.0.1', ['127.0.0.1', '10.0.0.0/24'])).toBe('10.0.0.9')
+  })
 })
+

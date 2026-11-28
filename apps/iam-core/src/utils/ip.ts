@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { isIP } from 'node:net'
+import { normalizeIpAddress, resolveClientAddress, type TrustedProxies } from '@hivemagnus/hive-common/rate-limit'
 import { checkIpAllowlist } from './ip-allowlist.js'
 
 function remoteAddress(c: Context): string | undefined {
@@ -11,17 +11,22 @@ function remoteAddress(c: Context): string | undefined {
   }
 }
 
-/** One `X-Forwarded-For` entry as a bare address, or undefined when it is not an IP address. */
-function forwardedAddress(entry: string): string | undefined {
-  let value = entry.trim()
-  const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(value)
-  if (bracketed) value = bracketed[1]!
-  else if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(value)) value = value.slice(0, value.lastIndexOf(':'))
-  return isIP(value) ? value : undefined
+/**
+ * The `TRUSTED_PROXY_IPS` entries as a HiveCommon trusted-proxy set. The entries keep Oathweave's
+ * format (exact addresses, CIDR ranges and IPv4 wildcards such as `10.*.*.*`), so they are matched
+ * with `checkIpAllowlist` rather than parsed by HiveCommon `trustedProxies()`, which has no
+ * wildcards. An empty list trusts no proxy.
+ */
+export function oathweaveTrustedProxies(entries: readonly string[]): TrustedProxies {
+  const patterns = entries.map((entry) => normalizeIpAddress(entry) ?? entry)
+  return {
+    has: (address) => patterns.length > 0 && checkIpAllowlist(patterns, address),
+    entries: patterns,
+  }
 }
 
 /**
- * The client address of a request.
+ * The client address of a request, decided by HiveCommon `resolveClientAddress()`.
  *
  * Forwarding headers count only when the socket peer is a trusted proxy. Each proxy appends the
  * address it received the request from, so the rightmost `X-Forwarded-For` entry is the only one
@@ -32,31 +37,23 @@ function forwardedAddress(entry: string): string | undefined {
  *
  * When every entry is a trusted proxy the request started inside the proxy tier, and the leftmost
  * entry is its origin. An entry that is not an IP address ends the walk at the proxy that reported
- * it. `X-Real-IP` is read only when a trusted proxy sent no `X-Forwarded-For` at all.
+ * it; empty entries are skipped. `X-Real-IP` is read only when a trusted proxy sent no
+ * `X-Forwarded-For` at all. Addresses are normalised (an IPv4-mapped IPv6 peer is its IPv4
+ * address, IPv6 is lowercase and compressed).
  */
 export function resolveClientIp(
   headers: { forwarded?: string | undefined; realIp?: string | undefined },
   remote: string | undefined,
   trustedProxies: readonly string[],
 ): string {
-  if (!remote) return 'unknown'
-  if (trustedProxies.length === 0) return remote
-  const trusted = (address: string) => checkIpAllowlist([...trustedProxies], address)
-  if (!trusted(remote)) return remote
-
-  const entries = (headers.forwarded ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)
-  if (entries.length === 0) {
-    const realIp = headers.realIp === undefined ? undefined : forwardedAddress(headers.realIp)
-    return realIp ?? remote
+  const trusted = oathweaveTrustedProxies(trustedProxies)
+  // Oathweave has always skipped empty entries (`a, , b`); HiveCommon would stop at them.
+  const forwardedFor = (headers.forwarded ?? '').split(',').map((entry) => entry.trim()).filter(Boolean).join(',')
+  const client = resolveClientAddress({ peer: remote, forwardedFor, trusted })
+  if (client.decision === 'proxy_without_forwarding' && headers.realIp !== undefined) {
+    return normalizeIpAddress(headers.realIp) ?? client.address
   }
-  let nearest = remote
-  for (let index = entries.length - 1; index >= 0; index--) {
-    const address = forwardedAddress(entries[index]!)
-    if (!address) return nearest
-    if (!trusted(address)) return address
-    nearest = address
-  }
-  return nearest
+  return client.address
 }
 
 /** The configured trusted proxies: exact addresses, CIDR ranges or IPv4 wildcards, comma-separated. */

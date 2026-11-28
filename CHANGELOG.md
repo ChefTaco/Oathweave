@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Client addresses use HiveCommon.** `@hivemagnus/hive-common` is now `^0.10.0`, and the
+  trusted-proxy walk behind every rate limit, IP allowlist, session risk check and audit record
+  is HiveCommon `resolveClientAddress()` (`/rate-limit`). `TRUSTED_PROXY_IPS` keeps its name and
+  format (exact addresses, CIDR ranges, IPv4 wildcards), empty `X-Forwarded-For` entries are still
+  skipped and `X-Real-IP` is still read only when a trusted proxy sent no `X-Forwarded-For`.
+  Two differences: addresses are normalised (an IPv4-mapped peer such as `::ffff:192.0.2.1` is
+  recorded as `192.0.2.1`, IPv6 is lowercase and compressed), and at most 32 entries of a
+  forwarded chain are read, so a chain of more than 32 trusted hops ends at the 32nd. Only a
+  server listening on an IPv6 socket (`HOST=::`) sees IPv4-mapped peers; there, each user's first
+  sign-in after the upgrade may count once as a new address for session risk. The container image
+  and the suite listen on `0.0.0.0` and are not affected.
+- The Redis rate limiter is a HiveCommon `RateLimitStore` (`redisSlidingWindowStore`) with the
+  same sliding window, limits, Redis keys (`<REDIS_PREFIX>:rl:*`), 429 body
+  (`{"error":"RATE_LIMITED",...}`) and `Retry-After`. Refused attempts still count.
+
 ## [2.7.0] - 2026-11-26
 
 **Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.7.0`. No database

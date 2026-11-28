@@ -173,6 +173,9 @@ its left were sent by that client and are never used, so a caller cannot choose 
 sending the header. List **every** proxy tier the request passes through (for example a load
 balancer in front of the reverse proxy): a tier that is not listed is taken to be the client.
 `X-Real-IP` is read only when a trusted proxy sends no `X-Forwarded-For`.
+The walk is HiveCommon's `resolveClientAddress()` (`@hivemagnus/hive-common/rate-limit`): it
+reads at most 32 entries from the right, and addresses are normalised, so an IPv4-mapped peer
+(`::ffff:192.0.2.1`) counts as `192.0.2.1` and IPv6 is lowercase and compressed.
 
 ## TLS
 
