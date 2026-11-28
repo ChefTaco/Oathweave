@@ -2,8 +2,44 @@
 
 ## [Unreleased]
 
+**Upgrade notes.** No database migration. `IAM_TOKEN_EXCHANGE_POLICIES` keeps its meaning: an
+existing policy accepts access-token subjects only and names no actors, as before. A policy keyed
+`oathweave-enrollment` is now refused at startup (that name is reserved for identity enrollment;
+such a policy could never mint a token its own verifier accepted).
+
+### Added
+
+- **Token exchange: actor tokens (RFC 8693 §4.1).** A client may send `actor_token` (a machine
+  client's client_credentials token, addressed to the caller) with `actor_token_type`
+  `urn:ietf:params:oauth:token-type:access_token`. When the audience's policy lists that client in
+  the new `actors` setting, the token names it as the current actor and the caller as the prior
+  one: `act: {"sub": "<actor>", "act": {"sub": "<caller>"}}`. People, delegated tokens, inactive
+  clients and unlisted actors are refused; the token never outlives the actor token.
+- **Token exchange: refresh-token subjects.** A policy that lists `refresh_token` in the new
+  `subjectTokenTypes` (default `["access_token"]`) may exchange a live refresh token issued to the
+  client itself. The refresh token is not rotated; a rotated or revoked one, another client's, and
+  one whose session ended are refused.
+- **Token exchange: refused types say why.** `id_token` subject tokens are refused: an ID token
+  proves a sign-in to its client, travels in browser URLs and logs, and carries none of the
+  person's authority. `jwt`, `saml1` and `saml2` are refused as well, each with its reason.
+- **Every exchange is audited.** Refusals for an authenticated client are now recorded as
+  `oauth.token_exchange_refused` (error, reason, audience and subject token type, never a
+  token); `oauth.token_exchange_delegated` now also records the subject token type, `act` and
+  lifetime.
+- Introspection returns `act` for delegated tokens.
+
 ### Changed
 
+- **Identity enrollment delegations use the token-exchange engine.** The `oathweave-enrollment`
+  tokens are minted by the same code as RFC 8693 exchanges, with a built-in policy that keeps
+  their behaviour: `clientId` `oathweave-enrollment`, `delegationVersion` 1, exact audience,
+  60 seconds, exactly the requested permissions (a `*` grant does not count; `hivemem:admin:all`
+  covers explicit HiveMem permissions), `auth_time`, no `scope`, `email` or `username`. They now
+  also carry `act: {"sub": "oathweave-enrollment"}` and are audited as
+  `oauth.token_exchange_delegated`. An operator whose token is itself delegated (has `act`) can
+  no longer enroll: delegated tokens never delegate again.
+- Access tokens whose `act` claim is not one Oathweave issues (an object with a non-empty `sub`,
+  optional `client_id`, at most one nested `act`) are refused.
 - CI runs on Node 26.13.1, the runtime the image ships, as well as Node 24.22.3.
 - CI fails when a document names a version that is no longer current (`npm run check:doc-versions`,
   tests in `npm test`): Oathweave image tags, links into a Hive suite release, and

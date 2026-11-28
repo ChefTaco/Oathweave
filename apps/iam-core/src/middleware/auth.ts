@@ -2,6 +2,7 @@ import { browserClientPolicies } from '../services/browser-policies.js'
 import type { MiddlewareHandler } from 'hono'
 import { verifyAccessToken, type AccessTokenPayload } from '../services/token-service.js'
 import { ApiError } from '../types/index.js'
+import { isActorClaim } from '../services/actor-claim.js'
 import type { Principal } from '../types/index.js'
 import { isRouterProxyPrincipal, routerOperatorAttributed } from '../services/router-operator.js'
 
@@ -60,6 +61,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
       sessionId: payload.sessionId,
       clientId: payload.clientId,
       ...(typeof payload['scope'] === 'string' ? { scope: payload['scope'] as string } : {}),
+      ...(isActorClaim(payload['act']) ? { act: payload['act'] } : {}),
     })
     const principal = c.get('principal')
     if (
