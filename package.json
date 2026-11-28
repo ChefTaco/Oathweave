@@ -1,6 +1,6 @@
 {
   "name": "oathweave-workspace",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "description": "Oathweave identity API and middleware SDK",
   "type": "module",

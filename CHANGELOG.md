@@ -2,11 +2,28 @@
 
 ## [Unreleased]
 
-**Upgrade notes.** No database migration. Check the startup log for `TRUSTED_PROXY_IPS: ignoring`
-lines: each names an entry that is no longer trusted (see Changed) and should be fixed or removed.
-`RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_ATTEMPTS` must now be whole numbers above zero; any
-other value stops the server at startup with a line naming the variable. The defaults (900000
-and 5) and the suite's settings are unaffected.
+## [2.8.0] - 2026-11-28
+
+**Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.8.0`. No database
+migration: a Hive suite upgrade needs no `--allow-migrations` for this release, and rolling back
+to 2.7.0 is safe (same schema). Before and after upgrading, operators check two settings:
+
+- **`TRUSTED_PROXY_IPS`: entries are now dropped with a warning.** Each entry HiveCommon refuses
+  is left out of the trusted list, and the server still starts. After the upgrade, look in the
+  startup log for lines `TRUSTED_PROXY_IPS: ignoring "<entry>": <reason>`: each names an entry
+  that is no longer trusted. Most are entries that never matched (they now only warn), but a CIDR
+  with trailing characters such as `10.0.0.0/8x` was trusted before and is not now, and an
+  IPv4-mapped range such as `::ffff:10.0.0.0/8` is ignored; write `10.0.0.0/8`. If a needed proxy
+  entry is dropped, requests through it are rate-limited, allowlisted and audited by the proxy's
+  own address. Fix or remove every entry named (see Changed).
+- **`RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_ATTEMPTS` must be whole numbers above zero.**
+  Any other value (a decimal such as `5.5`, `0`, a negative number, or text) stops the server at
+  startup with a line naming the variable. Check both before replacing the image (the 2.8.0
+  image's `check` command reports a bad value). The defaults
+  (900000 and 5) and the suite's settings are unaffected.
+
+Rate limits keep their Redis keys, limits and 429 responses. A Redis command that answers with an
+error now fails the request with `500 INTERNAL_ERROR` instead of letting it through.
 
 ### Changed
 
