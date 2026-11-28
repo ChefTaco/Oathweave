@@ -52,6 +52,19 @@ such a policy could never mint a token its own verifier accepted).
   "Hive X.Y.Z pins …" claims, which name no version because the signed suite release manifest is
   their only source. `CHANGELOG.md` and the retired 1.x launcher's documents are exempt.
 
+### Fixed
+
+- The private-data check (`scripts/check-private-data.sh`) fails closed. A commit-message input
+  large enough to fill a pipe, such as a new branch's whole history at pre-push, passed even when
+  it named a private term: `grep -q` exited early and the resulting SIGPIPE read as "no match". An
+  unreadable denylist, message file or staged file, or an invalid pattern, now stops the check
+  (exit 2) instead of passing.
+- The pre-push hook checks outgoing commits only: a new branch is compared with the
+  remote-tracking branches, so a commit that removes an already-published term can be pushed
+  without bypassing the hooks.
+- `scripts/privacy-fail-closed.test.sh` (run in CI) covers 50 MB messages, 3000-commit pushes and
+  a removal-only push with a test-only term. Repository tooling only; nothing to do when upgrading.
+
 ## [2.8.0] - 2026-11-28
 
 **Upgrade notes.** Replace the image with `ghcr.io/cheftaco/oathweave:2.8.0`. No database
