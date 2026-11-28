@@ -313,6 +313,10 @@ refused, and the token never outlives the actor token. Introspection returns `ac
   "audiences": {"memory": {"permissions": ["memory:read"], "lifetimeSeconds": 120, "actors": ["agent-runner"]}}}}
 ```
 
+A refused subject or actor token answers `400 invalid_request` (RFC 8693 §2.2.2) with a description
+that names the token; an unknown audience is `invalid_target` and no delegable permission
+`invalid_scope`.
+
 Every exchange is audited: `oauth.token_exchange_delegated` (the audience, permissions, session,
 subject token type and `act`) or, for an authenticated client, `oauth.token_exchange_refused`
 (the error and reason, never a token). Identity enrollment mints its product delegations with the

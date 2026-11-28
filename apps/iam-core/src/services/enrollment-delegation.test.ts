@@ -7,6 +7,7 @@ vi.mock('../queue/audit-queue.js', () => ({ auditQueue: { add: async (_name: str
 vi.mock('../config/env.js', () => ({ env: { JWT_ISSUER: 'native-identity', JWT_ACCESS_TTL: 3600 } }))
 vi.mock('../utils/keys.js', () => ({ getPrivateKey: async () => mocks.keys.privateKey, getSigningKeyId: async () => 'fixture-signing', getPublishedSigningJwks: async () => mocks.keys.jwks }))
 const { enrollmentDelegation } = await import('./enrollment-delegation.js')
+const { delegate } = await import('./token-exchange.js')
 const { verifyAccessToken } = await import('./token-service.js')
 const { authMiddleware } = await import('../middleware/auth.js')
 const pair = await generateKeyPair('RS256'); mocks.keys.privateKey = pair.privateKey; mocks.keys.publicKey = pair.publicKey; mocks.keys.jwks = { keys: [{ ...await exportJWK(pair.publicKey), kid: 'fixture-signing' }] }
@@ -61,5 +62,14 @@ it('keeps the enrollment ceiling: a wildcard grant does not count, nothing is na
  await expect(enrollmentDelegation(principal,'hivemem',[])).rejects.toThrow(/operator/)
  await expect(enrollmentDelegation(principal,'hivemem',['hivemem:*'])).rejects.toThrow(/operator/)
  await expect(enrollmentDelegation({...principal,act:{sub:'gateway'}},'hivemem',['hivemem:memories:read'])).rejects.toThrow(/delegated/)
+ expect(mocks.audit).toEqual([])
+})
+it('names the presented token whose expiry ends the delegation',async()=>{
+ const now=Math.floor(Date.now()/1000)
+ const target={audience:'emberpath',lifetimeSeconds:60,offered:[],allows:()=>true,covered:()=>true}
+ const request=(notAfterSource?:'subject_token'|'actor_token')=>delegate({clientId:'gateway',act:{sub:'gateway'},subject:{sub:'fixture-subject',sessionId:'fixture-session',notAfter:now,notAfterSource},target,requested:['router:keys:write'],mode:'narrow',insufficient:()=>new Error('insufficient') as never,identityClaims:true,scopeClaim:true,subjectTokenType:'access_token'})
+ await expect(request('actor_token')).rejects.toMatchObject({code:'INVALID_REQUEST',message:'actor_token has expired'})
+ await expect(request('subject_token')).rejects.toMatchObject({code:'INVALID_REQUEST',message:'subject_token has expired'})
+ await expect(request()).rejects.toMatchObject({message:'subject_token has expired'})
  expect(mocks.audit).toEqual([])
 })

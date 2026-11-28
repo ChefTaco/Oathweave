@@ -74,13 +74,14 @@ export interface TokenExchangeResult {
   scope: string
 }
 
+/**
+ * RFC 8693 §2.2.2: a subject or actor token that is invalid or unacceptable under the policy is
+ * `invalid_request` (not `invalid_grant`), as is any other malformed request.
+ */
 function invalid(message: string): ApiError {
   return new ApiError(400, 'INVALID_REQUEST', message)
 }
 
-function invalidGrant(message: string): ApiError {
-  return new ApiError(400, 'INVALID_GRANT', message)
-}
 
 function audiences(value: unknown): string[] {
   if (typeof value === 'string') return [value]
@@ -99,6 +100,8 @@ export interface DelegationSubject {
   readonly authTime?: number | undefined
   /** Epoch seconds the delegated token must not outlive (the subject or actor token's expiry). */
   readonly notAfter?: number | undefined
+  /** Which presented token `notAfter` comes from, for the refusal when it has passed. */
+  readonly notAfterSource?: 'subject_token' | 'actor_token' | undefined
 }
 
 /** One downstream audience of a policy: what may be delegated to it, and for how long. */
@@ -158,7 +161,7 @@ export async function delegate(request: DelegationRequest): Promise<Delegation> 
 
   const now = Math.floor(Date.now() / 1000)
   const expiresAt = Math.min(now + target.lifetimeSeconds, subject.notAfter ?? Number.POSITIVE_INFINITY)
-  if (expiresAt <= now) throw invalidGrant('subject_token has expired')
+  if (expiresAt <= now) throw invalid(`${subject.notAfterSource ?? 'subject_token'} has expired`)
   const accessToken = await new SignJWT({
     actorType: 'USER',
     ...(request.identityClaims && subject.email !== undefined ? { email: subject.email } : {}),
@@ -232,12 +235,12 @@ async function accessTokenSubject(raw: string, caller: string, policy: TokenExch
   try {
     subject = await verifyAccessToken(raw)
   } catch {
-    throw invalidGrant('subject_token is invalid, expired or revoked')
+    throw invalid('subject_token is invalid, expired or revoked')
   }
-  if (subject.actorType !== 'USER' || !subject.sessionId) throw invalidGrant('subject_token must be a person\'s session token')
+  if (subject.actorType !== 'USER' || !subject.sessionId) throw invalid('subject_token must be a person\'s session token')
   // No chains: an exchanged token cannot be exchanged again.
-  if (subject['act'] !== undefined) throw invalidGrant('subject_token is already a delegated token')
-  if (!addressedTo(subject, caller, policy)) throw invalidGrant('subject_token was not issued to this client')
+  if (subject['act'] !== undefined) throw invalid('subject_token is already a delegated token')
+  if (!addressedTo(subject, caller, policy)) throw invalid('subject_token was not issued to this client')
   return {
     sub: subject.sub,
     sessionId: subject.sessionId,
@@ -257,14 +260,14 @@ async function accessTokenSubject(raw: string, caller: string, policy: TokenExch
 async function refreshTokenSubject(raw: string, caller: string): Promise<DelegationSubject> {
   const now = new Date()
   const stored = await findRefreshToken(raw)
-  if (!stored || stored.revokedAt || stored.expiresAt <= now) throw invalidGrant('subject_token is invalid, expired or revoked')
-  if (stored.clientId !== caller) throw invalidGrant('subject_token was not issued to this client')
-  if (!stored.sessionId) throw invalidGrant('subject_token must be a person\'s session token')
+  if (!stored || stored.revokedAt || stored.expiresAt <= now) throw invalid('subject_token is invalid, expired or revoked')
+  if (stored.clientId !== caller) throw invalid('subject_token was not issued to this client')
+  if (!stored.sessionId) throw invalid('subject_token must be a person\'s session token')
   const session = await prisma.session.findFirst({
     where: { id: stored.sessionId, userId: stored.userId, revokedAt: null, expiresAt: { gt: now }, user: { active: true } },
     select: { expiresAt: true, user: { select: { email: true, username: true } } },
   })
-  if (!session) throw invalidGrant('subject_token is invalid, expired or revoked')
+  if (!session) throw invalid('subject_token is invalid, expired or revoked')
   return {
     sub: stored.userId,
     sessionId: stored.sessionId,
@@ -296,17 +299,17 @@ async function resolveActor(
   try {
     actor = await verifyAccessToken(request.actorToken)
   } catch {
-    throw invalidGrant('actor_token is invalid, expired or revoked')
+    throw invalid('actor_token is invalid, expired or revoked')
   }
-  if (actor['act'] !== undefined) throw invalidGrant('actor_token is already a delegated token')
+  if (actor['act'] !== undefined) throw invalid('actor_token is already a delegated token')
   if (actor.actorType !== 'SERVICE_ACCOUNT' || actor.sessionId !== undefined || !actor.clientId || actor.clientId !== actor.sub)
-    throw invalidGrant('actor_token must be a client_credentials token of a machine client; a person is never the actor')
+    throw invalid('actor_token must be a client_credentials token of a machine client; a person is never the actor')
   const notAfter = typeof actor.exp === 'number' ? actor.exp : undefined
   if (actor.sub === caller) return { act: { sub: caller }, notAfter }
-  if (!entry.actors.includes(actor.sub)) throw invalidGrant('This client may not name that actor for this audience')
-  if (!addressedTo(actor, caller, policy)) throw invalidGrant('actor_token was not issued to this client')
+  if (!entry.actors.includes(actor.sub)) throw invalid('This client may not name that actor for this audience')
+  if (!addressedTo(actor, caller, policy)) throw invalid('actor_token was not issued to this client')
   const client = await prisma.client.findUnique({ where: { id: actor.sub }, select: { active: true } })
-  if (!client?.active) throw invalidGrant('actor_token is invalid, expired or revoked')
+  if (!client?.active) throw invalid('actor_token is invalid, expired or revoked')
   return { act: { sub: actor.sub, act: { sub: caller } }, notAfter }
 }
 
@@ -337,12 +340,18 @@ async function exchange(client: Caller, request: TokenExchangeRequest, ipAddress
     ? await accessTokenSubject(request.subjectToken, client.clientId, policy)
     : await refreshTokenSubject(request.subjectToken, client.clientId)
   const actor = await resolveActor(client.clientId, policy, entry, request)
-  const notAfter = Math.min(subject.notAfter ?? Number.POSITIVE_INFINITY, actor.notAfter ?? Number.POSITIVE_INFINITY)
+  const subjectEnd = subject.notAfter ?? Number.POSITIVE_INFINITY
+  const actorEnd = actor.notAfter ?? Number.POSITIVE_INFINITY
+  const notAfter = Math.min(subjectEnd, actorEnd)
 
   const result = await delegate({
     clientId: client.clientId,
     act: actor.act,
-    subject: { ...subject, notAfter: Number.isFinite(notAfter) ? notAfter : undefined },
+    subject: {
+      ...subject,
+      notAfter: Number.isFinite(notAfter) ? notAfter : undefined,
+      notAfterSource: actorEnd < subjectEnd ? 'actor_token' : 'subject_token',
+    },
     target: configuredTarget(audience, entry),
     requested: request.scope === undefined ? undefined : scopeTokens(request.scope),
     mode: 'narrow',

@@ -30,6 +30,12 @@ such a policy could never mint a token its own verifier accepted).
 
 ### Changed
 
+- **Token exchange refusals of a presented token are `invalid_request`** (RFC 8693 §2.2.2). A
+  `subject_token` that is invalid, expired, revoked, not a person's, already delegated or not
+  issued to the client answered `400 invalid_grant`; it now answers `400 invalid_request`, as
+  every `actor_token` refusal does, and the description names the token (including which one
+  expired). The other errors (`invalid_client`, `unauthorized_client`, `invalid_target`,
+  `invalid_scope`) are unchanged. No suite product calls token exchange today.
 - **Identity enrollment delegations use the token-exchange engine.** The `oathweave-enrollment`
   tokens are minted by the same code as RFC 8693 exchanges, with a built-in policy that keeps
   their behaviour: `clientId` `oathweave-enrollment`, `delegationVersion` 1, exact audience,

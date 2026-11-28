@@ -114,18 +114,18 @@ describe('token exchange', () => {
     expect(await (await exchange(subject, { subject_token_type: 'urn:ietf:params:oauth:token-type:id_token' })).json()).toMatchObject({ error: 'invalid_request' })
     expect(await (await exchange(subject, {}, 'other')).json()).toMatchObject({ error: 'unauthorized_client' })
     expect((await exchange(subject, {}, 'gateway', 'wrong-secret-'.padEnd(43, 'w'))).status).toBe(401)
-    expect(await (await exchange('not-a-token')).json()).toMatchObject({ error: 'invalid_grant' })
+    expect(await (await exchange('not-a-token')).json()).toMatchObject({ error: 'invalid_request' })
   })
 
   it('refuses a token that was not addressed to the client, and chains', async () => {
     // The person's own sign-in token was issued to no client.
-    expect(await (await exchange(person.accessToken)).json()).toMatchObject({ error: 'invalid_grant' })
+    expect(await (await exchange(person.accessToken)).json()).toMatchObject({ error: 'invalid_request' })
     const machine = await harness.request('/api/v1/oauth/token', form({ grant_type: 'client_credentials', client_id: 'gateway', client_secret: SECRET, scope: 'gateway:read' }))
     const machineToken = ((await machine.json()) as { access_token: string }).access_token
     // A client_credentials token is no person's token.
-    expect(await (await exchange(machineToken)).json()).toMatchObject({ error: 'invalid_grant' })
+    expect(await (await exchange(machineToken)).json()).toMatchObject({ error: 'invalid_request' })
     const delegated = ((await (await exchange(await issuedToGateway(person.accessToken))).json()) as { access_token: string }).access_token
-    expect(await (await exchange(delegated)).json()).toMatchObject({ error: 'invalid_grant' })
+    expect(await (await exchange(delegated)).json()).toMatchObject({ error: 'invalid_request' })
   })
 })
 
@@ -157,7 +157,7 @@ describe('token exchange: refresh token subjects', () => {
     const refreshed = await harness.request('/api/v1/oauth/token', form({ grant_type: 'refresh_token', client_id: 'relay', client_secret: SECRET, refresh_token: signedIn.refresh_token! }))
     expect(refreshed.status).toBe(200)
     // ...and once rotated, it no longer exchanges.
-    expect(await errorOf(await relayExchange(signedIn.refresh_token!))).toMatchObject({ error: 'invalid_grant' })
+    expect(await errorOf(await relayExchange(signedIn.refresh_token!))).toMatchObject({ error: 'invalid_request' })
   })
 
   it('refuses refresh tokens of other clients, of no client, of ended sessions, and when the policy does not opt in', async () => {
@@ -165,13 +165,13 @@ describe('token exchange: refresh token subjects', () => {
     // gateway's policy accepts access tokens only.
     expect((await errorOf(await exchange(signedIn.refresh_token!, { subject_token_type: REFRESH }))).error_description).toMatch(/may not exchange a refresh_token/)
     // A refresh token is bound to one client: the native sign-in's has none.
-    expect(await errorOf(await relayExchange(person.refreshToken))).toMatchObject({ error: 'invalid_grant' })
-    expect(await errorOf(await relayExchange('not-a-refresh-token'))).toMatchObject({ error: 'invalid_grant' })
+    expect(await errorOf(await relayExchange(person.refreshToken))).toMatchObject({ error: 'invalid_request' })
+    expect(await errorOf(await relayExchange('not-a-refresh-token'))).toMatchObject({ error: 'invalid_request' })
     // An access token presented as a refresh token is no refresh token.
-    expect(await errorOf(await relayExchange(signedIn.access_token))).toMatchObject({ error: 'invalid_grant' })
+    expect(await errorOf(await relayExchange(signedIn.access_token))).toMatchObject({ error: 'invalid_request' })
     const sessionId = String(decodeJwt(signedIn.access_token)['sessionId'])
     await harness.request(`/api/v1/auth/sessions/${sessionId}`, { method: 'DELETE', headers: { authorization: `Bearer ${person.accessToken}` } })
-    expect(await errorOf(await relayExchange(signedIn.refresh_token!))).toMatchObject({ error: 'invalid_grant' })
+    expect(await errorOf(await relayExchange(signedIn.refresh_token!))).toMatchObject({ error: 'invalid_request' })
     person = await harness.login('kim', 'kim-fixture-password')
   })
 })
@@ -209,11 +209,11 @@ describe('token exchange: actor tokens (RFC 8693 delegation)', () => {
     expect((await errorOf(await exchange(subject, { actor_token: subject, actor_token_type: ACCESS }))).error_description).toMatch(/person is never the actor/)
     const delegated = ((await (await exchange(subject)).json()) as { access_token: string }).access_token
     expect((await errorOf(await exchange(subject, { actor_token: delegated, actor_token_type: ACCESS }))).error_description).toMatch(/already a delegated token/)
-    expect((await errorOf(await exchange(subject, { actor_token: 'not-a-token', actor_token_type: ACCESS }))).error).toBe('invalid_grant')
+    expect((await errorOf(await exchange(subject, { actor_token: 'not-a-token', actor_token_type: ACCESS }))).error).toBe('invalid_request')
     // A listed actor whose client was deactivated after its token was issued.
     const retired = await clientCredentials('retired')
     await harness.prisma.client.update({ where: { id: 'retired' }, data: { active: false } })
-    expect((await errorOf(await exchange(subject, { actor_token: retired, actor_token_type: ACCESS }))).error).toBe('invalid_grant')
+    expect((await errorOf(await exchange(subject, { actor_token: retired, actor_token_type: ACCESS }))).error).toBe('invalid_request')
   })
 })
 
