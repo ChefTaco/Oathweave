@@ -41,9 +41,9 @@ and 5) and the suite's settings are unaffected.
     `10.0.0.0/33`, a host name) are still ignored, now with that warning;
   - a CIDR prefix with trailing characters (`10.0.0.0/8x`, `10.0.0.0/+8`) used to be read as
     its leading digits and trusted; it is now ignored with the warning. Write it as `10.0.0.0/8`;
-  - an IPv6 range that would also cover IPv4 peers (`::/0` to `::/80`, or an IPv4-mapped network
-    such as `::ffff:10.0.0.0/8`) is ignored with the warning. Oathweave matched these against
-    IPv6 addresses only, and HiveCommon would trust every IPv4 peer for them;
+  - a range written as an IPv4-mapped IPv6 network (`::ffff:10.0.0.0/8`) is ignored with the
+    warning; write the IPv4 range (`10.0.0.0/8`). IPv6 ranges, `::/0` included, still match IPv6
+    peers only;
   - the HiveCommon presets `loopback`, `private` (RFC 1918 and IPv6 unique-local) and
     `linklocal` are accepted. A list that contained one of these words used to trust nothing
     for it.

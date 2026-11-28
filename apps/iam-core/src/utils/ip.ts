@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { isIP } from 'node:net'
 import { normalizeIpAddress, resolveClientAddress, trustedProxies, type TrustedProxies } from '@hivemagnus/hive-common/rate-limit'
 
 function remoteAddress(c: Context): string | undefined {
@@ -28,27 +27,20 @@ export interface IgnoredTrustedProxy {
  *   `10.0.0.0/33`, a host name. Oathweave matched none of these against any address. A CIDR
  *   prefix written loosely (`10.0.0.0/8x`) used to be read as its leading digits and is now left
  *   out too;
- * - an IPv6 range HiveCommon would also apply to IPv4 peers: one covering the IPv4-mapped range
- *   (`::/0` to `::/80`), or an IPv4-mapped network such as `::ffff:10.0.0.0/8`. Oathweave matched
- *   these against IPv6 addresses only, so trusting them now would trust IPv4 peers it never did.
+ * - a range written as an IPv4-mapped IPv6 network (`::ffff:10.0.0.0/8`), which HiveCommon refuses
+ *   as ambiguous: write the IPv4 range instead.
+ * IPv6 ranges, `::/0` included, are kept: they are matched against IPv6 peers only, as before.
  */
 export function parseTrustedProxyIps(entries: readonly string[]): { trusted: TrustedProxies; ignored: IgnoredTrustedProxy[] } {
   const kept: string[] = []
   const ignored: IgnoredTrustedProxy[] = []
   for (const entry of entries) {
-    let single: TrustedProxies
     try {
-      single = trustedProxies([entry])
-    } catch {
-      ignored.push({ entry, reason: 'not an address, CIDR range, IPv4 wildcard (four parts) or preset; it never matched' })
+      trustedProxies([entry])
+    } catch (error) {
+      const mapped = error instanceof Error && /IPv4 form/.test(error.message)
+      ignored.push({ entry, reason: mapped ? 'an IPv4-mapped range; write it in IPv4 form (for example 10.0.0.0/8)' : 'not an address, CIDR range, IPv4 wildcard (four parts) or preset; it never matched' })
       continue
-    }
-    if (entry.includes(':') && entry.includes('/')) {
-      const network = single.entries[0]?.split('/')[0] ?? ''
-      if (isIP(network) === 4 || single.has('0.0.0.0')) {
-        ignored.push({ entry, reason: 'an IPv6 range that would also trust IPv4 peers; list IPv4 ranges separately' })
-        continue
-      }
     }
     kept.push(entry)
   }

@@ -146,12 +146,17 @@ describe('TRUSTED_PROXY_IPS entries', () => {
   })
 
   it('does not let an IPv6 range trust IPv4 peers', () => {
-    for (const entry of ['::/0', '::/64', '::/80', '::ffff:10.0.0.0/8']) {
+    for (const entry of ['::/0', '::/64', '::/80', '::/96']) {
       const { trusted, ignored } = parseTrustedProxyIps([entry])
-      expect(ignored.map((item) => item.entry)).toEqual([entry])
+      expect(ignored).toEqual([])
       expect(trusted.has('10.1.2.3')).toBe(false)
+      expect(trusted.has('::ffff:10.1.2.3')).toBe(false)
+      expect(trusted.has('2001:db8::1')).toBe(entry === '::/0')
     }
-    expect(parseTrustedProxyIps(['::/96']).ignored).toEqual([])
+    const mapped = parseTrustedProxyIps(['::ffff:10.0.0.0/8'])
+    expect(mapped.ignored.map((item) => item.entry)).toEqual(['::ffff:10.0.0.0/8'])
+    expect(mapped.ignored[0]?.reason).toMatch(/IPv4 form/)
+    expect(mapped.trusted.has('10.1.2.3')).toBe(false)
     expect(matches('2001:db8::/32', '2001:db8::7')).toBe(true)
     expect(matches('2001:db8::/32', '10.1.2.3')).toBe(false)
   })
